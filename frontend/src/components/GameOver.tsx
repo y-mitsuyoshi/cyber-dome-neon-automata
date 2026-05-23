@@ -1,5 +1,6 @@
 import { Trophy, Star, Zap, RotateCcw, User } from 'lucide-react';
 import type { Standing } from '../types/game';
+import { useTranslation } from '../context/TranslationContext';
 
 interface GameOverProps {
   standings: Standing[];
@@ -11,6 +12,8 @@ function GameOver({ standings, onRestart }: GameOverProps) {
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.fans - a.fans;
   });
+
+  const { t } = useTranslation();
 
   const winner = sorted[0];
   const playerStanding = sorted.find(s => s.isPlayer);
@@ -33,13 +36,13 @@ function GameOver({ standings, onRestart }: GameOverProps) {
       <div className="relative z-10 w-full max-w-2xl px-4 text-center">
         {/* Pre-title */}
         <div className="animate-fade-in mb-4">
-          <span className="text-[10px] uppercase tracking-[0.5em] text-cyber-text-dim">
-            /// Tournament Complete ///
+          <span className="text-[10px] uppercase tracking-[0.5em] text-cyber-text-dim font-mono">
+            {t('tournamentCompleteLabel')}
           </span>
         </div>
 
         {/* Winner announcement */}
-        <div className="mb-8 animate-slide-in">
+        <div className="mb-8 animate-slide-in font-mono">
           {isPlayerWinner ? (
             <>
               <div className="mb-4">
@@ -47,12 +50,11 @@ function GameOver({ standings, onRestart }: GameOverProps) {
               </div>
               <h1
                 className="text-5xl font-black tracking-wider text-neon-amber text-glow-amber mb-3"
-                style={{ fontFamily: 'system-ui, sans-serif' }}
               >
-                VICTORY
+                {t('victoryHeader')}
               </h1>
               <p className="text-lg text-neon-green text-glow-green">
-                You are the Champion of the Cyber-Dome!
+                {t('championDesc')}
               </p>
             </>
           ) : (
@@ -62,26 +64,28 @@ function GameOver({ standings, onRestart }: GameOverProps) {
               </div>
               <h1
                 className="text-4xl font-black tracking-wider text-neon-magenta text-glow-magenta mb-3"
-                style={{ fontFamily: 'system-ui, sans-serif' }}
               >
-                TOURNAMENT OVER
+                {t('tournamentOverHeader')}
               </h1>
               <p className="text-md text-cyber-text">
-                <span className="text-neon-amber font-bold">{winner?.name}</span> claims the throne
+                {t('winnerClaimsThrone', { name: winner?.name || '' })}
               </p>
               <p className="text-sm text-cyber-text-dim mt-2">
-                You finished in <span className="text-neon-cyan font-bold">#{playerRank}</span> place
-                {playerStanding && ` with ${playerStanding.wins} wins and ${playerStanding.fans} fans`}
+                {t('playerFinalRank', {
+                  rank: playerRank,
+                  wins: playerStanding?.wins ?? 0,
+                  fans: playerStanding?.fans ?? 0
+                })}
               </p>
             </>
           )}
         </div>
 
         {/* Final standings */}
-        <div className="border border-cyber-border/40 rounded-lg overflow-hidden bg-cyber-surface/30 mb-8 animate-slide-in" style={{ animationDelay: '0.3s' }}>
+        <div className="border border-cyber-border/40 rounded-lg overflow-hidden bg-cyber-surface/30 mb-8 animate-slide-in font-mono" style={{ animationDelay: '0.3s' }}>
           <div className="px-4 py-3 bg-cyber-darker/50 border-b border-cyber-border/30">
             <span className="text-[10px] uppercase tracking-widest text-neon-amber font-bold">
-              ◈ Final Rankings ◈
+              {t('finalRankingsHeader')}
             </span>
           </div>
 
@@ -123,14 +127,16 @@ function GameOver({ standings, onRestart }: GameOverProps) {
                   {player.name}
                 </span>
                 {player.isPlayer && (
-                  <span className="text-[9px] text-neon-cyan/60 uppercase tracking-wider border border-neon-cyan/20 px-1.5 rounded">
-                    You
+                  <span className="text-[9px] text-neon-cyan/60 uppercase tracking-wider border border-neon-cyan/20 px-1.5 rounded font-bold">
+                    {t('youBadge')}
                   </span>
                 )}
               </div>
 
               <div className="flex items-center justify-center">
-                <span className="text-sm font-bold text-cyber-text">{player.wins}W</span>
+                <span className="text-sm font-bold text-cyber-text">
+                  {t('playerWins', { wins: player.wins })}
+                </span>
               </div>
 
               <div className="flex items-center justify-center gap-1">
@@ -145,14 +151,14 @@ function GameOver({ standings, onRestart }: GameOverProps) {
         <button
           onClick={onRestart}
           className="inline-flex items-center gap-2 px-10 py-4 rounded border-2 border-neon-cyan text-neon-cyan font-bold text-lg uppercase tracking-wider
-            hover:bg-cyan-900/20 hover:scale-105 transition-all duration-300 cursor-pointer animate-slide-in"
+            hover:bg-cyan-900/20 hover:scale-105 transition-all duration-300 cursor-pointer animate-slide-in font-mono"
           style={{
             animationDelay: '0.8s',
             boxShadow: '0 0 20px rgba(0,240,255,0.2), 0 0 40px rgba(0,240,255,0.1)',
           }}
         >
           <RotateCcw size={20} />
-          New Game
+          {t('newGameBtn')}
         </button>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Pause, SkipForward, FastForward, Rewind, Flag, Zap, User, Cpu } from 'lucide-react';
 import type { BattleLogEntry } from '../types/game';
 import MemorySlots from './MemorySlots';
+import { useTranslation } from '../context/TranslationContext';
 
 interface BattleArenaProps {
   battleLog: BattleLogEntry[];
@@ -16,6 +17,8 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
   const [showEffect, setShowEffect] = useState(false);
   const [cardKey, setCardKey] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { t, translateCardName, translateBattleDetail } = useTranslation();
 
   const entry = currentStep >= 0 && currentStep < battleLog.length ? battleLog[currentStep] : null;
   const isFinished = currentStep >= battleLog.length - 1;
@@ -93,6 +96,13 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
     }
   };
 
+  // Translated card details if card exists in current step
+  const stepCard = entry?.card;
+  const displayCardName = stepCard ? translateCardName(stepCard.name) : '';
+  const displayCardAttr = stepCard ? t(stepCard.attribute) : '';
+  const displayAction = entry ? translateBattleDetail(entry.action) : '';
+  const displayEffectTriggered = entry?.effectTriggered ? translateBattleDetail(entry.effectTriggered) : '';
+
   return (
     <div className="min-h-screen bg-cyber-dark relative overflow-hidden">
       {/* Arena background */}
@@ -111,15 +121,14 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
         {/* Arena header */}
         <div className="text-center mb-4 animate-slide-in">
           <h2
-            className="text-2xl font-black tracking-[0.3em] uppercase text-neon-magenta text-glow-magenta"
-            style={{ fontFamily: 'system-ui, sans-serif' }}
+            className="text-2xl font-black tracking-[0.3em] uppercase text-neon-magenta text-glow-magenta font-mono"
           >
-            ⟁ Battle Arena ⟁
+            {t('battleArenaHeader')}
           </h2>
-          <div className="flex items-center justify-center gap-6 mt-2">
+          <div className="flex items-center justify-center gap-6 mt-2 font-mono">
             <div className="flex items-center gap-2">
               <User size={14} className="text-neon-cyan" />
-              <span className="text-sm text-neon-cyan font-bold">YOU</span>
+              <span className="text-sm text-neon-cyan font-bold">{t('youSelf')}</span>
             </div>
             <span className="text-neon-red text-lg font-black">VS</span>
             <div className="flex items-center gap-2">
@@ -132,23 +141,23 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
         {/* Main battle area */}
         <div className="grid grid-cols-[200px_1fr_200px] gap-4 mb-4">
           {/* Player memory slots */}
-          <div className="animate-slide-in-left">
+          <div className="animate-slide-in-left font-mono">
             <MemorySlots
               slots={entry?.playerMemSlots || []}
-              label="Your Memory"
+              label={t('yourMemory')}
               side="left"
             />
             <div className="mt-3 border border-cyber-border/30 rounded px-3 py-2 bg-cyber-surface/30">
-              <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">Deck</div>
+              <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{t('deckRemaining')}</div>
               <div className="text-lg font-bold text-neon-cyan">{entry?.playerDeckCount ?? '?'}</div>
             </div>
           </div>
 
           {/* Center stage */}
-          <div className="flex flex-col items-center justify-center min-h-[350px]">
+          <div className="flex flex-col items-center justify-center min-h-[350px] font-mono">
             {/* Step indicator */}
-            <div className="mb-3 text-[10px] text-cyber-text-dim uppercase tracking-widest">
-              Step {entry ? entry.step : '-'} / {battleLog.length}
+            <div className="mb-3 text-[10px] text-cyber-text-dim uppercase tracking-widest font-mono">
+              {t('stepLabel')} {entry ? entry.step : '-'} / {battleLog.length}
             </div>
 
             {/* Flag indicator */}
@@ -172,13 +181,19 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
               >
                 <Flag size={16} className={entry.flagHolder === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'} />
                 <span className="text-xs font-bold uppercase tracking-wider">
-                  Access: {entry.flagHolder || 'None'}
+                  {t('accessLabel')}{
+                    entry.flagHolder === 'Player' 
+                      ? t('playerSelf') 
+                      : entry.flagHolder === 'CPU' 
+                      ? 'CPU' 
+                      : entry.flagHolder || t('noneLabel')
+                  }
                 </span>
               </div>
             )}
 
             {/* Card reveal area */}
-            {entry && entry.card ? (
+            {entry && stepCard ? (
               <div key={cardKey} className="animate-card-reveal">
                 <div
                   className={`relative rounded-xl border-2 p-6 w-56 text-center
@@ -193,70 +208,72 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                   <div className={`text-[10px] uppercase tracking-widest mb-2 font-bold ${
                     entry.player === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'
                   }`}>
-                    {entry.player === 'Player' ? '◆ Your Play' : '◆ Enemy Play'}
+                    {entry.player === 'Player' 
+                      ? t('yourPlay') 
+                      : t('enemyPlay')}
                   </div>
 
                   {/* Card name */}
-                  <h3 className="text-lg font-bold text-white mb-2">{entry.card.name}</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">{displayCardName}</h3>
 
                   {/* Attribute badge */}
-                  <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${getAttributeColor(entry.card.attribute)} bg-cyber-darker/50 border border-current/20 mb-3`}>
-                    {entry.card.attribute}
+                  <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${getAttributeColor(stepCard.attribute)} bg-cyber-darker/50 border border-current/20 mb-3`}>
+                    {displayCardAttr}
                   </div>
 
                   {/* Power */}
                   <div
-                    className={`text-4xl font-black ${getAttributeColor(entry.card.attribute)} mb-2`}
-                    style={{ textShadow: `0 0 15px ${getAttributeGlow(entry.card.attribute)}` }}
+                    className={`text-4xl font-black ${getAttributeColor(stepCard.attribute)} mb-2`}
+                    style={{ textShadow: `0 0 15px ${getAttributeGlow(stepCard.attribute)}` }}
                   >
-                    {entry.card.power}
+                    {stepCard.power}
                   </div>
 
-                  <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">Power</div>
+                  <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{t('powerLabel')}</div>
                 </div>
               </div>
             ) : entry ? (
-              <div key={cardKey} className="animate-card-reveal">
+              <div key={cardKey} className="animate-card-reveal font-mono">
                 <div className="rounded-xl border-2 border-cyber-border/40 p-6 w-56 text-center bg-cyber-surface/30">
                   <div className={`text-[10px] uppercase tracking-widest mb-3 font-bold ${
                     entry.player === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'
                   }`}>
-                    {entry.player}
+                    {entry.player === 'Player' ? t('playerSelf') : entry.player}
                   </div>
-                  <p className="text-sm text-cyber-text-dim">{entry.action}</p>
+                  <p className="text-sm text-cyber-text-dim">{displayAction}</p>
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border-2 border-dashed border-cyber-border/30 p-12 w-56 text-center">
+              <div className="rounded-xl border-2 border-dashed border-cyber-border/30 p-12 w-56 text-center font-mono">
                 <Zap size={32} className="text-cyber-border mx-auto mb-3" />
                 <p className="text-xs text-cyber-text-dim uppercase tracking-wider">
-                  Awaiting combat data...
+                  {t('awaitingCombatData')}
                 </p>
               </div>
             )}
 
             {/* Action text */}
             {entry && (
-              <div className="mt-4 text-center animate-fade-in" key={`action-${cardKey}`}>
-                <p className="text-sm text-cyber-text">{entry.action}</p>
+              <div className="mt-4 text-center animate-fade-in font-mono" key={`action-${cardKey}`}>
+                <p className="text-sm text-cyber-text">{displayAction}</p>
                 <div className="flex items-center justify-center gap-4 mt-2">
                   <span className="text-[10px] text-cyber-text-dim">
-                    Cumulative Power: <span className="text-neon-cyan font-bold">{entry.currentPower}</span>
+                    {t('cumulativePower')} <span className="text-neon-cyan font-bold">{entry.currentPower}</span>
                   </span>
                 </div>
               </div>
             )}
 
             {/* Effect triggered */}
-            {showEffect && entry && entry.effectTriggered && entry.effectTriggered !== 'None' && entry.effectTriggered !== '' && (
+            {showEffect && entry && displayEffectTriggered && displayEffectTriggered !== 'None' && displayEffectTriggered !== '' && (
               <div className="mt-3 animate-effect-flash" key={`effect-${cardKey}`}>
                 <div
-                  className="px-6 py-3 rounded-lg border border-neon-green/50 bg-green-900/20 text-center"
+                  className="px-6 py-3 rounded-lg border border-neon-green/50 bg-green-900/20 text-center font-mono"
                   style={{ boxShadow: '0 0 25px rgba(0,255,102,0.3)' }}
                 >
                   <Zap size={14} className="text-neon-green inline mr-2" />
-                  <span className="text-sm font-bold text-neon-green text-glow-green">
-                    {entry.effectTriggered}
+                  <span className="text-sm font-bold text-neon-green text-glow-green font-mono">
+                    {displayEffectTriggered}
                   </span>
                 </div>
               </div>
@@ -264,21 +281,21 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
           </div>
 
           {/* CPU memory slots */}
-          <div className="animate-slide-in-right">
+          <div className="animate-slide-in-right font-mono">
             <MemorySlots
               slots={entry?.cpuMemSlots || []}
-              label={`${opponent || 'CPU'} Memory`}
+              label={t('npcMemoryLabel', { opponent: opponent || 'CPU' })}
               side="right"
             />
             <div className="mt-3 border border-cyber-border/30 rounded px-3 py-2 bg-cyber-surface/30 text-right">
-              <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">Deck</div>
+              <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{t('deckRemaining')}</div>
               <div className="text-lg font-bold text-neon-magenta">{entry?.cpuDeckCount ?? '?'}</div>
             </div>
           </div>
         </div>
 
         {/* Timeline bar */}
-        <div className="mb-4">
+        <div className="mb-4 font-mono">
           <div className="w-full h-1.5 bg-cyber-darker rounded-full overflow-hidden border border-cyber-border/30">
             <div
               className="h-full bg-gradient-to-r from-neon-cyan to-neon-magenta rounded-full transition-all duration-300"
@@ -290,11 +307,11 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 font-mono">
           <button
             onClick={reset}
             className="p-2 rounded border border-cyber-border hover:border-neon-cyan/50 text-cyber-text-dim hover:text-neon-cyan transition-all cursor-pointer"
-            title="Reset"
+            title={t('resetBtnTitle')}
           >
             <Rewind size={18} />
           </button>
@@ -323,7 +340,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                 ? 'border-cyber-border text-cyber-border cursor-not-allowed'
                 : 'border-cyber-border hover:border-neon-cyan/50 text-cyber-text-dim hover:text-neon-cyan'
             }`}
-            title="Next Step"
+            title={t('nextStepBtnTitle')}
           >
             <SkipForward size={18} />
           </button>
@@ -334,7 +351,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
             <select
               value={speed}
               onChange={e => setSpeed(Number(e.target.value))}
-              className="bg-cyber-surface border border-cyber-border rounded px-2 py-1 text-xs text-cyber-text cursor-pointer focus:border-neon-cyan/50 outline-none"
+              className="bg-cyber-surface border border-cyber-border rounded px-2 py-1 text-xs text-cyber-text cursor-pointer focus:border-neon-cyan/50 outline-none font-mono"
             >
               <option value={2500}>0.5x</option>
               <option value={1500}>1x</option>
@@ -348,36 +365,41 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
             <button
               onClick={onComplete}
               className="ml-4 px-6 py-2 rounded border-2 border-neon-green text-neon-green font-bold text-sm uppercase tracking-wider
-                hover:bg-neon-green/10 transition-all cursor-pointer animate-slide-in"
+                hover:bg-neon-green/10 transition-all cursor-pointer animate-slide-in font-mono"
               style={{ boxShadow: '0 0 15px rgba(0,255,102,0.2)' }}
             >
-              Continue →
+              {t('continueBtn')}
             </button>
           )}
         </div>
 
         {/* Battle log text feed */}
         {currentStep >= 0 && (
-          <div className="mt-6 max-w-2xl mx-auto border border-cyber-border/30 rounded-lg p-3 bg-cyber-surface/30 max-h-40 overflow-y-auto">
+          <div className="mt-6 max-w-2xl mx-auto border border-cyber-border/30 rounded-lg p-3 bg-cyber-surface/30 max-h-40 overflow-y-auto font-mono">
             <div className="text-[10px] text-cyber-text-dim uppercase tracking-widest mb-2 font-bold">
-              ▸ Combat Log
+              {t('combatLogHeader')}
             </div>
-            {battleLog.slice(0, currentStep + 1).reverse().map((log, i) => (
-              <div
-                key={i}
-                className={`text-[11px] py-1 border-b border-cyber-border/10 last:border-0 ${
-                  i === 0 ? 'text-cyber-text' : 'text-cyber-text-dim/60'
-                }`}
-              >
-                <span className={`font-bold ${log.player === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
-                  [{log.player}]
-                </span>{' '}
-                {log.action}
-                {log.effectTriggered && log.effectTriggered !== 'None' && log.effectTriggered !== '' && (
-                  <span className="text-neon-green ml-2">⚡ {log.effectTriggered}</span>
-                )}
-              </div>
-            ))}
+            {battleLog.slice(0, currentStep + 1).reverse().map((log, i) => {
+              const displayLogAction = translateBattleDetail(log.action);
+              const displayLogEffect = log.effectTriggered ? translateBattleDetail(log.effectTriggered) : '';
+
+              return (
+                <div
+                  key={i}
+                  className={`text-[11px] py-1 border-b border-cyber-border/10 last:border-0 ${
+                    i === 0 ? 'text-cyber-text' : 'text-cyber-text-dim/60'
+                  }`}
+                >
+                  <span className={`font-bold ${log.player === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
+                    [{log.player === 'Player' ? t('playerSelf') : log.player}]
+                  </span>{' '}
+                  {displayLogAction}
+                  {log.effectTriggered && log.effectTriggered !== 'None' && log.effectTriggered !== '' && (
+                    <span className="text-neon-green ml-2">⚡ {displayLogEffect}</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

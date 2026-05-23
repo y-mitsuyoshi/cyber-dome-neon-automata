@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RefreshCw, Trash2, Swords, CreditCard, Layers } from 'lucide-react';
 import type { Card } from '../types/game';
 import CardDisplay from './CardDisplay';
+import { useTranslation } from '../context/TranslationContext';
 
 interface ShopProps {
   round: number;
@@ -19,6 +20,7 @@ interface ShopProps {
 function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onDelete, onBattle, loading }: ShopProps) {
   const [showDeck, setShowDeck] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-cyber-dark cyber-grid relative overflow-hidden">
@@ -35,38 +37,45 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
         <div className="flex items-center justify-between mb-6 animate-slide-in">
           {/* Round info */}
           <div className="flex items-center gap-4">
-            <div className="border border-neon-cyan/30 rounded px-4 py-2 bg-cyber-surface/50">
-              <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim block">Round</span>
+            <div className="border border-neon-cyan/30 rounded px-4 py-2 bg-cyber-surface/50 font-mono">
+              <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim block">
+                {t('round')}
+              </span>
               <span className="text-xl font-bold text-neon-cyan text-glow-cyan">{round}</span>
               <span className="text-cyber-text-dim text-sm">/{maxRounds}</span>
             </div>
           </div>
 
           {/* Credits */}
-          <div className="flex items-center gap-2 border border-neon-amber/30 rounded px-4 py-2 bg-cyber-surface/50">
+          <div className="flex items-center gap-2 border border-neon-amber/30 rounded px-4 py-2 bg-cyber-surface/50 font-mono">
             <CreditCard size={16} className="text-neon-amber" />
-            <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim">Credits</span>
+            <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim">
+              {t('credits')}
+            </span>
             <span className="text-2xl font-bold text-neon-amber text-glow-amber ml-2">{credits}¢</span>
           </div>
 
           {/* Deck count */}
           <button
             onClick={() => { setShowDeck(!showDeck); setDeleteMode(false); }}
-            className="flex items-center gap-2 border border-neon-magenta/30 rounded px-4 py-2 bg-cyber-surface/50 cursor-pointer hover:border-neon-magenta/60 transition-colors"
+            className="flex items-center gap-2 border border-neon-magenta/30 rounded px-4 py-2 bg-cyber-surface/50 cursor-pointer hover:border-neon-magenta/60 transition-colors font-mono"
           >
             <Layers size={16} className="text-neon-magenta" />
-            <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim">Deck</span>
+            <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim">
+              {t('deckLabel')}
+            </span>
             <span className="text-xl font-bold text-neon-magenta text-glow-magenta ml-2">{deck.length}</span>
           </button>
         </div>
 
         {/* Shop title */}
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-black tracking-[0.2em] text-neon-magenta text-glow-magenta uppercase"
-            style={{ fontFamily: 'system-ui, sans-serif' }}>
-            ◈ Black Market ◈
+          <h2 className="text-3xl font-black tracking-[0.2em] text-neon-magenta text-glow-magenta uppercase font-mono">
+            {t('blackMarketHeader')}
           </h2>
-          <p className="text-xs text-cyber-text-dim tracking-wider mt-1">Select your augmentations wisely</p>
+          <p className="text-xs text-cyber-text-dim tracking-wider mt-1 font-mono">
+            {t('shopSubtitle')}
+          </p>
         </div>
 
         {/* Shop cards */}
@@ -83,7 +92,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
                 onClick={() => onBuy(i)}
                 disabled={loading || credits < card.cost}
                 className={`
-                  mt-3 w-full py-2 rounded border text-xs uppercase tracking-wider font-bold
+                  mt-3 w-full py-2 rounded border text-xs uppercase tracking-wider font-bold font-mono
                   transition-all duration-300
                   ${credits >= card.cost
                     ? 'border-neon-green/50 text-neon-green hover:bg-neon-green/10 hover:border-neon-green cursor-pointer'
@@ -91,21 +100,23 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
                   }
                 `}
               >
-                {credits >= card.cost ? `Buy ${card.cost}¢` : 'Insufficient ¢'}
+                {credits >= card.cost 
+                  ? t('buyBtn', { cost: card.cost })
+                  : t('insufficientCredits')}
               </button>
             </div>
           ))}
 
           {shopCards.length === 0 && (
-            <div className="text-center text-cyber-text-dim py-12">
-              <p className="text-lg mb-2">No cards available</p>
-              <p className="text-xs">Try rerolling for new stock</p>
+            <div className="text-center text-cyber-text-dim py-12 font-mono">
+              <p className="text-lg mb-2">{t('noCardsAvailable')}</p>
+              <p className="text-xs">{t('tryRerolling')}</p>
             </div>
           )}
         </div>
 
         {/* Action buttons */}
-        <div className="flex justify-center gap-4 mb-8">
+        <div className="flex justify-center gap-4 mb-8 font-mono">
           <button
             onClick={onReroll}
             disabled={loading || credits < 1}
@@ -119,7 +130,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
             `}
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            Reroll (1¢)
+            {t('rerollText')}
           </button>
 
           <button
@@ -136,7 +147,9 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
             `}
           >
             <Trash2 size={16} />
-            {deleteMode ? 'Cancel Delete' : 'Delete Card'}
+            {deleteMode 
+              ? t('cancelDelete') 
+              : t('deleteCardText')}
           </button>
 
           <button
@@ -149,19 +162,21 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
             }}
           >
             <Swords size={18} />
-            Enter the Arena
+            {t('enterArenaBtn')}
           </button>
         </div>
 
         {/* Deck panel */}
         {showDeck && (
-          <div className="border border-cyber-border rounded-lg p-4 bg-cyber-surface/50 animate-slide-in max-w-3xl mx-auto">
+          <div className="border border-cyber-border rounded-lg p-4 bg-cyber-surface/50 animate-slide-in max-w-3xl mx-auto font-mono">
             <h3 className="text-sm font-bold text-neon-cyan tracking-widest uppercase mb-3 flex items-center gap-2">
               <Layers size={14} />
-              Your Deck ({deck.length} cards)
+              {t('yourDeckCount', { count: deck.length })}
             </h3>
             {deck.length === 0 ? (
-              <p className="text-cyber-text-dim text-sm text-center py-4">Your deck is empty</p>
+              <p className="text-cyber-text-dim text-sm text-center py-4">
+                {t('deckEmpty')}
+              </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {deck.map((card, i) => (
@@ -169,14 +184,14 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
                     key={card.id || i}
                     onClick={deleteMode ? () => onDelete(i) : undefined}
                     className={`
-                      transition-all duration-200
+                       transition-all duration-200
                       ${deleteMode ? 'cursor-pointer hover:bg-red-900/30 hover:border-neon-red rounded' : ''}
                     `}
                   >
                     <CardDisplay card={card} compact />
                     {deleteMode && (
-                      <div className="text-[9px] text-neon-red text-center mt-1 uppercase tracking-wider">
-                        Click to delete
+                      <div className="text-[9px] text-neon-red text-center mt-1 uppercase tracking-wider font-bold">
+                        {t('clickToDelete')}
                       </div>
                     )}
                   </div>

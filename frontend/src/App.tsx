@@ -8,6 +8,7 @@ import BattleArena from './components/BattleArena';
 import Standings from './components/Standings';
 import GameOver from './components/GameOver';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useTranslation } from './context/TranslationContext';
 import {
   createNewGame,
   getGameState,
@@ -38,6 +39,8 @@ function App() {
   const [waitingForBattle, setWaitingForBattle] = useState<boolean>(false);
   const [waitingForNextRound, setWaitingForNextRound] = useState<boolean>(false);
 
+  const { locale, setLocale, t } = useTranslation();
+
   // WebSocket Hook
   const {
     connected,
@@ -58,7 +61,7 @@ function App() {
       setScreen('title');
       setLobbyCode(null);
       setGameState(null);
-      setError('DISCONNECTED: You have been kicked from the tournament mainframe.');
+      setError(t('disconnectedMainframe'));
       resetKicked();
     }
   }, [kicked]);
@@ -329,7 +332,7 @@ function App() {
             onClick={() => setError(null)}
             className="text-[10px] uppercase border border-neon-red/30 px-2 py-0.5 rounded hover:bg-neon-red/10 cursor-pointer"
           >
-            Acknowledge
+            {t('acknowledgeBtn')}
           </button>
         </div>
       )}
@@ -339,10 +342,10 @@ function App() {
         <div className="fixed inset-0 z-40 bg-cyber-dark/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in p-4 text-center">
           <ShieldAlert size={48} className="text-neon-cyan animate-pulse mb-4 text-glow-cyan" />
           <h2 className="text-xl font-bold tracking-[0.25em] text-neon-cyan text-glow-cyan uppercase mb-2">
-            Combat Protocol Ready
+            {t('combatProtocolReady')}
           </h2>
           <p className="text-xs font-mono text-cyber-text-dim max-w-sm uppercase tracking-wider animate-pulse">
-            Ready to initialize neural battle loop. Standby while other combatants complete deck adjustments...
+            {t('combatProtocolDesc')}
           </p>
         </div>
       )}
@@ -351,10 +354,10 @@ function App() {
         <div className="fixed inset-0 z-40 bg-cyber-dark/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in p-4 text-center">
           <ShieldAlert size={48} className="text-neon-magenta animate-pulse mb-4 text-glow-magenta" />
           <h2 className="text-xl font-bold tracking-[0.25em] text-neon-magenta text-glow-magenta uppercase mb-2">
-            Advancing Tournament Sector
+            {t('advancingSector')}
           </h2>
           <p className="text-xs font-mono text-cyber-text-dim max-w-sm uppercase tracking-wider animate-pulse">
-            Standby while other combatants acknowledge standings. Awaiting sync trigger from neural mainframe...
+            {t('advancingSectorDesc')}
           </p>
         </div>
       )}
@@ -420,13 +423,40 @@ function App() {
       )}
 
       {/* Network Status Footer */}
-      <footer className="w-full text-center py-2 text-[9px] text-cyber-border uppercase tracking-widest border-t border-cyber-border/10 bg-cyber-darker">
-        <div className="flex items-center justify-center gap-2">
-          <span className={`inline-block w-1.5 h-1.5 rounded-full bg-neon-green ${lobbyCode ? 'animate-pulse' : ''}`} />
-          <span>Antigravity NetLink-982 {lobbyCode ? 'MULTIPLAYER' : 'SOLO'}</span>
-          <span className="mx-2">|</span>
-          <Terminal size={8} className="inline mr-1" />
-          <span>Cyber-Dome Autonomous Grid System</span>
+      <footer className="w-full py-2.5 text-[9px] text-cyber-border uppercase tracking-widest border-t border-cyber-border/10 bg-cyber-darker">
+        <div className="flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
+          <div className="flex items-center gap-2">
+            <span className={`inline-block w-1.5 h-1.5 rounded-full bg-neon-green ${lobbyCode ? 'animate-pulse' : ''}`} />
+            <span>Antigravity NetLink-982 {lobbyCode ? 'MULTIPLAYER' : 'SOLO'}</span>
+            <span className="mx-2">|</span>
+            <Terminal size={8} className="inline mr-1" />
+            <span>Cyber-Dome Autonomous Grid System</span>
+          </div>
+          
+          {/* Cyber Lang Toggle Selector */}
+          <div className="flex items-center gap-1 font-mono text-[9px]">
+            <button
+              onClick={() => setLocale('en')}
+              className={`px-1.5 py-0.5 rounded cursor-pointer transition-all ${
+                locale === 'en'
+                  ? 'text-neon-cyan border border-neon-cyan/30 bg-neon-cyan/5 font-bold shadow-[0_0_8px_rgba(0,242,254,0.1)]'
+                  : 'text-cyber-border hover:text-cyber-text'
+              }`}
+            >
+              EN
+            </button>
+            <span className="text-cyber-border/30">/</span>
+            <button
+              onClick={() => setLocale('ja')}
+              className={`px-1.5 py-0.5 rounded cursor-pointer transition-all flex items-center gap-1 ${
+                locale === 'ja'
+                  ? 'text-neon-magenta border border-neon-magenta/30 bg-neon-magenta/5 font-bold shadow-[0_0_8px_rgba(255,0,127,0.1)]'
+                  : 'text-cyber-border hover:text-cyber-text'
+              }`}
+            >
+              🌐 日本語
+            </button>
+          </div>
         </div>
       </footer>
     </div>
