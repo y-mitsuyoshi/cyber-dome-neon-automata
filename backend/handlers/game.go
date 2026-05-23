@@ -195,15 +195,15 @@ func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerNam
 }
 
 // BroadcastGameStateBroadcast broadcasts a phase transition update via WS.
-func BroadcastGameStateBroadcast(gs *models.GameState) {
-	if gs.LobbyCode == "" {
+func BroadcastGameStateBroadcast(lobbyCode string, phase string, round int) {
+	if lobbyCode == "" {
 		return
 	}
-	lobby.GlobalHub.Broadcast(gs.LobbyCode, map[string]interface{}{
+	lobby.GlobalHub.Broadcast(lobbyCode, map[string]interface{}{
 		"type": "state_update",
 		"data": map[string]interface{}{
-			"phase":        gs.Phase,
-			"currentRound": gs.CurrentRound,
+			"phase":        phase,
+			"currentRound": round,
 		},
 	})
 }
@@ -388,7 +388,7 @@ func HandleNextRound(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Broadcast new round state update to all players
-		go BroadcastGameStateBroadcast(gs)
+		go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
 	}
 	WritePlayerGameState(w, gs, req.PlayerName)
 }

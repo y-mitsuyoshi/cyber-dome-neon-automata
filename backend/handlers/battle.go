@@ -193,7 +193,7 @@ func HandleBattle(w http.ResponseWriter, r *http.Request) {
 	gs.ReadyPlayers = make(map[string]bool)
 
 	// Broadcast transition event to all connected clients
-	go BroadcastGameStateBroadcast(gs)
+	go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
 
 	WritePlayerGameState(w, gs, req.PlayerName)
 }
