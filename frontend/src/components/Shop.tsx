@@ -3,6 +3,7 @@ import { RefreshCw, Trash2, Swords, CreditCard, Layers } from 'lucide-react';
 import type { Card } from '../types/game';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
+import DeckViewerModal from './DeckViewerModal';
 
 interface ShopProps {
   round: number;
@@ -18,8 +19,8 @@ interface ShopProps {
 }
 
 function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onDelete, onBattle, loading }: ShopProps) {
-  const [showDeck, setShowDeck] = useState(false);
-  const [deleteMode, setDeleteMode] = useState(false);
+  const [isDeckModalOpen, setIsDeckModalOpen] = useState(false);
+  const [deleteModeSupportedInModal, setDeleteModeSupportedInModal] = useState(false);
   const { t } = useTranslation();
 
   return (
@@ -57,7 +58,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
 
           {/* Deck count */}
           <button
-            onClick={() => { setShowDeck(!showDeck); setDeleteMode(false); }}
+            onClick={() => { setIsDeckModalOpen(true); setDeleteModeSupportedInModal(false); }}
             className="flex items-center gap-2 border border-neon-magenta/30 rounded px-4 py-2 bg-cyber-surface/50 cursor-pointer hover:border-neon-magenta/60 transition-colors font-mono"
           >
             <Layers size={16} className="text-neon-magenta" />
@@ -134,22 +135,12 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
           </button>
 
           <button
-            onClick={() => { setDeleteMode(!deleteMode); setShowDeck(true); }}
+            onClick={() => { setIsDeckModalOpen(true); setDeleteModeSupportedInModal(true); }}
             disabled={loading || deck.length === 0}
-            className={`
-              flex items-center gap-2 px-6 py-3 rounded border text-sm uppercase tracking-wider font-bold
-              transition-all duration-300
-              ${deleteMode
-                ? 'border-neon-red bg-neon-red/10 text-neon-red'
-                : 'border-neon-red/50 text-neon-red hover:bg-neon-red/10 cursor-pointer'
-              }
-              ${deck.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
+            className="flex items-center gap-2 px-6 py-3 rounded border border-neon-red/50 text-neon-red hover:bg-neon-red/10 cursor-pointer transition-all duration-300 font-mono shadow-[0_0_8px_rgba(255,0,80,0.1)]"
           >
             <Trash2 size={16} />
-            {deleteMode 
-              ? t('cancelDelete') 
-              : t('deleteCardText')}
+            {t('deleteCardText')}
           </button>
 
           <button
@@ -166,41 +157,16 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
           </button>
         </div>
 
-        {/* Deck panel */}
-        {showDeck && (
-          <div className="border border-cyber-border rounded-lg p-4 bg-cyber-surface/50 animate-slide-in max-w-3xl mx-auto font-mono">
-            <h3 className="text-sm font-bold text-neon-cyan tracking-widest uppercase mb-3 flex items-center gap-2">
-              <Layers size={14} />
-              {t('yourDeckCount', { count: deck.length })}
-            </h3>
-            {deck.length === 0 ? (
-              <p className="text-cyber-text-dim text-sm text-center py-4">
-                {t('deckEmpty')}
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {deck.map((card, i) => (
-                  <div
-                    key={card.id || i}
-                    onClick={deleteMode ? () => onDelete(i) : undefined}
-                    className={`
-                       transition-all duration-200
-                      ${deleteMode ? 'cursor-pointer hover:bg-red-900/30 hover:border-neon-red rounded' : ''}
-                    `}
-                  >
-                    <CardDisplay card={card} compact />
-                    {deleteMode && (
-                      <div className="text-[9px] text-neon-red text-center mt-1 uppercase tracking-wider font-bold">
-                        {t('clickToDelete')}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
+
+      <DeckViewerModal
+        isOpen={isDeckModalOpen}
+        onClose={() => setIsDeckModalOpen(false)}
+        deck={deck}
+        credits={credits}
+        onDeleteCard={onDelete}
+        deleteModeSupported={deleteModeSupportedInModal}
+      />
     </div>
   );
 }

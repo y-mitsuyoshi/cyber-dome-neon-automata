@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Flag, Zap, User, Cpu, AlertTriangle, Trash2, Send } from 'lucide-react';
-import type { BattleLogEntry, BattleSession } from '../types/game';
+import { Flag, Zap, User, Cpu, AlertTriangle, Trash2, Send, Layers } from 'lucide-react';
+import type { BattleLogEntry, BattleSession, Card } from '../types/game';
 import MemorySlots from './MemorySlots';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
 import { submitBattleAction } from '../api/client';
+import DeckViewerModal from './DeckViewerModal';
 
 interface BattleArenaProps {
   gameId: string;
@@ -13,6 +14,7 @@ interface BattleArenaProps {
   battleLog: BattleLogEntry[];
   opponent: string;
   onComplete: () => void;
+  deck: Card[];
 }
 
 function BattleArena({
@@ -22,7 +24,9 @@ function BattleArena({
   battleLog,
   opponent,
   onComplete,
+  deck,
 }: BattleArenaProps) {
+  const [showDeckModal, setShowDeckModal] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -150,6 +154,13 @@ function BattleArena({
             <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('discardMatrix')}</div>
             <div className="text-sm font-bold text-neon-cyan">{myDiscard.length} Units</div>
           </div>
+          <button
+            onClick={() => setShowDeckModal(true)}
+            className="flex items-center justify-center gap-2 border border-neon-cyan/45 hover:border-neon-cyan rounded p-2 bg-cyber-surface/30 text-neon-cyan font-bold hover:bg-neon-cyan/10 transition-all text-xs cursor-pointer uppercase tracking-wider font-mono shadow-[0_0_8px_rgba(0,240,255,0.1)]"
+          >
+            <Layers size={14} className="text-neon-cyan animate-pulse" />
+            {t('viewDeckBtn')}
+          </button>
         </div>
 
         {/* Center Stage: Duel Field */}
@@ -361,6 +372,13 @@ function BattleArena({
             })}
         </div>
       )}
+
+      <DeckViewerModal
+        isOpen={showDeckModal}
+        onClose={() => setShowDeckModal(false)}
+        deck={deck}
+        deleteModeSupported={false}
+      />
     </div>
   );
 }

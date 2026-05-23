@@ -123,6 +123,9 @@ const uiDict: Record<Locale, Record<string, string>> = {
     deckEmpty: "Your deck is empty",
     clickToDelete: "Click to delete",
     deckLabel: "Deck",
+    viewDeckBtn: "View Deck",
+    deckViewerModalTitle: "DECK COMPONENT MATRIX",
+    deleteInfoText: "EACH DELETION COSTS 2 CREDITS. REMOVED PERMANENTLY.",
     
     // CardDisplay / MemorySlots
     memoryLabel: "MEMORY: {filled}/{max}",
@@ -308,6 +311,9 @@ const uiDict: Record<Locale, Record<string, string>> = {
     deckEmpty: "デッキが空です",
     clickToDelete: "クリックして削除",
     deckLabel: "デッキ残り",
+    viewDeckBtn: "デッキ確認",
+    deckViewerModalTitle: "デッキ構成モジュール一覧",
+    deleteInfoText: "1回の削除につき2クレジットを消費します。永久に削除されます。",
     
     // CardDisplay / MemorySlots
     memoryLabel: "メモリ容量: {filled}/{max}",
