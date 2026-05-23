@@ -169,6 +169,7 @@ const uiDict: Record<Locale, Record<string, string>> = {
     yourAugmentationHand: "Your Augmentation Hand ({count} Modules Remaining)",
     noDrawAdvice: "No draw. Play or Discard wisely.",
     noHandRemaining: "No Augmentations Remaining in Hand Matrix.",
+    viewManual: "System Manual",
     
     // Standings Screen
     standingsHeader: "MAIN MAINBOARD RANKINGS",
@@ -353,6 +354,7 @@ const uiDict: Record<Locale, Record<string, string>> = {
     yourAugmentationHand: "あなたのオーグメンテーションハンド（残り {count} モジュール）",
     noDrawAdvice: "ドローはありません。慎重にプレイまたは廃棄してください。",
     noHandRemaining: "ハンドマトリクスに残りオーグメンテーションがありません。",
+    viewManual: "システムマニュアル",
     
     // Standings Screen
     standingsHeader: "メインボード ランキング",
