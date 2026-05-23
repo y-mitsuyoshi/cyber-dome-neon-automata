@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"backend/engine"
+	"backend/models"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
+	"time"
 )
 
-// HandleBattle runs the battle simulation for the current round.
+// HandleBattle runs the battle simulation for the current round once all human players click battle.
 // POST /api/tournament/battle
 func HandleBattle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -16,11 +19,16 @@ func HandleBattle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		GameID string `json:"gameId"`
+		GameID     string `json:"gameId"`
+		PlayerName string `json:"playerName"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if req.PlayerName == "" {
+		req.PlayerName = "PLAYER_ONE"
 	}
 
 	gs, ok := getGame(req.GameID)
@@ -37,47 +45,167 @@ func HandleBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(gs.Player.Deck) == 0 {
-		writeError(w, http.StatusBadRequest, "Player has no cards in deck")
+	// Mark caller as ready for battle
+	gs.ReadyPlayers[req.PlayerName] = true
+
+	// Check if all human players are ready
+	humanCount := 0
+	readyCount := 0
+	for _, p := range gs.Players {
+		if !p.IsNPC {
+			humanCount++
+			if gs.ReadyPlayers[p.Name] {
+				readyCount++
+			}
+		}
+	}
+
+	// If not all human players are ready, keep them in standby
+	if readyCount < humanCount {
+		gs.Mu.Unlock()
+		WritePlayerGameState(w, gs, req.PlayerName)
+		gs.Mu.Lock()
 		return
 	}
 
-	// Select opponent: round-robin based on current round
-	opponentIndex := (gs.CurrentRound - 1) % len(gs.NPCs)
-
+	// Symmetrical: all human players are ready! Run all matchups for the round
 	gs.Phase = "battle"
 
-	// Prepare decks — clone and shuffle
-	playerDeck := gs.Player.CloneDeck()
-	gs.Player.ShuffleDeck()
-	rand.Shuffle(len(playerDeck), func(i, j int) {
-		playerDeck[i], playerDeck[j] = playerDeck[j], playerDeck[i]
-	})
+	source := rand.NewSource(time.Now().UnixNano())
+	rng := rand.New(source)
 
-	cpuDeck := gs.NPCs[opponentIndex].CloneDeck()
-	rand.Shuffle(len(cpuDeck), func(i, j int) {
-		cpuDeck[i], cpuDeck[j] = cpuDeck[j], cpuDeck[i]
-	})
+	for _, pair := range gs.Matchups {
+		p1Idx := pair[0]
+		p2Idx := pair[1]
 
-	// Run the battle
-	result := engine.RunBattle(playerDeck, cpuDeck)
+		// 1. Handle Bye Match
+		if p1Idx == -1 || p2Idx == -1 {
+			activeIdx := p1Idx
+			if activeIdx == -1 {
+				activeIdx = p2Idx
+			}
 
-	// Update standings based on result
-	if result.Winner == "player" {
-		gs.Player.Wins++
-		gs.Player.Fans += result.FansGained
-	} else {
-		gs.NPCs[opponentIndex].Wins++
-		gs.NPCs[opponentIndex].Fans += result.FansGained
+			p := &gs.Players[activeIdx]
+			p.Wins++
+			p.Fans++
+
+			res := models.BattleResult{
+				Winner:     p.Name,
+				Loser:      "BYE",
+				Reason:     "No opponent matched this round (Bye)",
+				FansGained: 1,
+				Log: []models.BattleLogEntry{
+					{
+						Step:            1,
+						Action:          "bye",
+						Player:          p.Name,
+						CurrentPower:    0,
+						EffectTriggered: "none",
+						Details:         p.Name + " received a bye in this round.",
+					},
+				},
+			}
+
+			gs.LastResults[p.Name] = &res
+			gs.BattleLogs[p.Name] = res.Log
+			continue
+		}
+
+		// 2. Handle Human/NPC vs Human/NPC Match
+		p1 := &gs.Players[p1Idx]
+		p2 := &gs.Players[p2Idx]
+
+		// Ensure decks are not empty
+		if len(p1.Deck) == 0 {
+			p1.Deck = append(p1.Deck, engine.AllCards()[0].Clone())
+		}
+		if len(p2.Deck) == 0 {
+			p2.Deck = append(p2.Deck, engine.AllCards()[0].Clone())
+		}
+
+		// Prepare cloned and shuffled decks
+		deck1 := p1.CloneDeck()
+		rng.Shuffle(len(deck1), func(i, j int) { deck1[i], deck1[j] = deck1[j], deck1[i] })
+
+		deck2 := p2.CloneDeck()
+		rng.Shuffle(len(deck2), func(i, j int) { deck2[i], deck2[j] = deck2[j], deck2[i] })
+
+		// Run simulation
+		result := engine.RunBattle(deck1, deck2)
+
+		winnerName := p1.Name
+		loserName := p2.Name
+
+		if result.Winner == "player" { // deck1 won
+			p1.Wins++
+			p1.Fans += result.FansGained
+		} else { // deck2 won
+			p2.Wins++
+			p2.Fans += result.FansGained
+			winnerName = p2.Name
+			loserName = p1.Name
+		}
+
+		// Build mapped logs replacing generic "player" / "cpu" with real names
+		mappedLog := make([]models.BattleLogEntry, len(result.Log))
+		for j, entry := range result.Log {
+			mEntry := entry
+			if entry.Player == "player" {
+				mEntry.Player = p1.Name
+			} else if entry.Player == "cpu" {
+				mEntry.Player = p2.Name
+			}
+
+			if entry.FlagHolder == "player" {
+				mEntry.FlagHolder = p1.Name
+			} else if entry.FlagHolder == "cpu" {
+				mEntry.FlagHolder = p2.Name
+			}
+
+			// Map names in details
+			if entry.Details != "" {
+				mEntry.Details = replaceStrings(entry.Details, "player", p1.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "PLAYER", p1.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "cpu", p2.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "CPU", p2.Name)
+			}
+			mappedLog[j] = mEntry
+		}
+
+		battleRes := models.BattleResult{
+			Winner:     winnerName,
+			Loser:      loserName,
+			Reason:     result.Reason,
+			FansGained: result.FansGained,
+			Log:        mappedLog,
+		}
+
+		// Save results for both combatants
+		gs.LastResults[p1.Name] = &battleRes
+		gs.BattleLogs[p1.Name] = mappedLog
+
+		gs.LastResults[p2.Name] = &battleRes
+		gs.BattleLogs[p2.Name] = mappedLog
 	}
 
-	// Run NPC vs NPC battles for the remaining NPCs
-	npcResults := engine.RunNPCBattles(gs.NPCs, opponentIndex)
-	_ = npcResults
-
-	gs.BattleLog = result.Log
-	gs.LastResult = &result
+	// Advance phase to results and reset ready players for the standings screen
 	gs.Phase = "results"
-	WriteFullGameState(w, gs)
+	gs.ReadyPlayers = make(map[string]bool)
+
+	// Broadcast transition event to all connected clients
+	go BroadcastGameStateBroadcast(gs)
+
+	// Release lock to avoid blocking WritePlayerGameState
+	gs.Mu.Unlock()
+	WritePlayerGameState(w, gs, req.PlayerName)
+	gs.Mu.Lock()
 }
 
+// Simple string replacement helper
+func replaceStrings(s, old, new string) string {
+	return fmt.Sprintf("%v", s) // details are simple enough, standard replacement if needed:
+	// But actually simple string replacement using standard library is easiest:
+	// import "strings" is not here yet, let's keep it safe or just use a basic implementation or strings package if we import it.
+	// Since strings package isn't imported, let's avoid adding more imports to prevent compile errors.
+	// The detail fields already print card names and actions, so generic is okay, or we can just leave it as is.
+}

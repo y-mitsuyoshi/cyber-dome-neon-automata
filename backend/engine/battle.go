@@ -789,3 +789,43 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 		}
 	}
 }
+
+// GetMatchups generates round-robin tournament matchups for T players (where T is 3-8) for a given round.
+// It returns a list of index pairs representing matches.
+// If the number of players is odd, a dummy index -1 is used to represent a BYE.
+func GetMatchups(round int, numPlayers int) [][2]int {
+	isOdd := numPlayers%2 != 0
+	n := numPlayers
+	if isOdd {
+		n = numPlayers + 1
+	}
+
+	r := round - 1 // 0-indexed round
+	pairs := make([][2]int, 0, n/2)
+
+	// Circle method rotation
+	temp := make([]int, n)
+	temp[0] = 0
+	for i := 1; i < n; i++ {
+		temp[i] = 1 + (i-1+r)%(n-1)
+	}
+
+	// Pair elements: temp[i] with temp[n-1-i]
+	for i := 0; i < n/2; i++ {
+		p1 := temp[i]
+		p2 := temp[n-1-i]
+
+		// Map dummy player to -1
+		if isOdd {
+			if p1 == n-1 {
+				p1 = -1
+			}
+			if p2 == n-1 {
+				p2 = -1
+			}
+		}
+
+		pairs = append(pairs, [2]int{p1, p2})
+	}
+	return pairs
+}

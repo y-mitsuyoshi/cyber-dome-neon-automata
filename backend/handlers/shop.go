@@ -6,8 +6,8 @@ import (
 	"net/http"
 )
 
-// HandleGetShop returns current shop offerings.
-// GET /api/shop?gameId=XXX
+// HandleGetShop returns current shop offerings for a specific player.
+// GET /api/shop?gameId=XXX&playerName=YYY
 func HandleGetShop(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "GET required")
@@ -15,9 +15,14 @@ func HandleGetShop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gameID := r.URL.Query().Get("gameId")
+	playerName := r.URL.Query().Get("playerName")
 	if gameID == "" {
 		writeError(w, http.StatusBadRequest, "gameId required")
 		return
+	}
+
+	if playerName == "" {
+		playerName = "PLAYER_ONE"
 	}
 
 	gs, ok := getGame(gameID)
@@ -34,15 +39,35 @@ func HandleGetShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gs.Shop.Credits = gs.Player.Credits
+	// Find the player to verify they exist
+	var playerIndex = -1
+	for idx, p := range gs.Players {
+		if p.Name == playerName {
+			playerIndex = idx
+			break
+		}
+	}
+
+	if playerIndex == -1 {
+		writeError(w, http.StatusNotFound, "Player not found")
+		return
+	}
+
+	shop, exists := gs.Shops[playerName]
+	if !exists || shop == nil {
+		writeError(w, http.StatusInternalServerError, "Shop not initialized for player")
+		return
+	}
+
+	shop.Credits = gs.Players[playerIndex].Credits
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"cards":   gs.Shop.Cards,
-		"credits": gs.Player.Credits,
+		"cards":   shop.Cards,
+		"credits": shop.Credits,
 	})
 }
 
-// HandleBuyCard processes buying a card from the shop.
+// HandleBuyCard processes buying a card from a player's personal shop.
 // POST /api/shop/buy
 func HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -51,12 +76,17 @@ func HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		GameID    string `json:"gameId"`
-		CardIndex int    `json:"cardIndex"`
+		GameID     string `json:"gameId"`
+		PlayerName string `json:"playerName"`
+		CardIndex  int    `json:"cardIndex"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if req.PlayerName == "" {
+		req.PlayerName = "PLAYER_ONE"
 	}
 
 	gs, ok := getGame(req.GameID)
@@ -73,17 +103,40 @@ func HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credits, card, errMsg := engine.BuyCard(&gs.Shop, &gs.Player.Deck, gs.Player.Credits, req.CardIndex)
+	// Find player index
+	playerIdx := -1
+	for idx, p := range gs.Players {
+		if p.Name == req.PlayerName {
+			playerIdx = idx
+			break
+		}
+	}
+
+	if playerIdx == -1 {
+		writeError(w, http.StatusNotFound, "Player not found")
+		return
+	}
+
+	p := &gs.Players[playerIdx]
+	shop, ok := gs.Shops[req.PlayerName]
+	if !ok || shop == nil {
+		writeError(w, http.StatusInternalServerError, "Shop state missing")
+		return
+	}
+
+	credits, _, errMsg := engine.BuyCard(shop, &p.Deck, p.Credits, req.CardIndex)
 	if errMsg != "" {
 		writeError(w, http.StatusBadRequest, errMsg)
 		return
 	}
-	_ = card
 
-	gs.Player.Credits = credits
-	gs.Shop.Credits = credits
+	p.Credits = credits
+	shop.Credits = credits
 
-	WriteFullGameState(w, gs)
+	// Settle writing player gamestate
+	gs.Mu.Unlock()
+	WritePlayerGameState(w, gs, req.PlayerName)
+	gs.Mu.Lock()
 }
 
 // HandleRerollShop regenerates the shop for 1 credit.
@@ -95,11 +148,16 @@ func HandleRerollShop(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		GameID string `json:"gameId"`
+		GameID     string `json:"gameId"`
+		PlayerName string `json:"playerName"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if req.PlayerName == "" {
+		req.PlayerName = "PLAYER_ONE"
 	}
 
 	gs, ok := getGame(req.GameID)
@@ -116,16 +174,38 @@ func HandleRerollShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credits, errMsg := engine.RerollShop(&gs.Shop, gs.Player.Credits)
+	playerIdx := -1
+	for idx, p := range gs.Players {
+		if p.Name == req.PlayerName {
+			playerIdx = idx
+			break
+		}
+	}
+
+	if playerIdx == -1 {
+		writeError(w, http.StatusNotFound, "Player not found")
+		return
+	}
+
+	p := &gs.Players[playerIdx]
+	shop, ok := gs.Shops[req.PlayerName]
+	if !ok || shop == nil {
+		writeError(w, http.StatusInternalServerError, "Shop state missing")
+		return
+	}
+
+	credits, errMsg := engine.RerollShop(shop, p.Credits)
 	if errMsg != "" {
 		writeError(w, http.StatusBadRequest, errMsg)
 		return
 	}
 
-	gs.Player.Credits = credits
-	gs.Shop.Credits = credits
+	p.Credits = credits
+	shop.Credits = credits
 
-	WriteFullGameState(w, gs)
+	gs.Mu.Unlock()
+	WritePlayerGameState(w, gs, req.PlayerName)
+	gs.Mu.Lock()
 }
 
 // HandleDeleteCard removes a card from the player's deck. Costs 2 credits.
@@ -137,12 +217,17 @@ func HandleDeleteCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		GameID    string `json:"gameId"`
-		CardIndex int    `json:"cardIndex"`
+		GameID     string `json:"gameId"`
+		PlayerName string `json:"playerName"`
+		CardIndex  int    `json:"cardIndex"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if req.PlayerName == "" {
+		req.PlayerName = "PLAYER_ONE"
 	}
 
 	gs, ok := getGame(req.GameID)
@@ -159,16 +244,33 @@ func HandleDeleteCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credits, deleted, errMsg := engine.DeleteCard(&gs.Player.Deck, gs.Player.Credits, req.CardIndex)
+	playerIdx := -1
+	for idx, p := range gs.Players {
+		if p.Name == req.PlayerName {
+			playerIdx = idx
+			break
+		}
+	}
+
+	if playerIdx == -1 {
+		writeError(w, http.StatusNotFound, "Player not found")
+		return
+	}
+
+	p := &gs.Players[playerIdx]
+
+	credits, _, errMsg := engine.DeleteCard(&p.Deck, p.Credits, req.CardIndex)
 	if errMsg != "" {
 		writeError(w, http.StatusBadRequest, errMsg)
 		return
 	}
-	_ = deleted // unused in generic full state response
 
-	gs.Player.Credits = credits
-	gs.Shop.Credits = credits
+	p.Credits = credits
+	if shop, ok := gs.Shops[req.PlayerName]; ok && shop != nil {
+		shop.Credits = credits
+	}
 
-	WriteFullGameState(w, gs)
+	gs.Mu.Unlock()
+	WritePlayerGameState(w, gs, req.PlayerName)
+	gs.Mu.Lock()
 }
-
