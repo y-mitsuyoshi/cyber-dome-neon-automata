@@ -62,9 +62,7 @@ func HandleBattle(w http.ResponseWriter, r *http.Request) {
 
 	// If not all human players are ready, keep them in standby
 	if readyCount < humanCount {
-		gs.Mu.Unlock()
 		WritePlayerGameState(w, gs, req.PlayerName)
-		gs.Mu.Lock()
 		return
 	}
 

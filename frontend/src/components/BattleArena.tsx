@@ -147,7 +147,7 @@ function BattleArena({
         <div className="font-mono flex flex-col gap-3 self-start">
           <MemorySlots slots={myMemSlots} label={t('yourMemory')} side="left" />
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30">
-            <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">Discard Matrix</div>
+            <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('discardMatrix')}</div>
             <div className="text-sm font-bold text-neon-cyan">{myDiscard.length} Units</div>
           </div>
         </div>
@@ -204,12 +204,12 @@ function BattleArena({
                     <div className="absolute inset-2 rounded-full border-4 border-b-neon-magenta border-t-transparent border-r-transparent border-l-transparent animate-spin-reverse" />
                   </div>
                   <h4 className="text-xs font-bold text-white uppercase tracking-widest mb-1">
-                    Syncing Neural Matrix
+                    {t('syncingNeuralMatrix')}
                   </h4>
                   <p className="text-[10px] text-cyber-text-dim max-w-xs">
                     {opponentCommitted
-                      ? "Resolving synaptic clash steps..."
-                      : `Awaiting decisons from ${opponentName}...`}
+                      ? t('combatProtocolDesc')
+                      : t('awaitingOpponentDecision', { name: opponentName })}
                   </p>
                 </div>
               ) : (
@@ -235,7 +235,7 @@ function BattleArena({
                           className="flex items-center gap-1.5 px-5 py-2 rounded border border-neon-red bg-red-950/20 text-neon-red text-xs font-bold uppercase tracking-wider hover:bg-neon-red/10 transition-all cursor-pointer shadow-[0_0_10px_rgba(255,0,80,0.1)]"
                         >
                           <Trash2 size={12} />
-                          Discard
+                          {t('discardBtn')}
                         </button>
                       </div>
                     </div>
@@ -243,7 +243,7 @@ function BattleArena({
                     <div className="flex flex-col items-center text-center py-16 border border-dashed border-cyber-border/30 rounded-xl px-12 w-full">
                       <Zap size={28} className="text-cyber-border/40 animate-pulse mb-3" />
                       <p className="text-[11px] text-cyber-text-dim tracking-wider uppercase">
-                        Select an Augmentation Card from Hand below
+                        {t('selectCardPrompt')}
                       </p>
                     </div>
                   )}
@@ -262,10 +262,10 @@ function BattleArena({
             <div className="flex flex-col items-center text-center font-mono py-6">
               <Zap size={32} className="text-neon-green text-glow-green mb-4 animate-bounce" />
               <h3 className="text-lg font-black tracking-widest text-white uppercase mb-2">
-                Grid Simulation Terminated
+                {t('gridSimTerminated')}
               </h3>
               <p className="text-xs text-cyber-text-dim max-w-sm mb-6 leading-relaxed">
-                All neural card components played. Dominance established over Sector.
+                {t('gridSimDesc')}
               </p>
               <button
                 onClick={onComplete}
@@ -281,11 +281,11 @@ function BattleArena({
         <div className="font-mono flex flex-col gap-3 self-start">
           <MemorySlots slots={opponentMemSlots} label={t('npcMemoryLabel', { opponent: opponentName })} side="right" />
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 text-right">
-            <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">Hand Modules</div>
+            <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('handModules')}</div>
             <div className="text-sm font-bold text-neon-magenta">{opponentHandCount} Active</div>
           </div>
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 text-right">
-            <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">Discard Matrix</div>
+            <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('discardMatrix')}</div>
             <div className="text-sm font-bold text-neon-magenta">{opponentDiscardCount} Units</div>
           </div>
         </div>
@@ -295,10 +295,10 @@ function BattleArena({
       <div className="relative z-10 max-w-7xl mx-auto w-full border-t border-cyber-border/30 pt-4 font-mono">
         <div className="flex justify-between items-center mb-2 px-1">
           <span className="text-[10px] text-cyber-text-dim uppercase tracking-widest">
-            Your Augmentation Hand ({myHand.length} Modules Remaining)
+            {t('yourAugmentationHand', { count: myHand.length })}
           </span>
           <span className="text-[9px] text-cyber-text-dim/50 uppercase">
-            No draw. Play or Discard wisely.
+            {t('noDrawAdvice')}
           </span>
         </div>
 
@@ -324,7 +324,7 @@ function BattleArena({
           </div>
         ) : (
           <div className="text-center py-8 text-xs text-cyber-text-dim border border-dashed border-cyber-border/20 rounded-lg">
-            No Augmentations Remaining in Hand Matrix.
+            {t('noHandRemaining')}
           </div>
         )}
       </div>

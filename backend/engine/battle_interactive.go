@@ -146,32 +146,38 @@ func StepBattle(session *models.BattleSession) {
 		p2Action = &models.BattleAction{PlayerName: session.Player2Name, ActionType: "DISCARD"}
 	}
 
-	// 2. Extract and remove cards from hands
-	var c1 *models.Card
+	// 2. Extract and remove cards from hands (value copies to avoid slice reallocation pointer issues)
+	var c1 models.Card
+	var c1Found bool
 	for i, c := range session.Player1Hand {
 		if c.ID == p1Action.CardID {
-			c1 = &session.Player1Hand[i]
+			c1 = c
+			c1Found = true
 			session.Player1Hand = append(session.Player1Hand[:i], session.Player1Hand[i+1:]...)
 			break
 		}
 	}
 	// Fallback first card if ID didn't match but PLAY requested
-	if c1 == nil && p1Action.ActionType == "PLAY" && len(session.Player1Hand) > 0 {
-		c1 = &session.Player1Hand[0]
+	if !c1Found && p1Action.ActionType == "PLAY" && len(session.Player1Hand) > 0 {
+		c1 = session.Player1Hand[0]
+		c1Found = true
 		session.Player1Hand = session.Player1Hand[1:]
 	}
 
-	var c2 *models.Card
+	var c2 models.Card
+	var c2Found bool
 	for i, c := range session.Player2Hand {
 		if c.ID == p2Action.CardID {
-			c2 = &session.Player2Hand[i]
+			c2 = c
+			c2Found = true
 			session.Player2Hand = append(session.Player2Hand[:i], session.Player2Hand[i+1:]...)
 			break
 		}
 	}
 	// Fallback first card if ID didn't match but PLAY requested
-	if c2 == nil && p2Action.ActionType == "PLAY" && len(session.Player2Hand) > 0 {
-		c2 = &session.Player2Hand[0]
+	if !c2Found && p2Action.ActionType == "PLAY" && len(session.Player2Hand) > 0 {
+		c2 = session.Player2Hand[0]
+		c2Found = true
 		session.Player2Hand = session.Player2Hand[1:]
 	}
 
@@ -195,8 +201,8 @@ func StepBattle(session *models.BattleSession) {
 	}
 
 	// Resolve the actions
-	p1Played := p1Action.ActionType == "PLAY" && c1 != nil
-	p2Played := p2Action.ActionType == "PLAY" && c2 != nil
+	p1Played := p1Action.ActionType == "PLAY" && c1Found
+	p2Played := p2Action.ActionType == "PLAY" && c2Found
 
 	p1Power := 0
 	p2Power := 0
@@ -204,22 +210,22 @@ func StepBattle(session *models.BattleSession) {
 	p2Effect := ""
 
 	// Process discards first
-	if !p1Played && c1 != nil {
-		session.Player1Discard = append(session.Player1Discard, *c1)
+	if !p1Played && c1Found {
+		session.Player1Discard = append(session.Player1Discard, c1)
 	}
-	if !p2Played && c2 != nil {
-		session.Player2Discard = append(session.Player2Discard, *c2)
+	if !p2Played && c2Found {
+		session.Player2Discard = append(session.Player2Discard, c2)
 	}
 
 	// Process PLAY reveals & OnReveal effects
 	if p1Played {
 		p1Power = c1.Power
-		p1Effect = bs.applyOnRevealEffects(c1, "player", &p1Power)
+		p1Effect = bs.applyOnRevealEffects(&c1, "player", &p1Power)
 		bs.PrevCardAttr["player"] = c1.Attribute
 	}
 	if p2Played {
 		p2Power = c2.Power
-		p2Effect = bs.applyOnRevealEffects(c2, "cpu", &p2Power)
+		p2Effect = bs.applyOnRevealEffects(&c2, "cpu", &p2Power)
 		bs.PrevCardAttr["cpu"] = c2.Attribute
 	}
 
@@ -235,7 +241,7 @@ func StepBattle(session *models.BattleSession) {
 		stepCard = &models.BattleLogCard{Name: fmt.Sprintf("%s vs %s", c1.Name, c2.Name), Power: p1Power, Attribute: "Clash"}
 		stepDetails = fmt.Sprintf("Clash! %s (%d POW) vs %s (%d POW)", c1.Name, p1Power, c2.Name, p2Power)
 
-		var winnerCard *models.Card
+		var winnerCard models.Card
 		var winnerSide string
 		var winnerName string
 		var loserName string
@@ -272,7 +278,7 @@ func StepBattle(session *models.BattleSession) {
 		}
 
 		// Apply OnWin effect
-		winEffect := bs.applyOnWinEffect(*winnerCard, winnerSide)
+		winEffect := bs.applyOnWinEffect(winnerCard, winnerSide)
 		if winEffect != "" {
 			stepEffect = fmt.Sprintf("Win Effect: %s", winEffect)
 		}
@@ -312,8 +318,8 @@ func StepBattle(session *models.BattleSession) {
 		session.FlagPower = winnerPower
 
 		// Symmetrical: Send both played cards to memory
-		p1Added := addToMemory(&bs.PlayerMem, *c1)
-		p2Added := addToMemory(&bs.CPUMem, *c2)
+		p1Added := addToMemory(&bs.PlayerMem, c1)
+		p2Added := addToMemory(&bs.CPUMem, c2)
 
 		if !p1Added || !p2Added {
 			session.IsFinished = true
@@ -339,7 +345,7 @@ func StepBattle(session *models.BattleSession) {
 		session.FlagPower = p1Power
 
 		// Send P1 card to memory
-		if !addToMemory(&bs.PlayerMem, *c1) {
+		if !addToMemory(&bs.PlayerMem, c1) {
 			session.IsFinished = true
 			session.Winner = session.Player2Name
 			session.Loser = session.Player1Name
@@ -359,7 +365,7 @@ func StepBattle(session *models.BattleSession) {
 		session.FlagPower = p2Power
 
 		// Send P2 card to memory
-		if !addToMemory(&bs.CPUMem, *c2) {
+		if !addToMemory(&bs.CPUMem, c2) {
 			session.IsFinished = true
 			session.Winner = session.Player1Name
 			session.Loser = session.Player2Name
