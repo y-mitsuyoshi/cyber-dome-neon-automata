@@ -72,7 +72,7 @@ func getGame(gameID string) (*models.GameState, bool) {
 
 // WritePlayerGameState returns the sliced game state tailored to a specific player's view.
 func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerName string) {
-	gs.Standings = buildStandings(gs, playerName)
+	standings := buildStandings(gs, playerName)
 
 	// Find the player
 	var player models.Player
@@ -185,7 +185,7 @@ func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerNam
 			"fans":     player.Fans,
 		},
 		"shop":         shop,
-		"standings":    gs.Standings,
+		"standings":    standings,
 		"npcs":         npcs,
 		"battleLog":    battleLog,
 		"lastResult":   lastResult,
@@ -391,4 +391,201 @@ func HandleNextRound(w http.ResponseWriter, r *http.Request) {
 		go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
 	}
 	WritePlayerGameState(w, gs, req.PlayerName)
+}
+
+// HandleKickPlayer converts an unresponsive human player in an active game into an NPC, letting the game continue.
+// POST /api/game/kick
+func HandleKickPlayer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	var req struct {
+		GameID     string `json:"gameId"`
+		HostName   string `json:"hostName"`
+		TargetName string `json:"targetName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	gs, ok := getGame(req.GameID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "Game not found")
+		return
+	}
+
+	gs.Mu.Lock()
+	defer gs.Mu.Unlock()
+
+	// Verify hostName is indeed the host (index 0 in player list)
+	if len(gs.Players) == 0 || gs.Players[0].Name != req.HostName {
+		writeError(w, http.StatusForbidden, "Only the host can execute kick commands")
+		return
+	}
+
+	// Find the target player
+	targetIdx := -1
+	for idx, p := range gs.Players {
+		if p.Name == req.TargetName {
+			targetIdx = idx
+			break
+		}
+	}
+
+	if targetIdx == -1 {
+		writeError(w, http.StatusNotFound, "Target player not found in game")
+		return
+	}
+
+	targetPlayer := &gs.Players[targetIdx]
+	if targetPlayer.IsNPC {
+		writeError(w, http.StatusBadRequest, "Target is already an NPC bot")
+		return
+	}
+
+	// Convert them to an NPC
+	targetPlayer.IsNPC = true
+	// Choose a strategy randomly
+	targetPlayer.AIStrategy = engine.NPCStrategies[rand.Intn(len(engine.NPCStrategies))]
+	
+	// Mark them as ready in current round standby so they don't block
+	gs.ReadyPlayers[req.TargetName] = true
+
+	// Check if this conversion triggers the battle resolution or next round transition!
+	if gs.Phase == "shop" {
+		humanCount := 0
+		readyCount := 0
+		for _, p := range gs.Players {
+			if !p.IsNPC {
+				humanCount++
+				if gs.ReadyPlayers[p.Name] {
+					readyCount++
+				}
+			}
+		}
+		
+		// If everyone is now ready, run battles
+		if readyCount >= humanCount {
+			gs.Phase = "battle"
+			for _, pair := range gs.Matchups {
+				p1Idx := pair[0]
+				p2Idx := pair[1]
+
+				if p1Idx == -1 || p2Idx == -1 {
+					activeIdx := p1Idx
+					if activeIdx == -1 {
+						activeIdx = p2Idx
+					}
+					p := &gs.Players[activeIdx]
+					p.Wins++
+					p.Fans++
+					res := models.BattleResult{
+						Winner:     p.Name,
+						Loser:      "BYE",
+						Reason:     "No opponent matched this round (Bye)",
+						FansGained: 1,
+						Log: []models.BattleLogEntry{
+							{Step: 1, Action: "bye", Player: p.Name, Details: p.Name + " received a bye."},
+						},
+					}
+					gs.LastResults[p.Name] = &res
+					gs.BattleLogs[p.Name] = res.Log
+					continue
+				}
+
+				p1 := &gs.Players[p1Idx]
+				p2 := &gs.Players[p2Idx]
+
+				deck1 := p1.CloneDeck()
+				rand.Shuffle(len(deck1), func(i, j int) { deck1[i], deck1[j] = deck1[j], deck1[i] })
+				deck2 := p2.CloneDeck()
+				rand.Shuffle(len(deck2), func(i, j int) { deck2[i], deck2[j] = deck2[j], deck2[i] })
+
+				result := engine.RunBattle(deck1, deck2)
+				winnerName := p1.Name
+				loserName := p2.Name
+
+				if result.Winner == "player" {
+					p1.Wins++
+					p1.Fans += result.FansGained
+				} else {
+					p2.Wins++
+					p2.Fans += result.FansGained
+					winnerName = p2.Name
+					loserName = p1.Name
+				}
+
+				mappedLog := make([]models.BattleLogEntry, len(result.Log))
+				for j, entry := range result.Log {
+					mEntry := entry
+					if entry.Player == "player" {
+						mEntry.Player = p1.Name
+					} else if entry.Player == "cpu" {
+						mEntry.Player = p2.Name
+					}
+					if entry.FlagHolder == "player" {
+						mEntry.FlagHolder = p1.Name
+					} else if entry.FlagHolder == "cpu" {
+						mEntry.FlagHolder = p2.Name
+					}
+					mappedLog[j] = mEntry
+				}
+
+				battleRes := models.BattleResult{
+					Winner:     winnerName,
+					Loser:      loserName,
+					Reason:     result.Reason,
+					FansGained: result.FansGained,
+					Log:        mappedLog,
+				}
+				gs.LastResults[p1.Name] = &battleRes
+				gs.BattleLogs[p1.Name] = mappedLog
+				gs.LastResults[p2.Name] = &battleRes
+				gs.BattleLogs[p2.Name] = mappedLog
+			}
+			gs.Phase = "results"
+			gs.ReadyPlayers = make(map[string]bool)
+			go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+		}
+	} else if gs.Phase == "results" {
+		humanCount := 0
+		readyCount := 0
+		for _, p := range gs.Players {
+			if !p.IsNPC {
+				humanCount++
+				if gs.ReadyPlayers[p.Name] {
+					readyCount++
+				}
+			}
+		}
+		if readyCount >= humanCount {
+			if gs.CurrentRound >= gs.MaxRounds {
+				gs.CurrentRound++
+				gs.Phase = "results"
+			} else {
+				gs.CurrentRound++
+				gs.Phase = "shop"
+				gs.ReadyPlayers = make(map[string]bool)
+				gs.BattleLogs = make(map[string][]models.BattleLogEntry)
+				gs.LastResults = make(map[string]*models.BattleResult)
+				for i := range gs.Players {
+					p := &gs.Players[i]
+					p.Credits += 10
+					if p.IsNPC {
+						engine.NPCShopPhase(p)
+					} else {
+						shop := engine.GenerateShop(p.Credits)
+						gs.Shops[p.Name] = &shop
+					}
+				}
+				gs.Matchups = engine.GetMatchups(gs.CurrentRound, len(gs.Players))
+			}
+			go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+		}
+	}
+
+	WritePlayerGameState(w, gs, req.HostName)
 }

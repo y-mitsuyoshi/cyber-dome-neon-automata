@@ -210,3 +210,20 @@ func (lm *LobbyManager) GetLobby(code string) *Lobby {
 	defer lm.RUnlock()
 	return lm.Lobbies[code]
 }
+
+// StartLobbyGC starts a background sweeper to clean up lobbies created more than 2 hours ago to prevent memory bloat.
+func StartLobbyGC(lm *LobbyManager) {
+	ticker := time.NewTicker(30 * time.Minute)
+	go func() {
+		for range ticker.C {
+			lm.Lock()
+			now := time.Now()
+			for code, lobby := range lm.Lobbies {
+				if now.Sub(lobby.CreatedAt) > 2*time.Hour {
+					delete(lm.Lobbies, code)
+				}
+			}
+			lm.Unlock()
+		}
+	}()
+}

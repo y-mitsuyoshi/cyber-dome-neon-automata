@@ -5,18 +5,25 @@ import (
 	"backend/lobby"
 	"backend/middleware"
 	"fmt"
+	"math/rand"
 	"net/http"
+	"time"
 )
 
 func main() {
-	// Initialize and run the WebSocket Hub
+	// Seed random generator
+	rand.Seed(time.Now().UnixNano())
+
+	// Initialize and run the WebSocket Hub & Lobby GC sweeper
 	go lobby.GlobalHub.Run()
+	go lobby.StartLobbyGC(lobby.GlobalLobbyManager)
 
 	mux := http.NewServeMux()
 
 	// Game endpoints
 	mux.HandleFunc("/api/game/new", handlers.HandleNewGame)
 	mux.HandleFunc("/api/game/state", handlers.HandleGameState)
+	mux.HandleFunc("/api/game/kick", handlers.HandleKickPlayer)
 
 	// Shop endpoints
 	mux.HandleFunc("/api/shop", handlers.HandleGetShop)

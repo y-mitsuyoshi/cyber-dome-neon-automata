@@ -32,7 +32,7 @@ export const useWebSocket = (code: string | null, name: string | null) => {
   const [phaseTrigger, setPhaseTrigger] = useState<{ phase: string; round: number } | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<any>(null);
   const attemptRef = useRef(0);
 
   const connect = () => {
