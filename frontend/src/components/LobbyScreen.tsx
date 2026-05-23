@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Users, User, ShieldAlert, Cpu, Send, Clipboard, Check } from 'lucide-react';
+import { useTranslation } from '../context/TranslationContext';
 import type { LobbyState, ChatMessage } from '../hooks/useWebSocket';
 
 interface LobbyScreenProps {
@@ -29,6 +30,8 @@ function LobbyScreen({
   const [copied, setCopied] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
+  const { locale } = useTranslation();
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
@@ -38,8 +41,8 @@ function LobbyScreen({
       <div className="min-h-screen bg-cyber-dark flex items-center justify-center">
         <div className="text-center">
           <span className="inline-block w-8 h-8 rounded-full border-4 border-neon-cyan border-t-transparent animate-spin mb-4" />
-          <p className="text-sm font-bold uppercase tracking-widest text-neon-cyan animate-pulse">
-            Establishing Link to Cyber-Dome...
+          <p className="text-sm font-bold uppercase tracking-widest text-neon-cyan animate-pulse font-mono">
+            {locale === 'ja' ? '電脳ドームへのリンクを確立中...' : 'Establishing Link to Cyber-Dome...'}
           </p>
         </div>
       </div>
@@ -87,18 +90,22 @@ function LobbyScreen({
           <div>
             <h2 className="text-2xl font-black tracking-[0.15em] text-neon-cyan text-glow-cyan flex items-center gap-2">
               <Users size={24} className="animate-pulse" />
-              ARENA LOBBY
+              {locale === 'ja' ? 'アリーナロビー' : 'ARENA LOBBY'}
             </h2>
             <div className="flex items-center gap-2 mt-1">
               <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-neon-green animate-pulse' : 'bg-neon-red'}`} />
-              <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim">
-                {connected ? 'Sync Link Established' : 'Sync Offline'}
+              <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-mono">
+                {connected 
+                  ? (locale === 'ja' ? '同期リンク確立完了' : 'Sync Link Established') 
+                  : (locale === 'ja' ? '同期リンク切断' : 'Sync Offline')}
               </span>
             </div>
           </div>
           
-          <div className="flex items-center gap-3 mt-4 sm:mt-0">
-            <span className="text-xs uppercase tracking-widest text-cyber-text-dim">Lobby Key:</span>
+          <div className="flex items-center gap-3 mt-4 sm:mt-0 font-mono">
+            <span className="text-xs uppercase tracking-widest text-cyber-text-dim">
+              {locale === 'ja' ? 'ロビーキー:' : 'Lobby Key:'}
+            </span>
             <button
               onClick={handleCopyCode}
               className="flex items-center gap-2 bg-cyber-darker/80 border border-neon-cyan/40 px-4 py-2 rounded font-mono text-xl font-bold tracking-widest text-neon-cyan text-glow-cyan hover:bg-neon-cyan/15 hover:border-neon-cyan transition-all duration-300 relative group cursor-pointer"
@@ -106,7 +113,7 @@ function LobbyScreen({
               {lobbyState.code}
               {copied ? <Check size={16} className="text-neon-green" /> : <Clipboard size={16} />}
               <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-cyber-darker text-[9px] uppercase tracking-wider px-2 py-0.5 rounded border border-cyber-border opacity-0 group-hover:opacity-100 transition-opacity">
-                {copied ? 'Copied' : 'Copy Key'}
+                {copied ? (locale === 'ja' ? 'コピー完了' : 'Copied') : (locale === 'ja' ? 'キーをコピー' : 'Copy Key')}
               </span>
             </button>
           </div>
@@ -114,13 +121,13 @@ function LobbyScreen({
 
         {/* LEFT COLUMN: ROSTER LIST */}
         <div className="col-span-12 md:col-span-7 flex flex-col">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 font-mono">
             <h3 className="text-xs uppercase tracking-widest text-cyber-text-dim font-bold flex items-center gap-1.5">
               <Terminal size={14} className="text-neon-cyan" />
-              Combatant Roster ({totalPlayers}/8)
+              {locale === 'ja' ? `コバタント名簿 (${totalPlayers}/8)` : `Combatant Roster (${totalPlayers}/8)`}
             </h3>
             <span className="text-[10px] text-neon-cyan/80 uppercase tracking-widest border border-neon-cyan/20 px-2 py-0.5 rounded">
-              Min 3 Required
+              {locale === 'ja' ? '最低3名必要' : 'Min 3 Required'}
             </span>
           </div>
 
@@ -154,14 +161,14 @@ function LobbyScreen({
                     </span>
 
                     {isMe && (
-                      <span className="text-[9px] uppercase tracking-wider bg-neon-cyan/25 border border-neon-cyan/40 px-1.5 py-0.1 rounded text-neon-cyan">
-                        You
+                      <span className="text-[9px] font-mono uppercase tracking-wider bg-neon-cyan/25 border border-neon-cyan/40 px-1.5 py-0.1 rounded text-neon-cyan">
+                        {locale === 'ja' ? 'あなた' : 'You'}
                       </span>
                     )}
 
                     {isPlayerHost && (
-                      <span className="text-[9px] uppercase tracking-wider bg-neon-amber/25 border border-neon-amber/40 px-1.5 py-0.1 rounded text-neon-amber">
-                        Host
+                      <span className="text-[9px] font-mono uppercase tracking-wider bg-neon-amber/25 border border-neon-amber/40 px-1.5 py-0.1 rounded text-neon-amber">
+                        {locale === 'ja' ? 'ホスト' : 'Host'}
                       </span>
                     )}
                   </div>
@@ -170,9 +177,9 @@ function LobbyScreen({
                   {isHost && p.isNpc && (
                     <button
                       onClick={() => onRemoveNPC(p.name)}
-                      className="text-[9px] font-bold uppercase tracking-wider border border-red-500/40 text-neon-red px-2 py-0.5 rounded hover:bg-red-500/10 transition-colors cursor-pointer"
+                      className="text-[9px] font-bold uppercase tracking-wider border border-red-500/40 text-neon-red px-2 py-0.5 rounded hover:bg-red-500/10 transition-colors cursor-pointer font-mono"
                     >
-                      Purge
+                      {locale === 'ja' ? '除外' : 'Purge'}
                     </button>
                   )}
                 </div>
@@ -185,7 +192,7 @@ function LobbyScreen({
                 key={`empty-${i}`}
                 className="border border-dashed border-cyber-border/20 p-2.5 rounded flex items-center justify-center text-xs text-cyber-text-dim/40 font-mono tracking-widest"
               >
-                [EMPTY COMBATANT SLOT]
+                {locale === 'ja' ? '[ 空きコバタントスロット ]' : '[EMPTY COMBATANT SLOT]'}
               </div>
             ))}
           </div>
@@ -194,25 +201,27 @@ function LobbyScreen({
           {isHost && totalPlayers < 8 && (
             <button
               onClick={onAddNPC}
-              className="mt-3 w-full border border-neon-amber/40 text-neon-amber py-2 rounded text-xs font-bold uppercase tracking-wider hover:bg-neon-amber/15 hover:border-neon-amber transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-neon-amber/5"
+              className="mt-3 w-full border border-neon-amber/40 text-neon-amber py-2 rounded text-xs font-bold uppercase tracking-wider hover:bg-neon-amber/15 hover:border-neon-amber transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-neon-amber/5 font-mono"
             >
               <Cpu size={14} className="animate-pulse" />
-              DEPLOY NPC BOT IN ARENA
+              {locale === 'ja' ? 'NPCボットを配備する' : 'DEPLOY NPC BOT IN ARENA'}
             </button>
           )}
         </div>
 
         {/* RIGHT COLUMN: CHAT TERMINAL */}
         <div className="col-span-12 md:col-span-5 flex flex-col">
-          <h3 className="text-xs uppercase tracking-widest text-cyber-text-dim font-bold mb-3 flex items-center gap-1.5">
+          <h3 className="text-xs uppercase tracking-widest text-cyber-text-dim font-bold mb-3 flex items-center gap-1.5 font-mono">
             <Terminal size={14} className="text-neon-cyan" />
-            Comms Channel
+            {locale === 'ja' ? '通信チャンネル' : 'Comms Channel'}
           </h3>
 
           <div className="flex-1 min-h-[220px] max-h-[220px] overflow-y-auto border border-cyber-border/20 rounded-md bg-cyber-darker/60 p-3 mb-3 font-mono text-xs space-y-1.5 flex flex-col">
             {chatMessages.length === 0 ? (
               <div className="text-cyber-text-dim/30 italic my-auto text-center">
-                Comms terminal initialized. Secure sub-layer active.
+                {locale === 'ja' 
+                  ? '通信ターミナルが初期化されました。セキュアサブレイヤー有効。' 
+                  : 'Comms terminal initialized. Secure sub-layer active.'}
               </div>
             ) : (
               chatMessages.map((m, i) => (
@@ -230,7 +239,7 @@ function LobbyScreen({
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Inject comms message..."
+              placeholder={locale === 'ja' ? '通信メッセージを注入...' : 'Inject comms message...'}
               className="flex-1 bg-cyber-darker border border-cyber-border/40 rounded px-3 py-2 text-xs font-mono text-cyber-text focus:outline-none focus:border-neon-cyan transition-colors"
             />
             <button
@@ -245,7 +254,7 @@ function LobbyScreen({
         {/* BOTTOM ACTION PANEL */}
         <div className="col-span-12 border-t border-cyber-border/20 pt-6 mt-2 flex flex-col items-center justify-center">
           {isHost ? (
-            <div className="text-center w-full max-w-md">
+            <div className="text-center w-full max-w-md font-mono">
               <button
                 onClick={onStartGame}
                 disabled={!canStart || loading}
@@ -261,22 +270,24 @@ function LobbyScreen({
                 {loading ? (
                   <span className="animate-spin inline-block">⟳</span>
                 ) : (
-                  'INITIALIZE TOURNAMENT'
+                  locale === 'ja' ? 'トーナメント初期化' : 'INITIALIZE TOURNAMENT'
                 )}
               </button>
               
               {!canStart && (
                 <p className="text-[10px] font-mono text-neon-amber uppercase tracking-widest mt-2 animate-pulse">
                   <ShieldAlert size={10} className="inline mr-1 -mt-0.5" />
-                  Grid lock: Roster size must be between 3 and 8 combatants to sync matrix.
+                  {locale === 'ja' 
+                    ? 'グリッドロック：マトリクス同期にはコバタント数が3人から8人である必要があります。' 
+                    : 'Grid lock: Roster size must be between 3 and 8 combatants to sync matrix.'}
                 </p>
               )}
             </div>
           ) : (
-            <div className="text-center py-2 flex items-center gap-3 bg-neon-cyan/5 border border-neon-cyan/20 px-6 rounded-md animate-pulse">
+            <div className="text-center py-2 flex items-center gap-3 bg-neon-cyan/5 border border-neon-cyan/20 px-6 rounded-md animate-pulse font-mono">
               <span className="inline-block w-2 h-2 rounded-full bg-neon-cyan animate-ping" />
               <span className="text-xs font-mono uppercase tracking-[0.2em] text-neon-cyan text-glow-cyan">
-                Awaiting host transmission signal...
+                {locale === 'ja' ? 'ホストからの送信シグナルを待機中...' : 'Awaiting host transmission signal...'}
               </span>
             </div>
           )}

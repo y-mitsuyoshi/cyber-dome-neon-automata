@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { HardDrive } from 'lucide-react';
+import { useTranslation } from '../context/TranslationContext';
 
 interface MemorySlotsProps {
   slots: string[][];
@@ -9,6 +10,7 @@ interface MemorySlotsProps {
 }
 
 function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
+  const { locale, translateCardName } = useTranslation();
   const filledCount = slots.filter(s => s.length > 0).length;
   const fillRatio = filledCount / maxSlots;
   const isWarning = fillRatio >= 5 / 6;
@@ -57,7 +59,7 @@ function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
         isWarning ? 'text-neon-amber text-glow-amber' :
         'text-cyber-text-dim'
       }`}>
-        MEMORY: {filledCount}/{maxSlots}
+        {locale === 'ja' ? 'メモリ容量' : 'MEMORY'}: {filledCount}/{maxSlots}
       </div>
 
       {/* Slot grid */}
@@ -93,13 +95,13 @@ function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
               }
             >
               {isEmpty ? (
-                <div className="text-[9px] text-cyber-border uppercase tracking-wider">
-                  Empty
+                <div className="text-[9px] text-cyber-border uppercase tracking-wider font-mono">
+                  {locale === 'ja' ? '空スロット' : 'Empty'}
                 </div>
               ) : (
                 <>
                   <div className="text-[10px] text-cyber-text truncate font-mono leading-tight">
-                    {slotName}
+                    {translateCardName(slotName || '')}
                   </div>
                   {stackCount > 1 && (
                     <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-neon-magenta text-[8px] font-bold text-white flex items-center justify-center"

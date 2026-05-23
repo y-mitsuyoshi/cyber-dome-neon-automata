@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Cpu, Bug, HardDrive, User, Zap } from 'lucide-react';
 import type { Card } from '../types/game';
+import { useTranslation } from '../context/TranslationContext';
 
 interface CardDisplayProps {
   card: Card;
@@ -18,6 +19,12 @@ const attributeConfig = {
 };
 
 function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false }: CardDisplayProps) {
+  const { locale, translateCard, t } = useTranslation();
+  
+  // Translate the card details for rendering
+  const displayCard = useMemo(() => translateCard(card), [card, locale]);
+
+  // Use original English values for style lookups
   const attr = attributeConfig[card.attribute];
   const AttrIcon = attr.icon;
 
@@ -45,8 +52,8 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
     return (
       <div className={`flex items-center gap-2 px-2 py-1 rounded border ${attr.border} ${attr.bg} text-xs`}>
         <AttrIcon size={12} className={attr.color} />
-        <span className="text-cyber-text truncate flex-1">{card.name}</span>
-        <span className={`font-bold ${attr.color}`}>{card.power}</span>
+        <span className="text-cyber-text truncate flex-1">{displayCard.name}</span>
+        <span className={`font-bold ${attr.color}`}>{displayCard.power}</span>
       </div>
     );
   }
@@ -78,23 +85,23 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
           card.rarity === 'Rare' ? 'text-neon-magenta text-glow-magenta' :
           'text-neon-cyan'
         }`}>
-          {card.rarity}
+          {displayCard.rarity}
         </span>
         <span className={`text-[10px] uppercase tracking-wider ${attr.color}`}>
-          {card.archetype}
+          {displayCard.archetype}
         </span>
       </div>
 
       {/* Card name */}
       <h3 className="text-sm font-bold text-white mb-2 tracking-wide leading-tight min-h-[2.5rem]">
-        {card.name}
+        {displayCard.name}
       </h3>
 
       {/* Attribute & Power */}
       <div className="flex items-center justify-between mb-3">
         <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${attr.bg} border ${attr.border}`}>
           <AttrIcon size={14} className={attr.color} />
-          <span className={`text-xs font-bold ${attr.color}`}>{card.attribute}</span>
+          <span className={`text-xs font-bold ${attr.color}`}>{displayCard.attribute}</span>
         </div>
         <div
           className="relative flex items-center justify-center w-12 h-12 rounded-lg border-2"
@@ -105,21 +112,21 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         >
           <Zap size={10} className={`absolute top-0.5 right-0.5 ${attr.color} opacity-50`} />
           <span className={`text-xl font-black ${attr.color}`} style={{ textShadow: `0 0 10px ${attr.glow}` }}>
-            {card.power}
+            {displayCard.power}
           </span>
         </div>
       </div>
 
       {/* Effect */}
       <div className="text-[11px] text-cyber-text-dim leading-relaxed border-t border-cyber-border pt-2 min-h-[2.5rem]">
-        {card.effect}
+        {displayCard.effect}
       </div>
 
       {/* Cost */}
       {showCost && (
         <div className="mt-2 pt-2 border-t border-cyber-border flex items-center justify-between">
-          <span className="text-[10px] text-cyber-text-dim uppercase tracking-wider">Cost</span>
-          <span className="text-sm font-bold text-neon-amber text-glow-amber">{card.cost}¢</span>
+          <span className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{t('cost')}</span>
+          <span className="text-sm font-bold text-neon-amber text-glow-amber">{displayCard.cost}¢</span>
         </div>
       )}
 
@@ -137,3 +144,4 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
 }
 
 export default CardDisplay;
+
