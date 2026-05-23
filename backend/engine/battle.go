@@ -67,13 +67,15 @@ func uniqueSlotCount(mem []models.MemorySlot) int {
 	return count
 }
 
-// benchPowerBonus returns the total +power bonus from bench_power_plus_1 cards in memory.
+// benchPowerBonus returns the total +power bonus from bench_power_plus_1/2 cards in memory.
 func benchPowerBonus(mem []models.MemorySlot) int {
 	bonus := 0
 	for _, slot := range mem {
 		for _, c := range slot.Cards {
 			if c.EffectType == "bench_power_plus_1" {
-				bonus++
+				bonus += 1
+			} else if c.EffectType == "bench_power_plus_2" {
+				bonus += 2
 			}
 		}
 	}
@@ -89,6 +91,28 @@ func countAIInMemory(mem []models.MemorySlot) int {
 				count++
 			}
 		}
+	}
+	return count
+}
+
+// countAttributeInMemory counts how many cards of a specific attribute are in memory.
+func countAttributeInMemory(mem []models.MemorySlot, attr string) int {
+	count := 0
+	for _, slot := range mem {
+		for _, c := range slot.Cards {
+			if c.Attribute == attr {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+// countTotalCardsInMemory counts the total number of benched cards in memory.
+func countTotalCardsInMemory(mem []models.MemorySlot) int {
+	count := 0
+	for _, slot := range mem {
+		count += slot.Count
 	}
 	return count
 }
@@ -119,6 +143,18 @@ func addToMemory(mem *[]models.MemorySlot, card models.Card) bool {
 		if rand.Intn(100) < 20 {
 			return true // saved! don't consume slot
 		}
+	}
+
+	// ram_save_50pct: 50% chance to skip using a new slot
+	if card.EffectType == "ram_save_50pct" {
+		if rand.Intn(100) < 50 {
+			return true // saved! don't consume slot
+		}
+	}
+
+	// ram_save_100pct: 100% chance to skip using a new slot (never consumes slot)
+	if card.EffectType == "ram_save_100pct" {
+		return true // saved! don't consume slot
 	}
 
 	// Need a new unique slot — check overflow
@@ -181,6 +217,20 @@ func (bs *BattleState) applyOnRevealEffects(card *models.Card, side string, effe
 		}
 		return fmt.Sprintf("%s reduces flag holder power by 2 (now %d)", card.Name, bs.FlagPower)
 
+	case "power_minus_3":
+		bs.FlagPower -= 3
+		if bs.FlagPower < 0 {
+			bs.FlagPower = 0
+		}
+		return fmt.Sprintf("%s reduces flag holder power by 3 (now %d)", card.Name, bs.FlagPower)
+
+	case "power_minus_4":
+		bs.FlagPower -= 4
+		if bs.FlagPower < 0 {
+			bs.FlagPower = 0
+		}
+		return fmt.Sprintf("%s reduces flag holder power by 4 (now %d)", card.Name, bs.FlagPower)
+
 	case "nullify_next_effect":
 		bs.NullifyNext[enemySide] = true
 		return fmt.Sprintf("%s nullifies the next enemy card effect", card.Name)
@@ -190,6 +240,36 @@ func (bs *BattleState) applyOnRevealEffects(card *models.Card, side string, effe
 		boost := 2 * aiCount
 		*effectivePower += boost
 		return fmt.Sprintf("%s gains +%d power (%d AI in memory)", card.Name, boost, aiCount)
+
+	case "power_per_virus_in_memory":
+		count := countAttributeInMemory(*myMem, "Virus")
+		boost := 2 * count
+		*effectivePower += boost
+		return fmt.Sprintf("%s gains +%d power (%d Virus in memory)", card.Name, boost, count)
+
+	case "power_per_hardware_in_memory":
+		count := countAttributeInMemory(*myMem, "Hardware")
+		boost := 2 * count
+		*effectivePower += boost
+		return fmt.Sprintf("%s gains +%d power (%d Hardware in memory)", card.Name, boost, count)
+
+	case "power_per_netrunner_in_memory":
+		count := countAttributeInMemory(*myMem, "Netrunner")
+		boost := 2 * count
+		*effectivePower += boost
+		return fmt.Sprintf("%s gains +%d power (%d Netrunner in memory)", card.Name, boost, count)
+
+	case "power_per_card_in_memory":
+		count := countTotalCardsInMemory(*myMem)
+		boost := 1 * count
+		*effectivePower += boost
+		return fmt.Sprintf("%s gains +%d power (%d total cards benched)", card.Name, boost, count)
+
+	case "power_per_card_in_memory_x2":
+		count := countTotalCardsInMemory(*myMem)
+		boost := 2 * count
+		*effectivePower += boost
+		return fmt.Sprintf("%s gains +%d power (%d total cards benched)", card.Name, boost, count)
 
 	case "double_if_same_name":
 		if hasSameNameInMemory(*myMem, card.Name) {
@@ -205,6 +285,100 @@ func (bs *BattleState) applyOnRevealEffects(card *models.Card, side string, effe
 		}
 		return "Previous card was not AI"
 
+	case "power_if_prev_virus":
+		if bs.PrevCardAttr[side] == "Virus" {
+			*effectivePower += 3
+			return fmt.Sprintf("%s gains +3 power (previous card was Virus)", card.Name)
+		}
+		return "Previous card was not Virus"
+
+	case "power_if_prev_hw":
+		if bs.PrevCardAttr[side] == "Hardware" {
+			*effectivePower += 3
+			return fmt.Sprintf("%s gains +3 power (previous card was Hardware)", card.Name)
+		}
+		return "Previous card was not Hardware"
+
+	case "power_if_prev_nr":
+		if bs.PrevCardAttr[side] == "Netrunner" {
+			*effectivePower += 3
+			return fmt.Sprintf("%s gains +3 power (previous card was Netrunner)", card.Name)
+		}
+		return "Previous card was not Netrunner"
+
+	case "power_vs_ai":
+		if bs.PrevCardAttr[enemySide] == "AI" {
+			*effectivePower += 4
+			return fmt.Sprintf("%s gains +4 power vs AI flag holder", card.Name)
+		}
+		return "Enemy flag holder is not AI"
+
+	case "power_vs_virus":
+		if bs.PrevCardAttr[enemySide] == "Virus" {
+			*effectivePower += 4
+			return fmt.Sprintf("%s gains +4 power vs Virus flag holder", card.Name)
+		}
+		return "Enemy flag holder is not Virus"
+
+	case "power_vs_hw":
+		if bs.PrevCardAttr[enemySide] == "Hardware" {
+			*effectivePower += 4
+			return fmt.Sprintf("%s gains +4 power vs Hardware flag holder", card.Name)
+		}
+		return "Enemy flag holder is not Hardware"
+
+	case "power_vs_nr":
+		if bs.PrevCardAttr[enemySide] == "Netrunner" {
+			*effectivePower += 4
+			return fmt.Sprintf("%s gains +4 power vs Netrunner flag holder", card.Name)
+		}
+		return "Enemy flag holder is not Netrunner"
+
+	case "power_if_deck_smaller":
+		var myDeckLen, enemyDeckLen int
+		if side == "player" {
+			myDeckLen = len(bs.PlayerDeck)
+			enemyDeckLen = len(bs.CPUDeck)
+		} else {
+			myDeckLen = len(bs.CPUDeck)
+			enemyDeckLen = len(bs.PlayerDeck)
+		}
+		if myDeckLen < enemyDeckLen {
+			*effectivePower += 3
+			return fmt.Sprintf("%s gains +3 power (own deck %d vs enemy %d)", card.Name, myDeckLen, enemyDeckLen)
+		}
+		return fmt.Sprintf("Own deck %d is not smaller than enemy's %d", myDeckLen, enemyDeckLen)
+
+	case "power_if_deck_larger":
+		var myDeckLen, enemyDeckLen int
+		if side == "player" {
+			myDeckLen = len(bs.PlayerDeck)
+			enemyDeckLen = len(bs.CPUDeck)
+		} else {
+			myDeckLen = len(bs.CPUDeck)
+			enemyDeckLen = len(bs.PlayerDeck)
+		}
+		if myDeckLen > enemyDeckLen {
+			*effectivePower += 3
+			return fmt.Sprintf("%s gains +3 power (own deck %d vs enemy %d)", card.Name, myDeckLen, enemyDeckLen)
+		}
+		return fmt.Sprintf("Own deck %d is not larger than enemy's %d", myDeckLen, enemyDeckLen)
+
+	case "self_delete_on_reveal":
+		var myDeck *[]models.Card
+		if side == "player" {
+			myDeck = &bs.PlayerDeck
+		} else {
+			myDeck = &bs.CPUDeck
+		}
+		if len(*myDeck) > 0 {
+			deleted := (*myDeck)[0]
+			*myDeck = (*myDeck)[1:]
+			*effectivePower += 5
+			return fmt.Sprintf("%s deleted own card %s to gain +5 power (total %d)", card.Name, deleted.Name, *effectivePower)
+		}
+		return fmt.Sprintf("%s found own deck empty, no card to delete", card.Name)
+
 	case "peek_enemy":
 		var enemyDeck *[]models.Card
 		if side == "player" {
@@ -218,8 +392,9 @@ func (bs *BattleState) applyOnRevealEffects(card *models.Card, side string, effe
 		}
 		return fmt.Sprintf("%s peeks: enemy deck is empty", card.Name)
 
-	case "redirect_30pct", "lock_enemy_highest", "ram_save_20pct",
-		"reduce_memory_count", "bench_power_plus_1", "delete_enemy_card":
+	case "redirect_30pct", "redirect_50pct", "lock_enemy_highest", "lock_enemy_highest_x2", "lock_enemy_lowest",
+		"ram_save_20pct", "ram_save_50pct", "ram_save_100pct", "reduce_memory_count",
+		"bench_power_plus_1", "bench_power_plus_2", "delete_enemy_card", "delete_enemy_card_x2", "draw_extra_card":
 		// These trigger at other phases, not on reveal
 		if bonus > 0 {
 			return fmt.Sprintf("Bench bonus applied: +%d power", bonus)
@@ -264,12 +439,63 @@ func (bs *BattleState) applyOnDefendEffect(card models.Card, side string) string
 		}
 		return "No enemy card to lock"
 
+	case "lock_enemy_highest_x2":
+		// Lock the enemy's highest power card with double security
+		var enemyDeck *[]models.Card
+		if side == "player" {
+			enemyDeck = &bs.CPUDeck
+		} else {
+			enemyDeck = &bs.PlayerDeck
+		}
+		highestName := ""
+		highestPow := -1
+		for _, c := range *enemyDeck {
+			if c.Power > highestPow {
+				highestPow = c.Power
+				highestName = c.Name
+			}
+		}
+		if highestName != "" {
+			bs.LockedCards[enemySide] = highestName
+			return fmt.Sprintf("%s locks enemy card %s (power %d) with double security", card.Name, highestName, highestPow)
+		}
+		return "No enemy card to lock"
+
+	case "lock_enemy_lowest":
+		// Lock the enemy's lowest power card
+		var enemyDeck *[]models.Card
+		if side == "player" {
+			enemyDeck = &bs.CPUDeck
+		} else {
+			enemyDeck = &bs.PlayerDeck
+		}
+		lowestName := ""
+		lowestPow := 9999
+		for _, c := range *enemyDeck {
+			if c.Power < lowestPow {
+				lowestPow = c.Power
+				lowestName = c.Name
+			}
+		}
+		if lowestName != "" {
+			bs.LockedCards[enemySide] = lowestName
+			return fmt.Sprintf("%s locks enemy card %s (power %d)", card.Name, lowestName, lowestPow)
+		}
+		return "No enemy card to lock"
+
 	case "redirect_30pct":
 		if rand.Intn(100) < 30 {
 			// Swap flag holder back
 			return fmt.Sprintf("%s REDIRECTED! Flag holder swaps back", card.Name)
 		}
 		return fmt.Sprintf("%s redirect failed (70%% chance)", card.Name)
+
+	case "redirect_50pct":
+		if rand.Intn(100) < 50 {
+			// Swap flag holder back
+			return fmt.Sprintf("%s REDIRECTED! Flag holder swaps back", card.Name)
+		}
+		return fmt.Sprintf("%s redirect failed (50%% chance)", card.Name)
 
 	default:
 		return ""
@@ -292,6 +518,27 @@ func (bs *BattleState) applyOnWinEffect(card models.Card, side string) string {
 			return fmt.Sprintf("%s deleted enemy card: %s", card.Name, deleted.Name)
 		}
 		return "No enemy card to delete"
+
+	case "delete_enemy_card_x2":
+		var enemyDeck *[]models.Card
+		if side == "player" {
+			enemyDeck = &bs.CPUDeck
+		} else {
+			enemyDeck = &bs.PlayerDeck
+		}
+		deletedCount := 0
+		var deletedNames []string
+		for deletedCount < 2 && len(*enemyDeck) > 0 {
+			deleted := (*enemyDeck)[0]
+			*enemyDeck = (*enemyDeck)[1:]
+			deletedNames = append(deletedNames, deleted.Name)
+			deletedCount++
+		}
+		if deletedCount > 0 {
+			return fmt.Sprintf("%s deleted enemy cards: %v", card.Name, deletedNames)
+		}
+		return "No enemy cards to delete"
+
 	default:
 		return ""
 	}
@@ -427,6 +674,20 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				bs.logEntry("bench", challengerSide, &revealedCards[i], 0,
 					"Card sent to memory", newFlagHolder,
 					fmt.Sprintf("%s benched to %s's memory", revealedCards[i].Name, challengerSide))
+
+				// Check recycler effect: appends a clone of itself to owner's deck
+				if revealedCards[i].EffectType == "draw_extra_card" {
+					var myDeck *[]models.Card
+					if challengerSide == "player" {
+						myDeck = &bs.PlayerDeck
+					} else {
+						myDeck = &bs.CPUDeck
+					}
+					*myDeck = append(*myDeck, revealedCards[i].Clone())
+					bs.logEntry("effect", challengerSide, &revealedCards[i], 0,
+						fmt.Sprintf("%s recycled: appended to owner's deck", revealedCards[i].Name), newFlagHolder,
+						"Recycler effect triggered")
+				}
 			}
 
 			// The winning card becomes the new flag card

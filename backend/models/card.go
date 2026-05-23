@@ -15,10 +15,14 @@ type Card struct {
 	Rarity     string `json:"rarity"`     // Common, Rare, Epic
 	Effect     string `json:"effect"`
 	EffectType string `json:"effectType"`
+	Cost       int    `json:"cost"`
 }
 
 // RarityCost returns the credit cost based on rarity.
 func (c Card) RarityCost() int {
+	if c.Cost > 0 {
+		return c.Cost
+	}
 	switch c.Rarity {
 	case "Common":
 		return 2
@@ -42,6 +46,7 @@ func (c Card) Clone() Card {
 		Rarity:     c.Rarity,
 		Effect:     c.Effect,
 		EffectType: c.EffectType,
+		Cost:       c.Cost,
 	}
 }
 
