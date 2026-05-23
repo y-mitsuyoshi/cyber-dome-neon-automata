@@ -62,6 +62,7 @@ type Player struct {
 	Name        string       `json:"name"`
 	Credits     int          `json:"credits"`
 	Deck        []Card       `json:"deck"`
+	Hand        []Card       `json:"hand"` // In-hand cards for interactive battle
 	Wins        int          `json:"wins"`
 	Fans        int          `json:"fans"`
 	IsNPC       bool         `json:"isNpc"`
@@ -110,8 +111,38 @@ type BattleLogEntry struct {
 	CPUMemSlots      []string        `json:"cpuMemSlots"`
 	PlayerDeckCount  int             `json:"playerDeckCount"`
 	CPUDeckCount     int             `json:"cpuDeckCount"`
+	PlayerHandCount  int             `json:"playerHandCount"` // Remaining hand size
+	CPUHandCount     int             `json:"cpuHandCount"`    // Remaining hand size
 	FlagHolder       string          `json:"flagHolder"`
 	Details          string          `json:"details,omitempty"`
+}
+
+// BattleAction represents a player's decision for a step.
+type BattleAction struct {
+	PlayerName string `json:"playerName"`
+	ActionType string `json:"actionType"` // "PLAY" or "DISCARD"
+	CardID     string `json:"cardId"`
+}
+
+// BattleSession represents an active interactive match between two combatants.
+type BattleSession struct {
+	SessionID      string                   `json:"sessionId"`
+	Player1Name    string                   `json:"player1Name"`
+	Player2Name    string                   `json:"player2Name"`
+	Player1Hand    []Card                   `json:"player1Hand"`
+	Player2Hand    []Card                   `json:"player2Hand"`
+	Player1Mem     []MemorySlot             `json:"player1Mem"`
+	Player2Mem     []MemorySlot             `json:"player2Mem"`
+	Player1Discard []Card                   `json:"player1Discard"`
+	Player2Discard []Card                   `json:"player2Discard"`
+	FlagHolder     string                   `json:"flagHolder"`
+	FlagPower      int                      `json:"flagPower"`
+	Step           int                      `json:"step"`
+	PendingActions map[string]*BattleAction `json:"pendingActions"` // player -> action
+	IsFinished     bool                     `json:"isFinished"`
+	Winner         string                   `json:"winner"`
+	Loser          string                   `json:"loser"`
+	Log            []BattleLogEntry         `json:"log"`
 }
 
 // BattleResult stores the outcome of a battle.
@@ -133,19 +164,19 @@ type StandingsEntry struct {
 
 // GameState holds all data for a single game/tournament session.
 type GameState struct {
-	Mu           sync.Mutex                  `json:"-"`
-	GameID       string                      `json:"gameId"`
-	LobbyCode    string                      `json:"lobbyCode,omitempty"`
-	HostName     string                      `json:"hostName"`
-	CurrentRound int                         `json:"currentRound"`
-	MaxRounds    int                         `json:"maxRounds"`
-	Phase        string                      `json:"phase"` // shop, battle, results
-	Players      []Player                    `json:"players"` // Size 3-8: mixture of humans and NPCs
-	Shops        map[string]*ShopState       `json:"shops"` // Keyed by player name
-	ReadyPlayers map[string]bool             `json:"readyPlayers"` // Keyed by player name, tracks ready status
-	Matchups     [][2]int                    `json:"matchups"` // Pairings of player indexes for the round
-	BattleLogs   map[string][]BattleLogEntry `json:"battleLogs"` // Keyed by player name
-	LastResults  map[string]*BattleResult    `json:"lastResults"` // Keyed by player name
-	Standings    []StandingsEntry            `json:"standings"`
+	Mu             sync.Mutex                  `json:"-"`
+	GameID         string                      `json:"gameId"`
+	LobbyCode      string                      `json:"lobbyCode,omitempty"`
+	HostName       string                      `json:"hostName"`
+	CurrentRound   int                         `json:"currentRound"`
+	MaxRounds      int                         `json:"maxRounds"`
+	Phase          string                      `json:"phase"` // shop, battle, results
+	Players        []Player                    `json:"players"` // Size 3-8: mixture of humans and NPCs
+	Shops          map[string]*ShopState       `json:"shops"` // Keyed by player name
+	ReadyPlayers   map[string]bool             `json:"readyPlayers"` // Keyed by player name, tracks ready status
+	Matchups       [][2]int                    `json:"matchups"` // Pairings of player indexes for the round
+	BattleLogs     map[string][]BattleLogEntry `json:"battleLogs"` // Keyed by player name
+	LastResults    map[string]*BattleResult    `json:"lastResults"` // Keyed by player name
+	Standings      []StandingsEntry            `json:"standings"`
+	BattleSessions map[string]*BattleSession   `json:"battleSessions"` // Keyed by player name (participant)
 }
-

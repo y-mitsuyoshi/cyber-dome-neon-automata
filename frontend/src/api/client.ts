@@ -1,4 +1,4 @@
-import type { GameState, Card } from '../types/game';
+import type { GameState, Card, BattleSession } from '../types/game';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -7,6 +7,7 @@ interface RawPlayer {
   name: string;
   credits: number;
   deck: Card[];
+  hand: Card[];
   wins: number;
   fans: number;
 }
@@ -32,25 +33,40 @@ interface RawGameState {
   player: RawPlayer;
   shop: RawShop;
   standings: any[];
+  npcs: any[];
   battleLog: any[];
   lastResult?: RawBattleResult;
   opponent?: string;
   battleResult?: string;
+  battleSession?: BattleSession;
 }
 
 function mapGameState(raw: RawGameState): GameState {
   return {
     gameId: raw.gameId,
-    round: raw.currentRound,
+    currentRound: raw.currentRound,
     maxRounds: raw.maxRounds || 7,
     phase: raw.phase,
-    credits: raw.player ? raw.player.credits : 0,
-    deck: raw.player ? raw.player.deck : [],
-    shopCards: raw.shop ? raw.shop.cards || [] : [],
+    player: raw.player ? {
+      name: raw.player.name,
+      credits: raw.player.credits,
+      deck: raw.player.deck || [],
+      hand: raw.player.hand || [],
+      deckSize: raw.player.deck ? raw.player.deck.length : 0,
+      wins: raw.player.wins,
+      fans: raw.player.fans,
+    } : { name: '', credits: 0, deck: [], hand: [], deckSize: 0, wins: 0, fans: 0 },
+    shop: raw.shop ? {
+      cards: raw.shop.cards || [],
+      credits: raw.shop.credits || 0,
+    } : { cards: [], credits: 0 },
     standings: raw.standings || [],
+    npcs: raw.npcs || [],
     battleLog: raw.battleLog || (raw.lastResult ? raw.lastResult.log : []) || [],
-    battleResult: raw.battleResult || '',
+    lastResult: raw.lastResult || null,
     opponent: raw.opponent || '',
+    battleResult: raw.battleResult || '',
+    battleSession: raw.battleSession || null,
   };
 }
 
@@ -117,6 +133,19 @@ export async function startBattle(gameId: string, playerName: string): Promise<G
   const raw = await apiFetch<RawGameState>('/api/tournament/battle', {
     method: 'POST',
     body: JSON.stringify({ gameId, playerName }),
+  });
+  return mapGameState(raw);
+}
+
+export async function submitBattleAction(
+  gameId: string,
+  playerName: string,
+  actionType: 'PLAY' | 'DISCARD',
+  cardId: string
+): Promise<GameState> {
+  const raw = await apiFetch<RawGameState>('/api/battle/action', {
+    method: 'POST',
+    body: JSON.stringify({ gameId, playerName, actionType, cardId }),
   });
   return mapGameState(raw);
 }

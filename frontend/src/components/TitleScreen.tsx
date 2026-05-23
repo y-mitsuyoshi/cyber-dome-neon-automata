@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Zap, Terminal, Plus, ArrowRight } from 'lucide-react';
+import { Zap, Terminal, Plus, ArrowRight, BookOpen } from 'lucide-react';
 import { useTranslation } from '../context/TranslationContext';
+import ManualModal from './ManualModal';
 
 interface TitleScreenProps {
   onStartSolo: () => void;
@@ -13,9 +14,11 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
   const [hoveredSolo, setHoveredSolo] = useState(false);
   const [hoveredCreate, setHoveredCreate] = useState(false);
   const [hoveredJoin, setHoveredJoin] = useState(false);
+  const [hoveredManual, setHoveredManual] = useState(false);
 
   const { t } = useTranslation();
 
@@ -184,6 +187,21 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
               {t('joinArena')}
             </button>
           </div>
+
+          <button
+            onClick={() => setShowManualModal(true)}
+            onMouseEnter={() => setHoveredManual(true)}
+            onMouseLeave={() => setHoveredManual(false)}
+            className={`
+              mt-2 py-3 rounded border border-cyber-border/60
+              text-cyber-border hover:text-neon-cyan font-bold text-[10px] tracking-[0.2em] uppercase
+              transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer
+              ${hoveredManual ? 'bg-neon-cyan/10 border-neon-cyan/50' : 'bg-transparent'}
+            `}
+          >
+            <BookOpen size={14} />
+            {t('viewManual')}
+          </button>
         </div>
 
         {/* Version info */}
@@ -239,6 +257,11 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
             </div>
           </form>
         </div>
+      )}
+
+      {/* MANUAL MODAL */}
+      {showManualModal && (
+        <ManualModal onClose={() => setShowManualModal(false)} />
       )}
     </div>
   );

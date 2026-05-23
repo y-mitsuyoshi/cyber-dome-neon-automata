@@ -48,9 +48,11 @@ function App() {
     chatMessages,
     gameId: wsGameId,
     phaseTrigger,
+    battleTrigger,
     kicked,
     sendChatMessage,
     resetTrigger,
+    resetBattleTrigger,
     resetGameId,
     resetKicked,
   } = useWebSocket(lobbyCode, lobbyCode ? playerName : null);
@@ -111,6 +113,23 @@ function App() {
       syncState();
     }
   }, [phaseTrigger]);
+
+  // 2.5 Listen for WS battle events
+  useEffect(() => {
+    if (battleTrigger && gameState) {
+      const syncBattleState = async () => {
+        try {
+          const state = await getGameState(gameState.gameId, playerName);
+          setGameState(state);
+        } catch (err) {
+          // Silent fallback on battle sync
+        } finally {
+          resetBattleTrigger();
+        }
+      };
+      syncBattleState();
+    }
+  }, [battleTrigger, gameState, playerName, resetBattleTrigger]);
 
   // 3. Auto-resync game state on WebSocket reconnection
   useEffect(() => {
@@ -289,7 +308,7 @@ function App() {
 
   const handleNextRound = async () => {
     if (!gameState) return;
-    if (gameState.round >= gameState.maxRounds) {
+    if (gameState.currentRound >= gameState.maxRounds) {
       return;
     }
     setLoading(true);
@@ -388,15 +407,15 @@ function App() {
 
       {screen === 'game' && gameState && (
         <>
-          {gameState.round > gameState.maxRounds && gameState.phase === 'results' ? (
+          {gameState.currentRound > gameState.maxRounds && gameState.phase === 'results' ? (
             <GameOver standings={gameState.standings} onRestart={handleRestart} />
           ) : gameState.phase === 'shop' ? (
             <Shop
-              round={gameState.round}
+              round={gameState.currentRound}
               maxRounds={gameState.maxRounds}
-              credits={gameState.credits}
-              shopCards={gameState.shopCards}
-              deck={gameState.deck}
+              credits={gameState.player.credits}
+              shopCards={gameState.shop.cards}
+              deck={gameState.player.deck}
               onBuy={handleBuyCard}
               onReroll={handleRerollShop}
               onDelete={handleDeleteCard}
@@ -405,6 +424,9 @@ function App() {
             />
           ) : gameState.phase === 'battle' ? (
             <BattleArena
+              gameId={gameState.gameId}
+              playerName={playerName}
+              battleSession={gameState.battleSession}
               battleLog={gameState.battleLog}
               opponent={gameState.opponent}
               onComplete={handleBattleComplete}
@@ -412,7 +434,7 @@ function App() {
           ) : (
             <Standings
               standings={gameState.standings}
-              round={gameState.round}
+              round={gameState.currentRound}
               maxRounds={gameState.maxRounds}
               battleResult={gameState.battleResult}
               onNext={handleNextRound}

@@ -28,14 +28,16 @@ var NPCStrategies = []string{
 
 // CreateNPC generates an NPC player with a starting deck and strategy.
 func CreateNPC(name string, strategy string) models.Player {
-	pool := AllCards()
-	// Symmetrical starting deck size: 6 cards, just like humans
-	deck := buildBiasedDeck(pool, strategy, 6)
+	deck := StarterDeck()
+	deckClone := make([]models.Card, len(deck))
+	for i, c := range deck {
+		deckClone[i] = c.Clone()
+	}
 
 	return models.Player{
 		Name:       name,
 		Credits:    10, // Symmetrical starting credits
-		Deck:       deck,
+		Deck:       deckClone,
 		Wins:       0,
 		Fans:       0,
 		IsNPC:      true,

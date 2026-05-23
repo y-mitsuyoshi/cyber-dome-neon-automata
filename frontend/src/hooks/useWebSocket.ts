@@ -30,6 +30,7 @@ export const useWebSocket = (code: string | null, name: string | null) => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [gameId, setGameId] = useState<string | null>(null);
   const [phaseTrigger, setPhaseTrigger] = useState<{ phase: string; round: number } | null>(null);
+  const [battleTrigger, setBattleTrigger] = useState<{ type: string; data?: unknown } | null>(null);
   const [kicked, setKicked] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
@@ -72,6 +73,11 @@ export const useWebSocket = (code: string | null, name: string | null) => {
               break;
             case 'state_update':
               setPhaseTrigger(msg.data);
+              break;
+            case 'battle_step_advanced':
+            case 'opponent_action_committed':
+            case 'battle_complete':
+              setBattleTrigger({ type: msg.type, data: msg.data });
               break;
             case 'player_kicked':
               setKicked(true);
@@ -129,9 +135,11 @@ export const useWebSocket = (code: string | null, name: string | null) => {
     chatMessages,
     gameId,
     phaseTrigger,
+    battleTrigger,
     kicked,
     sendChatMessage,
     resetTrigger: () => setPhaseTrigger(null),
+    resetBattleTrigger: () => setBattleTrigger(null),
     resetGameId: () => setGameId(null),
     resetKicked: () => setKicked(false),
   };

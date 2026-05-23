@@ -188,7 +188,6 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 	lob.GameID = gameID
 
 	// Create symmetric Player objects for the tournament
-	pool := engine.AllCards()
 	players := make([]models.Player, len(lob.Players))
 	shops := make(map[string]*models.ShopState)
 
@@ -199,11 +198,8 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 			strat := engine.NPCStrategies[rand.Intn(len(engine.NPCStrategies))]
 			p = engine.CreateNPC(lp.Name, strat)
 		} else {
-			// Symmetrical starting deck: 6 random cards
-			startDeck := make([]models.Card, 6)
-			for d := 0; d < 6; d++ {
-				startDeck[d] = pool[rand.Intn(len(pool))].Clone()
-			}
+			// Symmetrical starting deck: 10-card balanced starter
+			startDeck := engine.StarterDeck()
 			p = models.Player{
 				Name:    lp.Name,
 				Credits: 10,

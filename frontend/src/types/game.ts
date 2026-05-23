@@ -17,11 +17,14 @@ export interface BattleLogEntry {
   card: { name: string; power: number; attribute: string } | null;
   currentPower: number;
   effectTriggered: string;
-  playerMemSlots: string[][];
-  cpuMemSlots: string[][];
+  playerMemSlots: string[];
+  cpuMemSlots: string[];
   playerDeckCount: number;
   cpuDeckCount: number;
+  playerHandCount: number;
+  cpuHandCount: number;
   flagHolder: string;
+  details: string;
 }
 
 export interface ShopState {
@@ -29,18 +32,36 @@ export interface ShopState {
   credits: number;
 }
 
-export interface GameState {
-  gameId: string;
-  round: number;
-  maxRounds: number;
-  phase: 'shop' | 'battle' | 'results';
-  credits: number;
-  deck: Card[];
-  shopCards: Card[];
-  standings: Standing[];
-  battleLog: BattleLogEntry[];
-  battleResult: string;
-  opponent: string;
+export interface BattleAction {
+  playerName: string;
+  actionType: 'PLAY' | 'DISCARD';
+  cardId: string;
+}
+
+export interface MemorySlot {
+  cardName: string;
+  cards: Card[];
+  count: number;
+}
+
+export interface BattleSession {
+  sessionId: string;
+  player1Name: string;
+  player2Name: string;
+  player1Hand: Card[];
+  player2Hand: Card[];
+  player1Mem: MemorySlot[];
+  player2Mem: MemorySlot[];
+  player1Discard: Card[];
+  player2Discard: Card[];
+  flagHolder: string;
+  flagPower: number;
+  step: number;
+  pendingActions: Record<string, BattleAction>;
+  isFinished: boolean;
+  winner: string;
+  loser: string;
+  log: BattleLogEntry[];
 }
 
 export interface Standing {
@@ -48,4 +69,28 @@ export interface Standing {
   wins: number;
   fans: number;
   isPlayer: boolean;
+}
+
+export interface GameState {
+  gameId: string;
+  currentRound: number;
+  maxRounds: number;
+  phase: 'shop' | 'battle' | 'results';
+  player: {
+    name: string;
+    credits: number;
+    deck: Card[];
+    hand: Card[];
+    deckSize: number;
+    wins: number;
+    fans: number;
+  };
+  shop: ShopState;
+  standings: Standing[];
+  npcs: unknown[];
+  battleLog: BattleLogEntry[];
+  lastResult: unknown;
+  opponent: string;
+  battleResult: string;
+  battleSession: BattleSession | null;
 }
