@@ -30,7 +30,7 @@ function LobbyScreen({
   const [copied, setCopied] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  const { locale } = useTranslation();
+  const { t } = useTranslation();
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -42,7 +42,7 @@ function LobbyScreen({
         <div className="text-center">
           <span className="inline-block w-8 h-8 rounded-full border-4 border-neon-cyan border-t-transparent animate-spin mb-4" />
           <p className="text-sm font-bold uppercase tracking-widest text-neon-cyan animate-pulse font-mono">
-            {locale === 'ja' ? '電脳ドームへのリンクを確立中...' : 'Establishing Link to Cyber-Dome...'}
+            {t('establishingLink')}
           </p>
         </div>
       </div>
@@ -90,21 +90,21 @@ function LobbyScreen({
           <div>
             <h2 className="text-2xl font-black tracking-[0.15em] text-neon-cyan text-glow-cyan flex items-center gap-2">
               <Users size={24} className="animate-pulse" />
-              {locale === 'ja' ? 'アリーナロビー' : 'ARENA LOBBY'}
+              {t('arenaLobby')}
             </h2>
             <div className="flex items-center gap-2 mt-1">
               <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-neon-green animate-pulse' : 'bg-neon-red'}`} />
               <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-mono">
                 {connected 
-                  ? (locale === 'ja' ? '同期リンク確立完了' : 'Sync Link Established') 
-                  : (locale === 'ja' ? '同期リンク切断' : 'Sync Offline')}
+                  ? t('syncLinkEstablished')
+                  : t('syncOffline')}
               </span>
             </div>
           </div>
           
           <div className="flex items-center gap-3 mt-4 sm:mt-0 font-mono">
             <span className="text-xs uppercase tracking-widest text-cyber-text-dim">
-              {locale === 'ja' ? 'ロビーキー:' : 'Lobby Key:'}
+              {t('lobbyKey')}
             </span>
             <button
               onClick={handleCopyCode}
@@ -113,7 +113,7 @@ function LobbyScreen({
               {lobbyState.code}
               {copied ? <Check size={16} className="text-neon-green" /> : <Clipboard size={16} />}
               <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-cyber-darker text-[9px] uppercase tracking-wider px-2 py-0.5 rounded border border-cyber-border opacity-0 group-hover:opacity-100 transition-opacity">
-                {copied ? (locale === 'ja' ? 'コピー完了' : 'Copied') : (locale === 'ja' ? 'キーをコピー' : 'Copy Key')}
+                {copied ? t('copied') : t('copyKey')}
               </span>
             </button>
           </div>
@@ -124,10 +124,10 @@ function LobbyScreen({
           <div className="flex items-center justify-between mb-3 font-mono">
             <h3 className="text-xs uppercase tracking-widest text-cyber-text-dim font-bold flex items-center gap-1.5">
               <Terminal size={14} className="text-neon-cyan" />
-              {locale === 'ja' ? `コバタント名簿 (${totalPlayers}/8)` : `Combatant Roster (${totalPlayers}/8)`}
+              {t('combatantRoster', { count: totalPlayers })}
             </h3>
             <span className="text-[10px] text-neon-cyan/80 uppercase tracking-widest border border-neon-cyan/20 px-2 py-0.5 rounded">
-              {locale === 'ja' ? '最低3名必要' : 'Min 3 Required'}
+              {t('min3Required')}
             </span>
           </div>
 
@@ -162,13 +162,13 @@ function LobbyScreen({
 
                     {isMe && (
                       <span className="text-[9px] font-mono uppercase tracking-wider bg-neon-cyan/25 border border-neon-cyan/40 px-1.5 py-0.1 rounded text-neon-cyan">
-                        {locale === 'ja' ? 'あなた' : 'You'}
+                        {t('youBadge')}
                       </span>
                     )}
 
                     {isPlayerHost && (
                       <span className="text-[9px] font-mono uppercase tracking-wider bg-neon-amber/25 border border-neon-amber/40 px-1.5 py-0.1 rounded text-neon-amber">
-                        {locale === 'ja' ? 'ホスト' : 'Host'}
+                        {t('hostBadge')}
                       </span>
                     )}
                   </div>
@@ -179,7 +179,7 @@ function LobbyScreen({
                       onClick={() => onRemoveNPC(p.name)}
                       className="text-[9px] font-bold uppercase tracking-wider border border-red-500/40 text-neon-red px-2 py-0.5 rounded hover:bg-red-500/10 transition-colors cursor-pointer font-mono"
                     >
-                      {locale === 'ja' ? '除外' : 'Purge'}
+                      {t('purgeBtn')}
                     </button>
                   )}
                 </div>
@@ -192,7 +192,7 @@ function LobbyScreen({
                 key={`empty-${i}`}
                 className="border border-dashed border-cyber-border/20 p-2.5 rounded flex items-center justify-center text-xs text-cyber-text-dim/40 font-mono tracking-widest"
               >
-                {locale === 'ja' ? '[ 空きコバタントスロット ]' : '[EMPTY COMBATANT SLOT]'}
+                {t('emptySlot')}
               </div>
             ))}
           </div>
@@ -204,7 +204,7 @@ function LobbyScreen({
               className="mt-3 w-full border border-neon-amber/40 text-neon-amber py-2 rounded text-xs font-bold uppercase tracking-wider hover:bg-neon-amber/15 hover:border-neon-amber transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-neon-amber/5 font-mono"
             >
               <Cpu size={14} className="animate-pulse" />
-              {locale === 'ja' ? 'NPCボットを配備する' : 'DEPLOY NPC BOT IN ARENA'}
+              {t('deployNpcBtn')}
             </button>
           )}
         </div>
@@ -213,15 +213,13 @@ function LobbyScreen({
         <div className="col-span-12 md:col-span-5 flex flex-col">
           <h3 className="text-xs uppercase tracking-widest text-cyber-text-dim font-bold mb-3 flex items-center gap-1.5 font-mono">
             <Terminal size={14} className="text-neon-cyan" />
-            {locale === 'ja' ? '通信チャンネル' : 'Comms Channel'}
+            {t('commsChannel')}
           </h3>
 
           <div className="flex-1 min-h-[220px] max-h-[220px] overflow-y-auto border border-cyber-border/20 rounded-md bg-cyber-darker/60 p-3 mb-3 font-mono text-xs space-y-1.5 flex flex-col">
             {chatMessages.length === 0 ? (
               <div className="text-cyber-text-dim/30 italic my-auto text-center">
-                {locale === 'ja' 
-                  ? '通信ターミナルが初期化されました。セキュアサブレイヤー有効。' 
-                  : 'Comms terminal initialized. Secure sub-layer active.'}
+                {t('commsInitialized')}
               </div>
             ) : (
               chatMessages.map((m, i) => (
@@ -239,7 +237,7 @@ function LobbyScreen({
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder={locale === 'ja' ? '通信メッセージを注入...' : 'Inject comms message...'}
+              placeholder={t('chatPlaceholder')}
               className="flex-1 bg-cyber-darker border border-cyber-border/40 rounded px-3 py-2 text-xs font-mono text-cyber-text focus:outline-none focus:border-neon-cyan transition-colors"
             />
             <button
@@ -270,16 +268,14 @@ function LobbyScreen({
                 {loading ? (
                   <span className="animate-spin inline-block">⟳</span>
                 ) : (
-                  locale === 'ja' ? 'トーナメント初期化' : 'INITIALIZE TOURNAMENT'
+                  t('startTournament')
                 )}
               </button>
               
               {!canStart && (
                 <p className="text-[10px] font-mono text-neon-amber uppercase tracking-widest mt-2 animate-pulse">
                   <ShieldAlert size={10} className="inline mr-1 -mt-0.5" />
-                  {locale === 'ja' 
-                    ? 'グリッドロック：マトリクス同期にはコバタント数が3人から8人である必要があります。' 
-                    : 'Grid lock: Roster size must be between 3 and 8 combatants to sync matrix.'}
+                  {t('gridLockError')}
                 </p>
               )}
             </div>
@@ -287,7 +283,7 @@ function LobbyScreen({
             <div className="text-center py-2 flex items-center gap-3 bg-neon-cyan/5 border border-neon-cyan/20 px-6 rounded-md animate-pulse font-mono">
               <span className="inline-block w-2 h-2 rounded-full bg-neon-cyan animate-ping" />
               <span className="text-xs font-mono uppercase tracking-[0.2em] text-neon-cyan text-glow-cyan">
-                {locale === 'ja' ? 'ホストからの送信シグナルを待機中...' : 'Awaiting host transmission signal...'}
+                {t('awaitingHostSignal')}
               </span>
             </div>
           )}

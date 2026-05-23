@@ -18,7 +18,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
   const [cardKey, setCardKey] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { locale, translateCardName, translateBattleDetail } = useTranslation();
+  const { t, translateCardName, translateBattleDetail } = useTranslation();
 
   const entry = currentStep >= 0 && currentStep < battleLog.length ? battleLog[currentStep] : null;
   const isFinished = currentStep >= battleLog.length - 1;
@@ -99,15 +99,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
   // Translated card details if card exists in current step
   const stepCard = entry?.card;
   const displayCardName = stepCard ? translateCardName(stepCard.name) : '';
-  const displayCardAttr = stepCard ? (
-    locale === 'ja'
-      ? stepCard.attribute === 'Virus' ? 'ウイルス'
-        : stepCard.attribute === 'AI' ? 'AI'
-        : stepCard.attribute === 'Hardware' ? 'ハードウェア'
-        : stepCard.attribute === 'Netrunner' ? 'ネットランナー'
-        : stepCard.attribute
-      : stepCard.attribute
-  ) : '';
+  const displayCardAttr = stepCard ? t(stepCard.attribute) : '';
   const displayAction = entry ? translateBattleDetail(entry.action) : '';
   const displayEffectTriggered = entry?.effectTriggered ? translateBattleDetail(entry.effectTriggered) : '';
 
@@ -131,12 +123,12 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
           <h2
             className="text-2xl font-black tracking-[0.3em] uppercase text-neon-magenta text-glow-magenta font-mono"
           >
-            {locale === 'ja' ? '⟁ バトルアリーナ ⟁' : '⟁ Battle Arena ⟁'}
+            {t('battleArenaHeader')}
           </h2>
           <div className="flex items-center justify-center gap-6 mt-2 font-mono">
             <div className="flex items-center gap-2">
               <User size={14} className="text-neon-cyan" />
-              <span className="text-sm text-neon-cyan font-bold">{locale === 'ja' ? 'あなた' : 'YOU'}</span>
+              <span className="text-sm text-neon-cyan font-bold">{t('youSelf')}</span>
             </div>
             <span className="text-neon-red text-lg font-black">VS</span>
             <div className="flex items-center gap-2">
@@ -152,11 +144,11 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
           <div className="animate-slide-in-left font-mono">
             <MemorySlots
               slots={entry?.playerMemSlots || []}
-              label={locale === 'ja' ? 'あなたのメモリ' : 'Your Memory'}
+              label={t('yourMemory')}
               side="left"
             />
             <div className="mt-3 border border-cyber-border/30 rounded px-3 py-2 bg-cyber-surface/30">
-              <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{locale === 'ja' ? 'デッキ残り' : 'Deck'}</div>
+              <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{t('deckRemaining')}</div>
               <div className="text-lg font-bold text-neon-cyan">{entry?.playerDeckCount ?? '?'}</div>
             </div>
           </div>
@@ -165,7 +157,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
           <div className="flex flex-col items-center justify-center min-h-[350px] font-mono">
             {/* Step indicator */}
             <div className="mb-3 text-[10px] text-cyber-text-dim uppercase tracking-widest font-mono">
-              {locale === 'ja' ? 'ステップ' : 'Step'} {entry ? entry.step : '-'} / {battleLog.length}
+              {t('stepLabel')} {entry ? entry.step : '-'} / {battleLog.length}
             </div>
 
             {/* Flag indicator */}
@@ -189,12 +181,12 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
               >
                 <Flag size={16} className={entry.flagHolder === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'} />
                 <span className="text-xs font-bold uppercase tracking-wider">
-                  {locale === 'ja' ? 'アクセス権取得：' : 'Access: '}{
+                  {t('accessLabel')}{
                     entry.flagHolder === 'Player' 
-                      ? (locale === 'ja' ? 'あなた' : 'Player') 
+                      ? t('playerSelf') 
                       : entry.flagHolder === 'CPU' 
                       ? 'CPU' 
-                      : entry.flagHolder || (locale === 'ja' ? 'なし' : 'None')
+                      : entry.flagHolder || t('noneLabel')
                   }
                 </span>
               </div>
@@ -217,8 +209,8 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                     entry.player === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'
                   }`}>
                     {entry.player === 'Player' 
-                      ? (locale === 'ja' ? '◆ あなたの送信' : '◆ Your Play') 
-                      : (locale === 'ja' ? '◆ 敵の送信' : '◆ Enemy Play')}
+                      ? t('yourPlay') 
+                      : t('enemyPlay')}
                   </div>
 
                   {/* Card name */}
@@ -237,7 +229,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                     {stepCard.power}
                   </div>
 
-                  <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{locale === 'ja' ? 'パワー' : 'Power'}</div>
+                  <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{t('powerLabel')}</div>
                 </div>
               </div>
             ) : entry ? (
@@ -246,7 +238,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                   <div className={`text-[10px] uppercase tracking-widest mb-3 font-bold ${
                     entry.player === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'
                   }`}>
-                    {entry.player === 'Player' ? (locale === 'ja' ? 'あなた' : 'Player') : entry.player}
+                    {entry.player === 'Player' ? t('playerSelf') : entry.player}
                   </div>
                   <p className="text-sm text-cyber-text-dim">{displayAction}</p>
                 </div>
@@ -255,7 +247,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
               <div className="rounded-xl border-2 border-dashed border-cyber-border/30 p-12 w-56 text-center font-mono">
                 <Zap size={32} className="text-cyber-border mx-auto mb-3" />
                 <p className="text-xs text-cyber-text-dim uppercase tracking-wider">
-                  {locale === 'ja' ? '同期データを待機中...' : 'Awaiting combat data...'}
+                  {t('awaitingCombatData')}
                 </p>
               </div>
             )}
@@ -266,7 +258,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                 <p className="text-sm text-cyber-text">{displayAction}</p>
                 <div className="flex items-center justify-center gap-4 mt-2">
                   <span className="text-[10px] text-cyber-text-dim">
-                    {locale === 'ja' ? '累積パワー:' : 'Cumulative Power:'} <span className="text-neon-cyan font-bold">{entry.currentPower}</span>
+                    {t('cumulativePower')} <span className="text-neon-cyan font-bold">{entry.currentPower}</span>
                   </span>
                 </div>
               </div>
@@ -292,11 +284,11 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
           <div className="animate-slide-in-right font-mono">
             <MemorySlots
               slots={entry?.cpuMemSlots || []}
-              label={locale === 'ja' ? `${opponent || 'CPU'} のメモリ` : `${opponent || 'CPU'} Memory`}
+              label={t('npcMemoryLabel', { opponent: opponent || 'CPU' })}
               side="right"
             />
             <div className="mt-3 border border-cyber-border/30 rounded px-3 py-2 bg-cyber-surface/30 text-right">
-              <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{locale === 'ja' ? 'デッキ残り' : 'Deck'}</div>
+              <div className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{t('deckRemaining')}</div>
               <div className="text-lg font-bold text-neon-magenta">{entry?.cpuDeckCount ?? '?'}</div>
             </div>
           </div>
@@ -319,7 +311,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
           <button
             onClick={reset}
             className="p-2 rounded border border-cyber-border hover:border-neon-cyan/50 text-cyber-text-dim hover:text-neon-cyan transition-all cursor-pointer"
-            title={locale === 'ja' ? '最初に戻る' : 'Reset'}
+            title={t('resetBtnTitle')}
           >
             <Rewind size={18} />
           </button>
@@ -348,7 +340,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                 ? 'border-cyber-border text-cyber-border cursor-not-allowed'
                 : 'border-cyber-border hover:border-neon-cyan/50 text-cyber-text-dim hover:text-neon-cyan'
             }`}
-            title={locale === 'ja' ? '次のステップ' : 'Next Step'}
+            title={t('nextStepBtnTitle')}
           >
             <SkipForward size={18} />
           </button>
@@ -376,7 +368,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                 hover:bg-neon-green/10 transition-all cursor-pointer animate-slide-in font-mono"
               style={{ boxShadow: '0 0 15px rgba(0,255,102,0.2)' }}
             >
-              {locale === 'ja' ? '次へ進む →' : 'Continue →'}
+              {t('continueBtn')}
             </button>
           )}
         </div>
@@ -385,7 +377,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
         {currentStep >= 0 && (
           <div className="mt-6 max-w-2xl mx-auto border border-cyber-border/30 rounded-lg p-3 bg-cyber-surface/30 max-h-40 overflow-y-auto font-mono">
             <div className="text-[10px] text-cyber-text-dim uppercase tracking-widest mb-2 font-bold">
-              {locale === 'ja' ? '▸ 対戦ログフィード' : '▸ Combat Log'}
+              {t('combatLogHeader')}
             </div>
             {battleLog.slice(0, currentStep + 1).reverse().map((log, i) => {
               const displayLogAction = translateBattleDetail(log.action);
@@ -399,7 +391,7 @@ function BattleArena({ battleLog, opponent, onComplete }: BattleArenaProps) {
                   }`}
                 >
                   <span className={`font-bold ${log.player === 'Player' ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
-                    [{log.player === 'Player' ? (locale === 'ja' ? 'あなた' : 'Player') : log.player}]
+                    [{log.player === 'Player' ? t('playerSelf') : log.player}]
                   </span>{' '}
                   {displayLogAction}
                   {log.effectTriggered && log.effectTriggered !== 'None' && log.effectTriggered !== '' && (

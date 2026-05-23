@@ -20,7 +20,7 @@ interface ShopProps {
 function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onDelete, onBattle, loading }: ShopProps) {
   const [showDeck, setShowDeck] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
-  const { locale, t } = useTranslation();
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-cyber-dark cyber-grid relative overflow-hidden">
@@ -50,7 +50,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
           <div className="flex items-center gap-2 border border-neon-amber/30 rounded px-4 py-2 bg-cyber-surface/50 font-mono">
             <CreditCard size={16} className="text-neon-amber" />
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim">
-              {locale === 'ja' ? 'クレジット' : 'Credits'}
+              {t('credits')}
             </span>
             <span className="text-2xl font-bold text-neon-amber text-glow-amber ml-2">{credits}¢</span>
           </div>
@@ -62,7 +62,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
           >
             <Layers size={16} className="text-neon-magenta" />
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim">
-              {locale === 'ja' ? 'デッキ' : 'Deck'}
+              {t('deckLabel')}
             </span>
             <span className="text-xl font-bold text-neon-magenta text-glow-magenta ml-2">{deck.length}</span>
           </button>
@@ -71,10 +71,10 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
         {/* Shop title */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-black tracking-[0.2em] text-neon-magenta text-glow-magenta uppercase font-mono">
-            {locale === 'ja' ? '◈ 闇マーケット接続中 ◈' : '◈ Black Market ◈'}
+            {t('blackMarketHeader')}
           </h2>
           <p className="text-xs text-cyber-text-dim tracking-wider mt-1 font-mono">
-            {locale === 'ja' ? 'インプラントの選択は慎重に行え' : 'Select your augmentations wisely'}
+            {t('shopSubtitle')}
           </p>
         </div>
 
@@ -101,16 +101,16 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
                 `}
               >
                 {credits >= card.cost 
-                  ? (locale === 'ja' ? `購入 ${card.cost}¢` : `Buy ${card.cost}¢`)
-                  : (locale === 'ja' ? 'クレジット不足' : 'Insufficient ¢')}
+                  ? t('buyBtn', { cost: card.cost })
+                  : t('insufficientCredits')}
               </button>
             </div>
           ))}
 
           {shopCards.length === 0 && (
             <div className="text-center text-cyber-text-dim py-12 font-mono">
-              <p className="text-lg mb-2">{locale === 'ja' ? 'カードがありません' : 'No cards available'}</p>
-              <p className="text-xs">{locale === 'ja' ? 'リロールして在庫を更新してください' : 'Try rerolling for new stock'}</p>
+              <p className="text-lg mb-2">{t('noCardsAvailable')}</p>
+              <p className="text-xs">{t('tryRerolling')}</p>
             </div>
           )}
         </div>
@@ -130,7 +130,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
             `}
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            {locale === 'ja' ? 'グリッド再ロール (1¢)' : 'Reroll (1¢)'}
+            {t('rerollText')}
           </button>
 
           <button
@@ -148,8 +148,8 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
           >
             <Trash2 size={16} />
             {deleteMode 
-              ? (locale === 'ja' ? '削除キャンセル' : 'Cancel Delete') 
-              : (locale === 'ja' ? 'カード削除 (2¢)' : 'Delete Card')}
+              ? t('cancelDelete') 
+              : t('deleteCardText')}
           </button>
 
           <button
@@ -162,7 +162,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
             }}
           >
             <Swords size={18} />
-            {locale === 'ja' ? 'アリーナへ突入する' : 'Enter the Arena'}
+            {t('enterArenaBtn')}
           </button>
         </div>
 
@@ -171,11 +171,11 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
           <div className="border border-cyber-border rounded-lg p-4 bg-cyber-surface/50 animate-slide-in max-w-3xl mx-auto font-mono">
             <h3 className="text-sm font-bold text-neon-cyan tracking-widest uppercase mb-3 flex items-center gap-2">
               <Layers size={14} />
-              {locale === 'ja' ? `あなたのデッキ (${deck.length} 枚)` : `Your Deck (${deck.length} cards)`}
+              {t('yourDeckCount', { count: deck.length })}
             </h3>
             {deck.length === 0 ? (
               <p className="text-cyber-text-dim text-sm text-center py-4">
-                {locale === 'ja' ? 'デッキが空です' : 'Your deck is empty'}
+                {t('deckEmpty')}
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
@@ -184,14 +184,14 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
                     key={card.id || i}
                     onClick={deleteMode ? () => onDelete(i) : undefined}
                     className={`
-                      transition-all duration-200
+                       transition-all duration-200
                       ${deleteMode ? 'cursor-pointer hover:bg-red-900/30 hover:border-neon-red rounded' : ''}
                     `}
                   >
                     <CardDisplay card={card} compact />
                     {deleteMode && (
                       <div className="text-[9px] text-neon-red text-center mt-1 uppercase tracking-wider font-bold">
-                        {locale === 'ja' ? 'クリックして削除' : 'Click to delete'}
+                        {t('clickToDelete')}
                       </div>
                     )}
                   </div>

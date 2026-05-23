@@ -10,7 +10,7 @@ interface MemorySlotsProps {
 }
 
 function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
-  const { locale, translateCardName } = useTranslation();
+  const { t, translateCardName } = useTranslation();
   const filledCount = slots.filter(s => s.length > 0).length;
   const fillRatio = filledCount / maxSlots;
   const isWarning = fillRatio >= 5 / 6;
@@ -59,7 +59,7 @@ function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
         isWarning ? 'text-neon-amber text-glow-amber' :
         'text-cyber-text-dim'
       }`}>
-        {locale === 'ja' ? 'メモリ容量' : 'MEMORY'}: {filledCount}/{maxSlots}
+        {t('memoryLabel', { filled: filledCount, max: maxSlots })}
       </div>
 
       {/* Slot grid */}
@@ -96,7 +96,7 @@ function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
             >
               {isEmpty ? (
                 <div className="text-[9px] text-cyber-border uppercase tracking-wider font-mono">
-                  {locale === 'ja' ? '空スロット' : 'Empty'}
+                  {t('emptySlotLabel')}
                 </div>
               ) : (
                 <>

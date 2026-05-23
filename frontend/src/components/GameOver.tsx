@@ -13,7 +13,7 @@ function GameOver({ standings, onRestart }: GameOverProps) {
     return b.fans - a.fans;
   });
 
-  const { locale } = useTranslation();
+  const { t } = useTranslation();
 
   const winner = sorted[0];
   const playerStanding = sorted.find(s => s.isPlayer);
@@ -37,7 +37,7 @@ function GameOver({ standings, onRestart }: GameOverProps) {
         {/* Pre-title */}
         <div className="animate-fade-in mb-4">
           <span className="text-[10px] uppercase tracking-[0.5em] text-cyber-text-dim font-mono">
-            {locale === 'ja' ? '/// トーナメント集計完了 ///' : '/// Tournament Complete ///'}
+            {t('tournamentCompleteLabel')}
           </span>
         </div>
 
@@ -51,10 +51,10 @@ function GameOver({ standings, onRestart }: GameOverProps) {
               <h1
                 className="text-5xl font-black tracking-wider text-neon-amber text-glow-amber mb-3"
               >
-                {locale === 'ja' ? '完全勝利' : 'VICTORY'}
+                {t('victoryHeader')}
               </h1>
               <p className="text-lg text-neon-green text-glow-green">
-                {locale === 'ja' ? 'あなたが電脳ドームの覇者（チャンピオン）です！' : 'You are the Champion of the Cyber-Dome!'}
+                {t('championDesc')}
               </p>
             </>
           ) : (
@@ -65,31 +65,17 @@ function GameOver({ standings, onRestart }: GameOverProps) {
               <h1
                 className="text-4xl font-black tracking-wider text-neon-magenta text-glow-magenta mb-3"
               >
-                {locale === 'ja' ? 'トーナメント終了' : 'TOURNAMENT OVER'}
+                {t('tournamentOverHeader')}
               </h1>
               <p className="text-md text-cyber-text">
-                {locale === 'ja' ? (
-                  <>
-                    <span className="text-neon-amber font-bold">{winner?.name}</span> が王座に君臨しました
-                  </>
-                ) : (
-                  <>
-                    <span className="text-neon-amber font-bold">{winner?.name}</span> claims the throne
-                  </>
-                )}
+                {t('winnerClaimsThrone', { name: winner?.name || '' })}
               </p>
               <p className="text-sm text-cyber-text-dim mt-2">
-                {locale === 'ja' ? (
-                  <>
-                    あなたの最終順位は <span className="text-neon-cyan font-bold">#{playerRank}</span> 位です
-                    {playerStanding && `（勝利数: ${playerStanding.wins}、ファン数: ${playerStanding.fans}）`}
-                  </>
-                ) : (
-                  <>
-                    You finished in <span className="text-neon-cyan font-bold">#{playerRank}</span> place
-                    {playerStanding && ` with ${playerStanding.wins} wins and ${playerStanding.fans} fans`}
-                  </>
-                )}
+                {t('playerFinalRank', {
+                  rank: playerRank,
+                  wins: playerStanding?.wins ?? 0,
+                  fans: playerStanding?.fans ?? 0
+                })}
               </p>
             </>
           )}
@@ -99,7 +85,7 @@ function GameOver({ standings, onRestart }: GameOverProps) {
         <div className="border border-cyber-border/40 rounded-lg overflow-hidden bg-cyber-surface/30 mb-8 animate-slide-in font-mono" style={{ animationDelay: '0.3s' }}>
           <div className="px-4 py-3 bg-cyber-darker/50 border-b border-cyber-border/30">
             <span className="text-[10px] uppercase tracking-widest text-neon-amber font-bold">
-              {locale === 'ja' ? '◈ 最終順位一覧 ◈' : '◈ Final Rankings ◈'}
+              {t('finalRankingsHeader')}
             </span>
           </div>
 
@@ -142,14 +128,14 @@ function GameOver({ standings, onRestart }: GameOverProps) {
                 </span>
                 {player.isPlayer && (
                   <span className="text-[9px] text-neon-cyan/60 uppercase tracking-wider border border-neon-cyan/20 px-1.5 rounded font-bold">
-                    {locale === 'ja' ? 'あなた' : 'You'}
+                    {t('youBadge')}
                   </span>
                 )}
               </div>
 
               <div className="flex items-center justify-center">
                 <span className="text-sm font-bold text-cyber-text">
-                  {locale === 'ja' ? `${player.wins}勝` : `${player.wins}W`}
+                  {t('playerWins', { wins: player.wins })}
                 </span>
               </div>
 
@@ -172,7 +158,7 @@ function GameOver({ standings, onRestart }: GameOverProps) {
           }}
         >
           <RotateCcw size={20} />
-          {locale === 'ja' ? 'メインコアへ戻る' : 'New Game'}
+          {t('newGameBtn')}
         </button>
       </div>
     </div>

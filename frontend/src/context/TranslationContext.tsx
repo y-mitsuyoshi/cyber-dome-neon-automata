@@ -1,13 +1,19 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { Card } from '../types/game';
 
-type Locale = 'en' | 'ja';
+export type Locale = 'en' | 'ja';
+
+export interface LocalizedCard extends Omit<Card, 'attribute' | 'archetype' | 'rarity'> {
+  attribute: string;
+  archetype: string;
+  rarity: string;
+}
 
 interface TranslationContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
-  t: (key: string) => string;
-  translateCard: (card: Card) => Card;
+  t: (key: string, replacements?: Record<string, string | number>) => string;
+  translateCard: (card: Card) => LocalizedCard;
   translateCardName: (name: string) => string;
   translateBattleDetail: (detail: string) => string;
   translateBattleResult: (text: string) => string;
@@ -37,6 +43,21 @@ const uiDict: Record<Locale, Record<string, string>> = {
     enterName: "ENTER COMBAT NAME",
     cancel: "TERMINATE",
     connect: "ESTABLISH",
+    systemOnline: "/// SYSTEM ONLINE ///",
+    cyber: "CYBER",
+    dome: "DOME",
+    neonAutomata: "Neon Automata",
+    injectCombatantId: "Inject Combatant ID (Display Name)",
+    combatantPlaceholder: "COMBATANT_ONE",
+    jackInSolo: "Jack In (Solo Mode)",
+    multiplayerMatrix: "Multiplayer Matrix",
+    createArena: "Create Arena",
+    joinArena: "Join Arena",
+    multiplayerActive: "MULTIPLAYER GRID LAYER ACTIVE",
+    connectToArenaKey: "Connect to Arena Key",
+    enter6CharSectorCode: "Enter 6-Character Arena Code",
+    cancelBtn: "Cancel",
+    connectBtn: "Connect",
     
     // Lobby Screen
     arenaSector: "ARENA SECTOR",
@@ -53,6 +74,24 @@ const uiDict: Record<Locale, Record<string, string>> = {
     minPlayersNeeded: "MINIMUM 3 COMBATANTS REQUIRED",
     lobbyStatusWaiting: "Waiting for combatants...",
     lobbyStatusPlaying: "Active game in progress.",
+    establishingLink: "Establishing Link to Cyber-Dome...",
+    arenaLobby: "ARENA LOBBY",
+    syncLinkEstablished: "Sync Link Established",
+    syncOffline: "Sync Offline",
+    lobbyKey: "Lobby Key:",
+    copied: "Copied",
+    copyKey: "Copy Key",
+    combatantRoster: "Combatant Roster ({count}/8)",
+    min3Required: "Min 3 Required",
+    youBadge: "You",
+    purgeBtn: "Purge",
+    emptySlot: "[EMPTY COMBATANT SLOT]",
+    deployNpcBtn: "DEPLOY NPC BOT IN ARENA",
+    commsChannel: "Comms Channel",
+    commsInitialized: "Comms terminal initialized. Secure sub-layer active.",
+    chatPlaceholder: "Inject comms message...",
+    gridLockError: "Grid lock: Roster size must be between 3 and 8 combatants to sync matrix.",
+    awaitingHostSignal: "Awaiting host transmission signal...",
     
     // Shop Screen
     round: "ROUND",
@@ -70,7 +109,25 @@ const uiDict: Record<Locale, Record<string, string>> = {
     rarity: "RARITY",
     attr: "TYPE",
     arch: "ARCH",
+    blackMarketHeader: "◈ Black Market ◈",
+    shopSubtitle: "Select your augmentations wisely",
+    buyBtn: "Buy {cost}¢",
+    insufficientCredits: "Insufficient ¢",
+    noCardsAvailable: "No cards available",
+    tryRerolling: "Try rerolling for new stock",
+    rerollText: "Reroll (1¢)",
+    cancelDelete: "Cancel Delete",
+    deleteCardText: "Delete Card",
+    enterArenaBtn: "Enter the Arena",
+    yourDeckCount: "Your Deck ({count} cards)",
+    deckEmpty: "Your deck is empty",
+    clickToDelete: "Click to delete",
+    deckLabel: "Deck",
     
+    // CardDisplay / MemorySlots
+    memoryLabel: "MEMORY: {filled}/{max}",
+    emptySlotLabel: "Empty",
+
     // Battle Screen
     battleStep: "SIMULATION STEP",
     claimsFlag: "claims the flag",
@@ -79,6 +136,28 @@ const uiDict: Record<Locale, Record<string, string>> = {
     emptyMemory: "MEMORY BANK INACTIVE",
     skipSim: "FAST-FORWARD BATTLE",
     completeSim: "TERMINATE SIMULATION",
+    cumulativePower: "Cumulative Power:",
+    npcMemoryLabel: "{opponent} Memory",
+    resetBtnTitle: "Reset",
+    nextStepBtnTitle: "Next Step",
+    continueBtn: "Continue →",
+    combatLogHeader: "▸ Combat Log",
+    playerSelf: "Player",
+    combatProtocolReady: "Combat Protocol Ready",
+    combatProtocolDesc: "Ready to initialize neural battle loop. Standby while other combatants complete deck adjustments...",
+    advancingSector: "Advancing Tournament Sector",
+    advancingSectorDesc: "Standby while other combatants acknowledge standings. Awaiting sync trigger from neural mainframe...",
+    battleArenaHeader: "⟁ Battle Arena ⟁",
+    youSelf: "YOU",
+    yourMemory: "Your Memory",
+    deckRemaining: "Deck",
+    stepLabel: "Step",
+    accessLabel: "Access: ",
+    noneLabel: "None",
+    yourPlay: "◆ Your Play",
+    enemyPlay: "◆ Enemy Play",
+    awaitingCombatData: "Awaiting combat data...",
+    powerLabel: "Power",
     
     // Standings Screen
     standingsHeader: "MAIN MAINBOARD RANKINGS",
@@ -86,12 +165,36 @@ const uiDict: Record<Locale, Record<string, string>> = {
     fans: "FANS",
     nextRound: "INITIALIZE NEXT ROUND",
     endTournament: "CALCULATE FINAL STANDINGS",
+    roundOf: "Round {round} of {maxRounds}",
+    rankHeader: "Rank",
+    combatantHeader: "Combatant",
+    winsHeader: "Wins",
+    fansHeader: "Fans",
+    finalResultsBtn: "Final Results",
+    nextRoundBtn: "Next Round",
     
     // Game Over Screen
     tournamentComplete: "TOURNAMENT MAINBOARD TERMINATED",
     champion: "ARENA CHAMPION",
     finalResults: "FINAL SYNAPSE RANKINGS",
-    returnTitle: "RETURN TO CORE MAINBOARD"
+    returnTitle: "RETURN TO CORE MAINBOARD",
+    tournamentCompleteLabel: "/// Tournament Complete ///",
+    victoryHeader: "VICTORY",
+    championDesc: "You are the Champion of the Cyber-Dome!",
+    tournamentOverHeader: "TOURNAMENT OVER",
+    winnerClaimsThrone: "{name} claims the throne",
+    playerFinalRank: "You finished in #{rank} place with {wins} wins and {fans} fans",
+    finalRankingsHeader: "◈ Final Rankings ◈",
+    playerWins: "{wins}W",
+    newGameBtn: "New Game",
+
+    // App Screen
+    disconnectedMainframe: "DISCONNECTED: You have been kicked from the tournament mainframe.",
+    acknowledgeBtn: "Acknowledge",
+    Virus: "Virus",
+    AI: "AI",
+    Hardware: "Hardware",
+    Netrunner: "Netrunner"
   },
   ja: {
     // Title Screen
@@ -113,6 +216,21 @@ const uiDict: Record<Locale, Record<string, string>> = {
     enterName: "名前を入力してください",
     cancel: "接続中断",
     connect: "接続確立",
+    systemOnline: "/// システムオンライン ///",
+    cyber: "電脳",
+    dome: "ドーム",
+    neonAutomata: "ネオン・オートマタ",
+    injectCombatantId: "コバタントID注入 (表示名)",
+    combatantPlaceholder: "プレイヤー名",
+    jackInSolo: "ジャックイン (ソロモード)",
+    multiplayerMatrix: "マルチプレイヤーマトリクス",
+    createArena: "アリーナ生成",
+    joinArena: "アリーナ参戦",
+    multiplayerActive: "マルチプレイヤー接続有効化",
+    connectToArenaKey: "アリーナキーに接続",
+    enter6CharSectorCode: "6桁のアリーナコードを入力してください",
+    cancelBtn: "キャンセル",
+    connectBtn: "接続確立",
     
     // Lobby Screen
     arenaSector: "アリーナセクター",
@@ -129,6 +247,24 @@ const uiDict: Record<Locale, Record<string, string>> = {
     minPlayersNeeded: "最低3名のコバタントが必要です",
     lobbyStatusWaiting: "参加者を待機中...",
     lobbyStatusPlaying: "現在対戦中...",
+    establishingLink: "電脳ドームへのリンクを確立中...",
+    arenaLobby: "アリーナロビー",
+    syncLinkEstablished: "同期リンク確立完了",
+    syncOffline: "同期リンク切断",
+    lobbyKey: "ロビーキー:",
+    copied: "コピー完了",
+    copyKey: "キーをコピー",
+    combatantRoster: "コバタント名簿 ({count}/8)",
+    min3Required: "最低3名必要",
+    youBadge: "あなた",
+    purgeBtn: "除外",
+    emptySlot: "[ 空きコバタントスロット ]",
+    deployNpcBtn: "NPCボットを配備する",
+    commsChannel: "通信チャンネル",
+    commsInitialized: "通信ターミナルが初期化されました。セキュアサブレイヤー有効。",
+    chatPlaceholder: "通信メッセージを注入...",
+    gridLockError: "グリッドロック：マトリクス同期にはコバタント数が3人から8人である必要があります。",
+    awaitingHostSignal: "ホストからの送信シグナルを待機中...",
     
     // Shop Screen
     round: "ラウンド",
@@ -146,7 +282,25 @@ const uiDict: Record<Locale, Record<string, string>> = {
     rarity: "レア度",
     attr: "属性",
     arch: "スタイル",
+    blackMarketHeader: "◈ 闇マーケット接続中 ◈",
+    shopSubtitle: "インプラントの選択は慎重に行え",
+    buyBtn: "購入 {cost}¢",
+    insufficientCredits: "クレジット不足",
+    noCardsAvailable: "カードがありません",
+    tryRerolling: "リロールして在庫を更新してください",
+    rerollText: "グリッド再ロール (1¢)",
+    cancelDelete: "削除キャンセル",
+    deleteCardText: "カード削除 (2¢)",
+    enterArenaBtn: "アリーナへ突入する",
+    yourDeckCount: "あなたのデッキ ({count} 枚)",
+    deckEmpty: "デッキが空です",
+    clickToDelete: "クリックして削除",
+    deckLabel: "デッキ残り",
     
+    // CardDisplay / MemorySlots
+    memoryLabel: "メモリ容量: {filled}/{max}",
+    emptySlotLabel: "空スロット",
+
     // Battle Screen
     battleStep: "シミュレーションステップ",
     claimsFlag: "がフラグを確保しました",
@@ -155,6 +309,28 @@ const uiDict: Record<Locale, Record<string, string>> = {
     emptyMemory: "空のメモリバンク",
     skipSim: "バトル早送り",
     completeSim: "シミュレーション完了",
+    cumulativePower: "累積パワー:",
+    npcMemoryLabel: "{opponent} のメモリ",
+    resetBtnTitle: "最初に戻る",
+    nextStepBtnTitle: "次のステップ",
+    continueBtn: "次へ進む →",
+    combatLogHeader: "▸ 対戦ログフィード",
+    playerSelf: "あなた",
+    combatProtocolReady: "戦闘プロトコル初期化完了",
+    combatProtocolDesc: "神経バトルループを初期化する準備ができました。他の対戦者がデッキ調整を完了するまで待機してください...",
+    advancingSector: "トーナメントセクター進行中",
+    advancingSectorDesc: "他の対戦者が順位を確認するまで待機してください。メインフレームからの同期トリガーを待っています...",
+    battleArenaHeader: "⟁ バトルアリーナ ⟁",
+    youSelf: "あなた",
+    yourMemory: "あなたのメモリ",
+    deckRemaining: "デッキ残り",
+    stepLabel: "ステップ",
+    accessLabel: "アクセス権取得：",
+    noneLabel: "なし",
+    yourPlay: "◆ あなたの送信",
+    enemyPlay: "◆ 敵の送信",
+    awaitingCombatData: "同期データを待機中...",
+    powerLabel: "パワー",
     
     // Standings Screen
     standingsHeader: "メインボード ランキング",
@@ -162,12 +338,36 @@ const uiDict: Record<Locale, Record<string, string>> = {
     fans: "ファン数",
     nextRound: "次ラウンドに進む",
     endTournament: "最終結果を集計する",
+    roundOf: "ラウンド {round} / {maxRounds}",
+    rankHeader: "順位",
+    combatantHeader: "コバタント",
+    winsHeader: "勝利数",
+    fansHeader: "ファン数",
+    finalResultsBtn: "最終成績の集計",
+    nextRoundBtn: "次のラウンドへ",
     
     // Game Over Screen
     tournamentComplete: "トーナメント終了",
     champion: "アリーナチャンピオン",
     finalResults: "最終ランキング一覧",
-    returnTitle: "メインフレームに戻る"
+    returnTitle: "メインフレームに戻る",
+    tournamentCompleteLabel: "/// トーナメント集計完了 ///",
+    victoryHeader: "完全勝利",
+    championDesc: "あなたが電脳ドームの覇者（チャンピオン）です！",
+    tournamentOverHeader: "トーナメント終了",
+    winnerClaimsThrone: "{name} が王座に君臨しました",
+    playerFinalRank: "あなたの最終順位は #{rank} 位です（勝利数: {wins}、ファン数: {fans}）",
+    finalRankingsHeader: "◈ 最終順位一覧 ◈",
+    playerWins: "{wins}勝",
+    newGameBtn: "メインコアへ戻る",
+
+    // App Screen
+    disconnectedMainframe: "接続切断：アリーナのメインフレームからキックされました。",
+    acknowledgeBtn: "確認",
+    Virus: "ウイルス",
+    AI: "AI",
+    Hardware: "ハードウェア",
+    Netrunner: "ネットランナー"
   }
 };
 
@@ -383,36 +583,49 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return navigator.language.startsWith('ja') ? 'ja' : 'en';
   });
 
-  const setLocale = (newLocale: Locale) => {
+  const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
     localStorage.setItem('cyber_dome_locale', newLocale);
-  };
+  }, []);
 
-  const t = (key: string): string => {
-    return uiDict[locale][key] || key;
-  };
+  const t = useCallback((key: string, replacements?: Record<string, string | number>): string => {
+    let text = uiDict[locale][key] || key;
+    if (replacements) {
+      Object.entries(replacements).forEach(([k, v]) => {
+        text = text.replace(new RegExp(`{${k}}`, 'g'), String(v));
+      });
+    }
+    return text;
+  }, [locale]);
 
-  // Localizes a card on-the-fly
-  const translateCard = (card: Card): Card => {
-    if (locale === 'en') return card;
+  // Localizes a card on-the-fly without casting as any
+  const translateCard = useCallback((card: Card): LocalizedCard => {
+    if (locale === 'en') {
+      return {
+        ...card,
+        attribute: card.attribute,
+        archetype: card.archetype,
+        rarity: card.rarity
+      };
+    }
     const jaInfo = cardDictJa[card.id];
     return {
       ...card,
       name: jaInfo ? jaInfo.name : card.name,
       effect: jaInfo ? jaInfo.effect : card.effect,
-      attribute: (attributeJa[card.attribute] || card.attribute) as any,
-      archetype: (archetypeJa[card.archetype] || card.archetype) as any,
-      rarity: (rarityJa[card.rarity] || card.rarity) as any
+      attribute: attributeJa[card.attribute] || card.attribute,
+      archetype: archetypeJa[card.archetype] || card.archetype,
+      rarity: rarityJa[card.rarity] || card.rarity
     };
-  };
+  }, [locale]);
 
-  const translateCardName = (name: string): string => {
+  const translateCardName = useCallback((name: string): string => {
     if (locale === 'en' || !name) return name;
     return enCardNameToJa[name] || name;
-  };
+  }, [locale]);
 
   // Translates complex backend battle detail strings to Japanese
-  const translateBattleDetail = (detail: string): string => {
+  const translateBattleDetail = useCallback((detail: string): string => {
     if (locale === 'en' || !detail) return detail;
     let translated = detail;
 
@@ -487,7 +700,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     // Localize card names dynamically inside logs too using enCardNameToJa mapping
     Object.keys(enCardNameToJa).forEach(enName => {
-      const escaped = enName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const escaped = enName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
       const nameRegex = new RegExp(`\\b${escaped}\\b`, 'g');
       translated = translated.replace(nameRegex, enCardNameToJa[enName]);
     });
@@ -498,10 +711,10 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     return translated;
-  };
+  }, [locale]);
 
   // Translates results summaries
-  const translateBattleResult = (text: string): string => {
+  const translateBattleResult = useCallback((text: string): string => {
     if (locale === 'en' || !text) return text;
     if (text.startsWith("BYE:")) {
       return "BYE: 不戦勝！(+1 ファン)";
@@ -519,7 +732,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     }
     return text;
-  };
+  }, [locale]);
 
   return (
     <TranslationContext.Provider value={{ locale, setLocale, t, translateCard, translateCardName, translateBattleDetail, translateBattleResult }}>
@@ -528,6 +741,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTranslation = () => {
   const context = useContext(TranslationContext);
   if (context === undefined) {

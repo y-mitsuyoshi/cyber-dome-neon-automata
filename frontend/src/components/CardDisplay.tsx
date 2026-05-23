@@ -19,10 +19,10 @@ const attributeConfig = {
 };
 
 function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false }: CardDisplayProps) {
-  const { locale, translateCard, t } = useTranslation();
+  const { translateCard, t } = useTranslation();
   
   // Translate the card details for rendering
-  const displayCard = useMemo(() => translateCard(card), [card, locale]);
+  const displayCard = useMemo(() => translateCard(card), [card, translateCard]);
 
   // Use original English values for style lookups
   const attr = attributeConfig[card.attribute];

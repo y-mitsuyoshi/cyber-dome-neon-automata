@@ -17,7 +17,7 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
     return b.fans - a.fans;
   });
 
-  const { locale, translateBattleResult } = useTranslation();
+  const { t, translateBattleResult } = useTranslation();
   const isFinalRound = round >= maxRounds;
 
   // Localize Go backend match results banner
@@ -69,10 +69,10 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
             className="text-3xl font-black tracking-[0.2em] uppercase text-neon-cyan text-glow-cyan"
           >
             <Trophy size={28} className="inline mr-3 -mt-1" />
-            {locale === 'ja' ? 'コバタントランキング' : 'Standings'}
+            {t('standingsHeader')}
           </h2>
           <p className="text-xs text-cyber-text-dim tracking-wider mt-2">
-            {locale === 'ja' ? `ラウンド ${round} / ${maxRounds}` : `Round ${round} of ${maxRounds}`}
+            {t('roundOf', { round: round, maxRounds: maxRounds })}
           </p>
         </div>
 
@@ -81,16 +81,16 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
           {/* Header */}
           <div className="grid grid-cols-[50px_1fr_80px_80px] gap-2 px-4 py-3 bg-cyber-darker/50 border-b border-cyber-border/30">
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-bold">
-              {locale === 'ja' ? '順位' : 'Rank'}
+              {t('rankHeader')}
             </span>
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-bold">
-              {locale === 'ja' ? 'コバタント' : 'Combatant'}
+              {t('combatantHeader')}
             </span>
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-bold text-center">
-              {locale === 'ja' ? '勝利数' : 'Wins'}
+              {t('winsHeader')}
             </span>
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-bold text-center">
-              {locale === 'ja' ? 'ファン数' : 'Fans'}
+              {t('fansHeader')}
             </span>
           </div>
 
@@ -134,7 +134,7 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
                 </span>
                 {player.isPlayer && (
                   <span className="text-[9px] text-neon-cyan/60 uppercase tracking-wider border border-neon-cyan/20 px-1.5 rounded">
-                    {locale === 'ja' ? 'あなた' : 'You'}
+                    {t('youBadge')}
                   </span>
                 )}
               </div>
@@ -181,11 +181,11 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
             ) : isFinalRound ? (
               <>
                 <Trophy size={18} />
-                {locale === 'ja' ? '最終成績の集計' : 'Final Results'}
+                {t('finalResultsBtn')}
               </>
             ) : (
               <>
-                {locale === 'ja' ? '次のラウンドへ' : 'Next Round'}
+                {t('nextRoundBtn')}
                 <ChevronRight size={18} />
               </>
             )}

@@ -39,7 +39,7 @@ function App() {
   const [waitingForBattle, setWaitingForBattle] = useState<boolean>(false);
   const [waitingForNextRound, setWaitingForNextRound] = useState<boolean>(false);
 
-  const { locale, setLocale } = useTranslation();
+  const { locale, setLocale, t } = useTranslation();
 
   // WebSocket Hook
   const {
@@ -61,7 +61,7 @@ function App() {
       setScreen('title');
       setLobbyCode(null);
       setGameState(null);
-      setError(locale === 'ja' ? '接続切断：アリーナのメインフレームからキックされました。' : 'DISCONNECTED: You have been kicked from the tournament mainframe.');
+      setError(t('disconnectedMainframe'));
       resetKicked();
     }
   }, [kicked]);
@@ -332,7 +332,7 @@ function App() {
             onClick={() => setError(null)}
             className="text-[10px] uppercase border border-neon-red/30 px-2 py-0.5 rounded hover:bg-neon-red/10 cursor-pointer"
           >
-            {locale === 'ja' ? '確認' : 'Acknowledge'}
+            {t('acknowledgeBtn')}
           </button>
         </div>
       )}
@@ -342,12 +342,10 @@ function App() {
         <div className="fixed inset-0 z-40 bg-cyber-dark/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in p-4 text-center">
           <ShieldAlert size={48} className="text-neon-cyan animate-pulse mb-4 text-glow-cyan" />
           <h2 className="text-xl font-bold tracking-[0.25em] text-neon-cyan text-glow-cyan uppercase mb-2">
-            {locale === 'ja' ? '戦闘プロトコル初期化完了' : 'Combat Protocol Ready'}
+            {t('combatProtocolReady')}
           </h2>
           <p className="text-xs font-mono text-cyber-text-dim max-w-sm uppercase tracking-wider animate-pulse">
-            {locale === 'ja'
-              ? '神経バトルループを初期化する準備ができました。他の対戦者がデッキ調整を完了するまで待機してください...'
-              : 'Ready to initialize neural battle loop. Standby while other combatants complete deck adjustments...'}
+            {t('combatProtocolDesc')}
           </p>
         </div>
       )}
@@ -356,12 +354,10 @@ function App() {
         <div className="fixed inset-0 z-40 bg-cyber-dark/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in p-4 text-center">
           <ShieldAlert size={48} className="text-neon-magenta animate-pulse mb-4 text-glow-magenta" />
           <h2 className="text-xl font-bold tracking-[0.25em] text-neon-magenta text-glow-magenta uppercase mb-2">
-            {locale === 'ja' ? 'トーナメントセクター進行中' : 'Advancing Tournament Sector'}
+            {t('advancingSector')}
           </h2>
           <p className="text-xs font-mono text-cyber-text-dim max-w-sm uppercase tracking-wider animate-pulse">
-            {locale === 'ja'
-              ? '他の対戦者が順位を確認するまで待機してください。メインフレームからの同期トリガーを待っています...'
-              : 'Standby while other combatants acknowledge standings. Awaiting sync trigger from neural mainframe...'}
+            {t('advancingSectorDesc')}
           </p>
         </div>
       )}
