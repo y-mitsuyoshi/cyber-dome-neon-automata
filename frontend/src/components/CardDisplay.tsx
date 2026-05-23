@@ -97,6 +97,20 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         {displayCard.name}
       </h3>
 
+      {/* Card Image */}
+      <div className="relative w-full h-24 mb-3 rounded overflow-hidden border border-cyber-border/40 bg-cyber-darker group-hover:border-neon-cyan/30 transition-colors">
+        <img
+          src={`/images/cards/${card.id}.png`}
+          alt={displayCard.name}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.src = '/images/cards/default.png';
+          }}
+        />
+        {/* Hologram lines overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent pointer-events-none" />
+      </div>
+
       {/* Attribute & Power */}
       <div className="flex items-center justify-between mb-3">
         <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${attr.bg} border ${attr.border}`}>

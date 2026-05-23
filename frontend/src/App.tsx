@@ -430,6 +430,7 @@ function App() {
               battleLog={gameState.battleLog}
               opponent={gameState.opponent}
               onComplete={handleBattleComplete}
+              deck={gameState.player.deck}
             />
           ) : (
             <Standings
