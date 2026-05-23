@@ -685,7 +685,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       { en: "Tournament Grid Exhausted\\. (.*) claims absolute dominance!", ja: "電脳グリッド完全消費。$1 がアリーナの支配権を掌握しました！" },
 
       { en: "claims the flag", ja: "がフラグを確保しました" },
-      { en: "Challerger cumulative power:", ja: "挑戦者の累積パワー：" },
+      { en: "Challenger cumulative power:", ja: "挑戦者の累積パワー：" },
       { en: "vs flag:", ja: "対 フラグパワー：" },
       { en: "cannot draw", ja: "がカードを引けません" },
       { en: "No cards left", ja: "残りカードがありません" },

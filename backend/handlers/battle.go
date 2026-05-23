@@ -111,6 +111,11 @@ func HandleBattleAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if session.PendingActions[req.PlayerName] != nil {
+		writeError(w, http.StatusBadRequest, "Action already committed for this step")
+		return
+	}
+
 	// 1. Register the player's action
 	action := &models.BattleAction{
 		PlayerName: req.PlayerName,
