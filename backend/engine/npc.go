@@ -115,8 +115,8 @@ func NPCShopPhase(npc *models.Player) {
 		boughtAny := false
 
 		// 1. Evaluate and buy matching cards
-		for i := 0; i < len(shop.Cards); i++ {
-			card := shop.Cards[i]
+		remainingCards := make([]models.Card, 0, len(shop.Cards))
+		for _, card := range shop.Cards {
 			isPreferred := false
 			switch strategy {
 			case "Aggro":
@@ -133,12 +133,11 @@ func NPCShopPhase(npc *models.Player) {
 				npc.Credits -= cost
 				npc.Deck = append(npc.Deck, card.Clone())
 				boughtAny = true
-				
-				// Remove card from shop offering
-				shop.Cards = append(shop.Cards[:i], shop.Cards[i+1:]...)
-				i--
+			} else {
+				remainingCards = append(remainingCards, card)
 			}
 		}
+		shop.Cards = remainingCards
 
 		// 2. Reroll decision: If didn't buy anything, has >= 3 credits, and has iteration left, spend 1 credit to reroll
 		if !boughtAny && npc.Credits >= 3 && iter < 2 {

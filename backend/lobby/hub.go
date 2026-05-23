@@ -140,6 +140,34 @@ func (h *Hub) Broadcast(lobbyCode string, msg interface{}) {
 	}
 }
 
+// SendToPlayer sends a message to a specific client in a lobby.
+func (h *Hub) SendToPlayer(lobbyCode string, playerName string, msg interface{}) {
+	h.RLock()
+	clients, ok := h.LobbyCodeToClients[lobbyCode]
+	if !ok {
+		h.RUnlock()
+		return
+	}
+	client, ok := clients[playerName]
+	if !ok {
+		h.RUnlock()
+		return
+	}
+	h.RUnlock()
+
+	payload, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("Error marshalling message for %s: %v", playerName, err)
+		return
+	}
+
+	select {
+	case client.Send <- payload:
+	default:
+		log.Printf("Send buffer full for player %s", playerName)
+	}
+}
+
 // BroadcastLobbyState broadcasts the current lobby players and settings.
 func (h *Hub) BroadcastLobbyState(lobbyCode string) {
 	lobby := GlobalLobbyManager.GetLobby(lobbyCode)

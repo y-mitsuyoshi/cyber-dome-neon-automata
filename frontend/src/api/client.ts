@@ -61,7 +61,14 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`API Error ${res.status}: ${text}`);
+    let msg = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.error === 'string') {
+        msg = parsed.error;
+      }
+    } catch (_) {}
+    throw new Error(msg);
   }
   return res.json();
 }

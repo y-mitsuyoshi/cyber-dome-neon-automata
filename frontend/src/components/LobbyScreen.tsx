@@ -125,7 +125,7 @@ function LobbyScreen({
           </div>
 
           <div className="flex-1 min-h-[300px] max-h-[300px] overflow-y-auto border border-cyber-border/20 rounded-md bg-cyber-darker/50 p-3 space-y-2">
-            {lobbyState.players.map((p, idx) => {
+            {lobbyState.players.map((p) => {
               const isMe = p.name === playerName;
               const isPlayerHost = p.name === lobbyState.host;
 

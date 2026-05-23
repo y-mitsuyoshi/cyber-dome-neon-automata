@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 )
 
 // GameStore is the in-memory store for all active games.
@@ -254,6 +255,7 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 
 	gs := &models.GameState{
 		GameID:       gameID,
+		HostName:     "PLAYER_ONE",
 		CurrentRound: 1,
 		MaxRounds:    7,
 		Phase:        "shop",
@@ -355,40 +357,7 @@ func HandleNextRound(w http.ResponseWriter, r *http.Request) {
 
 	// If all humans are ready, advance the round
 	if readyCount >= humanCount {
-		if gs.CurrentRound >= gs.MaxRounds {
-			// Tournament is over
-			gs.CurrentRound++ // Let round exceed maxRounds to trigger GameOver screen
-			gs.Phase = "results"
-		} else {
-			gs.CurrentRound++
-			gs.Phase = "shop"
-
-			// Reset ready players and results maps for the new round
-			gs.ReadyPlayers = make(map[string]bool)
-			gs.BattleLogs = make(map[string][]models.BattleLogEntry)
-			gs.LastResults = make(map[string]*models.BattleResult)
-
-			// Process shop phase start for everyone
-			for i := range gs.Players {
-				p := &gs.Players[i]
-				p.Credits += 10 // Gain 10 shop credits
-
-				if p.IsNPC {
-					// Simulate symmetrical shop AI for NPCs!
-					engine.NPCShopPhase(p)
-				} else {
-					// Generate fresh shop for human players
-					shop := engine.GenerateShop(p.Credits)
-					gs.Shops[p.Name] = &shop
-				}
-			}
-
-			// Generate matchups for the new round
-			gs.Matchups = engine.GetMatchups(gs.CurrentRound, len(gs.Players))
-		}
-
-		// Broadcast new round state update to all players
-		go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+		advanceRound(gs)
 	}
 	WritePlayerGameState(w, gs, req.PlayerName)
 }
@@ -420,8 +389,8 @@ func HandleKickPlayer(w http.ResponseWriter, r *http.Request) {
 	gs.Mu.Lock()
 	defer gs.Mu.Unlock()
 
-	// Verify hostName is indeed the host (index 0 in player list)
-	if len(gs.Players) == 0 || gs.Players[0].Name != req.HostName {
+	// Verify hostName is indeed the host of the GameState
+	if gs.HostName != req.HostName {
 		writeError(w, http.StatusForbidden, "Only the host can execute kick commands")
 		return
 	}
@@ -446,6 +415,16 @@ func HandleKickPlayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Notify the kicked player via WebSocket before converting them
+	if gs.LobbyCode != "" {
+		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, req.TargetName, map[string]interface{}{
+			"type": "player_kicked",
+			"data": map[string]string{
+				"reason": "Kicked by host",
+			},
+		})
+	}
+
 	// Convert them to an NPC
 	targetPlayer.IsNPC = true
 	// Choose a strategy randomly
@@ -455,137 +434,194 @@ func HandleKickPlayer(w http.ResponseWriter, r *http.Request) {
 	gs.ReadyPlayers[req.TargetName] = true
 
 	// Check if this conversion triggers the battle resolution or next round transition!
-	if gs.Phase == "shop" {
-		humanCount := 0
-		readyCount := 0
-		for _, p := range gs.Players {
-			if !p.IsNPC {
-				humanCount++
-				if gs.ReadyPlayers[p.Name] {
-					readyCount++
-				}
+	humanCount := 0
+	readyCount := 0
+	for _, p := range gs.Players {
+		if !p.IsNPC {
+			humanCount++
+			if gs.ReadyPlayers[p.Name] {
+				readyCount++
 			}
 		}
-		
+	}
+
+	if gs.Phase == "shop" {
 		// If everyone is now ready, run battles
 		if readyCount >= humanCount {
-			gs.Phase = "battle"
-			for _, pair := range gs.Matchups {
-				p1Idx := pair[0]
-				p2Idx := pair[1]
-
-				if p1Idx == -1 || p2Idx == -1 {
-					activeIdx := p1Idx
-					if activeIdx == -1 {
-						activeIdx = p2Idx
-					}
-					p := &gs.Players[activeIdx]
-					p.Wins++
-					p.Fans++
-					res := models.BattleResult{
-						Winner:     p.Name,
-						Loser:      "BYE",
-						Reason:     "No opponent matched this round (Bye)",
-						FansGained: 1,
-						Log: []models.BattleLogEntry{
-							{Step: 1, Action: "bye", Player: p.Name, Details: p.Name + " received a bye."},
-						},
-					}
-					gs.LastResults[p.Name] = &res
-					gs.BattleLogs[p.Name] = res.Log
-					continue
-				}
-
-				p1 := &gs.Players[p1Idx]
-				p2 := &gs.Players[p2Idx]
-
-				deck1 := p1.CloneDeck()
-				rand.Shuffle(len(deck1), func(i, j int) { deck1[i], deck1[j] = deck1[j], deck1[i] })
-				deck2 := p2.CloneDeck()
-				rand.Shuffle(len(deck2), func(i, j int) { deck2[i], deck2[j] = deck2[j], deck2[i] })
-
-				result := engine.RunBattle(deck1, deck2)
-				winnerName := p1.Name
-				loserName := p2.Name
-
-				if result.Winner == "player" {
-					p1.Wins++
-					p1.Fans += result.FansGained
-				} else {
-					p2.Wins++
-					p2.Fans += result.FansGained
-					winnerName = p2.Name
-					loserName = p1.Name
-				}
-
-				mappedLog := make([]models.BattleLogEntry, len(result.Log))
-				for j, entry := range result.Log {
-					mEntry := entry
-					if entry.Player == "player" {
-						mEntry.Player = p1.Name
-					} else if entry.Player == "cpu" {
-						mEntry.Player = p2.Name
-					}
-					if entry.FlagHolder == "player" {
-						mEntry.FlagHolder = p1.Name
-					} else if entry.FlagHolder == "cpu" {
-						mEntry.FlagHolder = p2.Name
-					}
-					mappedLog[j] = mEntry
-				}
-
-				battleRes := models.BattleResult{
-					Winner:     winnerName,
-					Loser:      loserName,
-					Reason:     result.Reason,
-					FansGained: result.FansGained,
-					Log:        mappedLog,
-				}
-				gs.LastResults[p1.Name] = &battleRes
-				gs.BattleLogs[p1.Name] = mappedLog
-				gs.LastResults[p2.Name] = &battleRes
-				gs.BattleLogs[p2.Name] = mappedLog
-			}
-			gs.Phase = "results"
-			gs.ReadyPlayers = make(map[string]bool)
-			go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+			resolveRound(gs)
 		}
 	} else if gs.Phase == "results" {
-		humanCount := 0
-		readyCount := 0
-		for _, p := range gs.Players {
-			if !p.IsNPC {
-				humanCount++
-				if gs.ReadyPlayers[p.Name] {
-					readyCount++
-				}
-			}
-		}
+		// If everyone is now ready, advance round
 		if readyCount >= humanCount {
-			if gs.CurrentRound >= gs.MaxRounds {
-				gs.CurrentRound++
-				gs.Phase = "results"
-			} else {
-				gs.CurrentRound++
-				gs.Phase = "shop"
-				gs.ReadyPlayers = make(map[string]bool)
-				gs.BattleLogs = make(map[string][]models.BattleLogEntry)
-				gs.LastResults = make(map[string]*models.BattleResult)
-				for i := range gs.Players {
-					p := &gs.Players[i]
-					p.Credits += 10
-					if p.IsNPC {
-						engine.NPCShopPhase(p)
-					} else {
-						shop := engine.GenerateShop(p.Credits)
-						gs.Shops[p.Name] = &shop
-					}
-				}
-				gs.Matchups = engine.GetMatchups(gs.CurrentRound, len(gs.Players))
-			}
-			go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+			advanceRound(gs)
 		}
 	}
 
 	WritePlayerGameState(w, gs, req.HostName)
+}
+
+// resolveRound runs the round battle simulation and transitions the phase to results.
+func resolveRound(gs *models.GameState) {
+	gs.Phase = "battle"
+
+	source := rand.NewSource(time.Now().UnixNano())
+	rng := rand.New(source)
+
+	for _, pair := range gs.Matchups {
+		p1Idx := pair[0]
+		p2Idx := pair[1]
+
+		// 1. Handle Bye Match
+		if p1Idx == -1 || p2Idx == -1 {
+			activeIdx := p1Idx
+			if activeIdx == -1 {
+				activeIdx = p2Idx
+			}
+
+			p := &gs.Players[activeIdx]
+			p.Wins++
+			p.Fans++
+
+			res := models.BattleResult{
+				Winner:     p.Name,
+				Loser:      "BYE",
+				Reason:     "No opponent matched this round (Bye)",
+				FansGained: 1,
+				Log: []models.BattleLogEntry{
+					{
+						Step:            1,
+						Action:          "bye",
+						Player:          p.Name,
+						CurrentPower:    0,
+						EffectTriggered: "none",
+						Details:         p.Name + " received a bye in this round.",
+					},
+				},
+			}
+
+			gs.LastResults[p.Name] = &res
+			gs.BattleLogs[p.Name] = res.Log
+			continue
+		}
+
+		// 2. Handle Human/NPC vs Human/NPC Match
+		p1 := &gs.Players[p1Idx]
+		p2 := &gs.Players[p2Idx]
+
+		// Ensure decks are not empty
+		if len(p1.Deck) == 0 {
+			p1.Deck = append(p1.Deck, engine.AllCards()[0].Clone())
+		}
+		if len(p2.Deck) == 0 {
+			p2.Deck = append(p2.Deck, engine.AllCards()[0].Clone())
+		}
+
+		// Prepare cloned and shuffled decks
+		deck1 := p1.CloneDeck()
+		rng.Shuffle(len(deck1), func(i, j int) { deck1[i], deck1[j] = deck1[j], deck1[i] })
+
+		deck2 := p2.CloneDeck()
+		rng.Shuffle(len(deck2), func(i, j int) { deck2[i], deck2[j] = deck2[j], deck2[i] })
+
+		// Run simulation
+		result := engine.RunBattle(deck1, deck2)
+
+		winnerName := p1.Name
+		loserName := p2.Name
+
+		if result.Winner == "player" { // deck1 won
+			p1.Wins++
+			p1.Fans += result.FansGained
+		} else { // deck2 won
+			p2.Wins++
+			p2.Fans += result.FansGained
+			winnerName = p2.Name
+			loserName = p1.Name
+		}
+
+		// Build mapped logs replacing generic "player" / "cpu" with real names
+		mappedLog := make([]models.BattleLogEntry, len(result.Log))
+		for j, entry := range result.Log {
+			mEntry := entry
+			if entry.Player == "player" {
+				mEntry.Player = p1.Name
+			} else if entry.Player == "cpu" {
+				mEntry.Player = p2.Name
+			}
+
+			if entry.FlagHolder == "player" {
+				mEntry.FlagHolder = p1.Name
+			} else if entry.FlagHolder == "cpu" {
+				mEntry.FlagHolder = p2.Name
+			}
+
+			// Map names in details
+			if entry.Details != "" {
+				mEntry.Details = replaceStrings(entry.Details, "player", p1.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "PLAYER", p1.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "cpu", p2.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "CPU", p2.Name)
+			}
+			mappedLog[j] = mEntry
+		}
+
+		battleRes := models.BattleResult{
+			Winner:     winnerName,
+			Loser:      loserName,
+			Reason:     result.Reason,
+			FansGained: result.FansGained,
+			Log:        mappedLog,
+		}
+
+		// Save results for both combatants
+		gs.LastResults[p1.Name] = &battleRes
+		gs.BattleLogs[p1.Name] = mappedLog
+
+		gs.LastResults[p2.Name] = &battleRes
+		gs.BattleLogs[p2.Name] = mappedLog
+	}
+
+	// Advance phase to results and reset ready players for the standings screen
+	gs.Phase = "results"
+	gs.ReadyPlayers = make(map[string]bool)
+
+	// Broadcast transition event to all connected clients
+	go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+}
+
+// advanceRound increments the tournament round and transitions the phase to shop.
+func advanceRound(gs *models.GameState) {
+	if gs.CurrentRound >= gs.MaxRounds {
+		gs.CurrentRound++ // Let round exceed maxRounds to trigger GameOver screen
+		gs.Phase = "results"
+	} else {
+		gs.CurrentRound++
+		gs.Phase = "shop"
+
+		// Reset ready players and results maps for the new round
+		gs.ReadyPlayers = make(map[string]bool)
+		gs.BattleLogs = make(map[string][]models.BattleLogEntry)
+		gs.LastResults = make(map[string]*models.BattleResult)
+
+		// Process shop phase start for everyone
+		for i := range gs.Players {
+			p := &gs.Players[i]
+			p.Credits += 10 // Gain 10 shop credits
+
+			if p.IsNPC {
+				// Simulate symmetrical shop AI for NPCs!
+				engine.NPCShopPhase(p)
+			} else {
+				// Generate fresh shop for human players
+				shop := engine.GenerateShop(p.Credits)
+				gs.Shops[p.Name] = &shop
+			}
+		}
+
+		// Generate matchups for the new round
+		gs.Matchups = engine.GetMatchups(gs.CurrentRound, len(gs.Players))
+	}
+
+	// Broadcast new round state update to all players
+	go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
 }

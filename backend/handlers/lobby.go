@@ -220,14 +220,21 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 		shops[lp.Name] = &shop
 	}
 
+	// Generate dynamic rounds size based on T players
+	maxRounds := len(players)
+	if len(players)%2 == 0 {
+		maxRounds = len(players) - 1
+	}
+
 	// Generate initial pairings for Round 1
 	matchups := engine.GetMatchups(1, len(players))
 
 	gs := &models.GameState{
 		GameID:       gameID,
 		LobbyCode:    lob.Code,
+		HostName:     lob.Host,
 		CurrentRound: 1,
-		MaxRounds:    7,
+		MaxRounds:    maxRounds,
 		Phase:        "shop",
 		Players:      players,
 		Shops:        shops,

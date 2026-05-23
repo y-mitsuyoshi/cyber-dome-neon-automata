@@ -30,9 +30,10 @@ export const useWebSocket = (code: string | null, name: string | null) => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [gameId, setGameId] = useState<string | null>(null);
   const [phaseTrigger, setPhaseTrigger] = useState<{ phase: string; round: number } | null>(null);
+  const [kicked, setKicked] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<any>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptRef = useRef(0);
 
   const connect = () => {
@@ -47,7 +48,6 @@ export const useWebSocket = (code: string | null, name: string | null) => {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('WebSocket Connection Opened.');
       setConnected(true);
       attemptRef.current = 0;
     };
@@ -59,7 +59,6 @@ export const useWebSocket = (code: string | null, name: string | null) => {
         if (!line.trim()) continue;
         try {
           const msg = JSON.parse(line);
-          console.log('WS Message Received:', msg);
           
           switch (msg.type) {
             case 'lobby_state':
@@ -74,17 +73,20 @@ export const useWebSocket = (code: string | null, name: string | null) => {
             case 'state_update':
               setPhaseTrigger(msg.data);
               break;
+            case 'player_kicked':
+              setKicked(true);
+              break;
             default:
-              console.log('Unhandled WS message type:', msg.type);
+              // Safe ignored message type
+              break;
           }
         } catch (err) {
-          console.error('Error parsing WS message line:', err);
+          // Silent JSON parsing error handling
         }
       }
     };
 
-    ws.onclose = (event) => {
-      console.log('WebSocket Connection Closed:', event.reason);
+    ws.onclose = () => {
       setConnected(false);
       
       // Auto reconnect with backoff
@@ -97,8 +99,8 @@ export const useWebSocket = (code: string | null, name: string | null) => {
       }
     };
 
-    ws.onerror = (err) => {
-      console.error('WebSocket Error:', err);
+    ws.onerror = () => {
+      // Safe websocket connection error tracking
     };
   };
 
@@ -127,8 +129,10 @@ export const useWebSocket = (code: string | null, name: string | null) => {
     chatMessages,
     gameId,
     phaseTrigger,
+    kicked,
     sendChatMessage,
     resetTrigger: () => setPhaseTrigger(null),
     resetGameId: () => setGameId(null),
+    resetKicked: () => setKicked(false),
   };
 };

@@ -136,6 +136,7 @@ type GameState struct {
 	Mu           sync.Mutex                  `json:"-"`
 	GameID       string                      `json:"gameId"`
 	LobbyCode    string                      `json:"lobbyCode,omitempty"`
+	HostName     string                      `json:"hostName"`
 	CurrentRound int                         `json:"currentRound"`
 	MaxRounds    int                         `json:"maxRounds"`
 	Phase        string                      `json:"phase"` // shop, battle, results

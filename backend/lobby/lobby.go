@@ -109,6 +109,13 @@ func (lm *LobbyManager) LeaveLobby(code string, playerName string) (*Lobby, erro
 		return nil, errors.New("lobby not found")
 	}
 
+	// If game is in progress, do not remove player from roster on WS disconnect,
+	// just remove their client connection reference.
+	if lobby.Status == "playing" {
+		delete(lobby.Clients, playerName)
+		return lobby, nil
+	}
+
 	// Find and remove the player
 	index := -1
 	for i, p := range lobby.Players {
