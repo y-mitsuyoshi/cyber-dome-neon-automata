@@ -133,10 +133,7 @@ func HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 	p.Credits = credits
 	shop.Credits = credits
 
-	// Settle writing player gamestate
-	gs.Mu.Unlock()
 	WritePlayerGameState(w, gs, req.PlayerName)
-	gs.Mu.Lock()
 }
 
 // HandleRerollShop regenerates the shop for 1 credit.
@@ -203,9 +200,7 @@ func HandleRerollShop(w http.ResponseWriter, r *http.Request) {
 	p.Credits = credits
 	shop.Credits = credits
 
-	gs.Mu.Unlock()
 	WritePlayerGameState(w, gs, req.PlayerName)
-	gs.Mu.Lock()
 }
 
 // HandleDeleteCard removes a card from the player's deck. Costs 2 credits.
@@ -270,7 +265,5 @@ func HandleDeleteCard(w http.ResponseWriter, r *http.Request) {
 		shop.Credits = credits
 	}
 
-	gs.Mu.Unlock()
 	WritePlayerGameState(w, gs, req.PlayerName)
-	gs.Mu.Lock()
 }

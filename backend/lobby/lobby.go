@@ -38,12 +38,10 @@ var GlobalLobbyManager = &LobbyManager{
 // GenerateCode generates a unique 6-character room code.
 func (lm *LobbyManager) GenerateCode() string {
 	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	source := rand.NewSource(time.Now().UnixNano())
-	r := rand.New(source)
 	for {
 		b := make([]byte, 6)
 		for i := range b {
-			b[i] = chars[r.Intn(len(chars))]
+			b[i] = chars[rand.Intn(len(chars))]
 		}
 		code := string(b)
 		if _, exists := lm.Lobbies[code]; !exists {

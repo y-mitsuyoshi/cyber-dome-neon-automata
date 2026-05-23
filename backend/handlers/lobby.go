@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"time"
 )
 
 // Helper to write JSON in lobby
@@ -99,8 +98,6 @@ func HandleAddNPC(w http.ResponseWriter, r *http.Request) {
 
 	// Pick a random NPC name that isn't taken
 	npcName := ""
-	source := rand.NewSource(time.Now().UnixNano())
-	rng := rand.New(source)
 	for _, name := range engine.NPCNames {
 		taken := false
 		for _, p := range lob.Players {
@@ -117,7 +114,7 @@ func HandleAddNPC(w http.ResponseWriter, r *http.Request) {
 
 	// Fallback if all 10 are taken (should not happen since max size is 8)
 	if npcName == "" {
-		npcName = fmt.Sprintf("NPC_%d", rng.Intn(1000))
+		npcName = fmt.Sprintf("NPC_%d", rand.Intn(1000))
 	}
 
 	_, err := lobby.GlobalLobbyManager.AddNPC(req.Code, npcName)
@@ -195,20 +192,17 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 	players := make([]models.Player, len(lob.Players))
 	shops := make(map[string]*models.ShopState)
 
-	source := rand.NewSource(time.Now().UnixNano())
-	rng := rand.New(source)
-
 	for i, lp := range lob.Players {
 		var p models.Player
 		if lp.IsNPC {
 			// Choose a strategy: Aggro, Combo, or Control
-			strat := engine.NPCStrategies[rng.Intn(len(engine.NPCStrategies))]
+			strat := engine.NPCStrategies[rand.Intn(len(engine.NPCStrategies))]
 			p = engine.CreateNPC(lp.Name, strat)
 		} else {
 			// Symmetrical starting deck: 6 random cards
 			startDeck := make([]models.Card, 6)
 			for d := 0; d < 6; d++ {
-				startDeck[d] = pool[rng.Intn(len(pool))].Clone()
+				startDeck[d] = pool[rand.Intn(len(pool))].Clone()
 			}
 			p = models.Player{
 				Name:    lp.Name,

@@ -4,9 +4,9 @@ import (
 	"backend/engine"
 	"backend/models"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -195,17 +195,10 @@ func HandleBattle(w http.ResponseWriter, r *http.Request) {
 	// Broadcast transition event to all connected clients
 	go BroadcastGameStateBroadcast(gs)
 
-	// Release lock to avoid blocking WritePlayerGameState
-	gs.Mu.Unlock()
 	WritePlayerGameState(w, gs, req.PlayerName)
-	gs.Mu.Lock()
 }
 
 // Simple string replacement helper
 func replaceStrings(s, old, new string) string {
-	return fmt.Sprintf("%v", s) // details are simple enough, standard replacement if needed:
-	// But actually simple string replacement using standard library is easiest:
-	// import "strings" is not here yet, let's keep it safe or just use a basic implementation or strings package if we import it.
-	// Since strings package isn't imported, let's avoid adding more imports to prevent compile errors.
-	// The detail fields already print card names and actions, so generic is okay, or we can just leave it as is.
+	return strings.ReplaceAll(s, old, new)
 }

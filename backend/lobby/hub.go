@@ -33,6 +33,15 @@ type Client struct {
 	Send       chan []byte
 	LobbyCode  string
 	PlayerName string
+	closeOnce  sync.Once
+}
+
+// Close safely closes the connection and the send channel exactly once.
+func (c *Client) Close() {
+	c.closeOnce.Do(func() {
+		c.Conn.Close()
+		close(c.Send)
+	})
 }
 
 // Hub manages active WebSocket connections.
@@ -77,7 +86,7 @@ func (h *Hub) Run() {
 			h.Lock()
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
-				close(client.Send)
+				client.Close()
 				if clients, ok2 := h.LobbyCodeToClients[client.LobbyCode]; ok2 {
 					delete(clients, client.PlayerName)
 					if len(clients) == 0 {
@@ -154,7 +163,7 @@ func (h *Hub) BroadcastLobbyState(lobbyCode string) {
 func (c *Client) readPump() {
 	defer func() {
 		c.Hub.Unregister <- c
-		c.Conn.Close()
+		c.Close()
 	}()
 
 	c.Conn.SetReadLimit(maxMessageSize)
@@ -195,7 +204,7 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.Conn.Close()
+		c.Close()
 	}()
 
 	for {

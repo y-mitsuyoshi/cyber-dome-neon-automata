@@ -390,9 +390,5 @@ func HandleNextRound(w http.ResponseWriter, r *http.Request) {
 		// Broadcast new round state update to all players
 		go BroadcastGameStateBroadcast(gs)
 	}
-
-	// Release lock to avoid blocking WritePlayerGameState which locks internally
-	gs.Mu.Unlock()
 	WritePlayerGameState(w, gs, req.PlayerName)
-	gs.Mu.Lock() // re-acquire lock so defer Unlock completes correctly
 }

@@ -60,6 +60,7 @@ function App() {
           const state = await getGameState(wsGameId, playerName);
           setGameState(state);
           setScreen('game');
+          resetGameId();
           setWaitingForBattle(false);
           setWaitingForNextRound(false);
         } catch (err: any) {
@@ -67,7 +68,6 @@ function App() {
           setError('SYNC_FAILED: Failed to pull arena state.');
         } finally {
           setLoading(false);
-          resetGameId();
         }
       };
       initGame();
@@ -98,6 +98,28 @@ function App() {
       syncState();
     }
   }, [phaseTrigger]);
+
+  // 3. Auto-resync game state on WebSocket reconnection
+  useEffect(() => {
+    if (connected && screen === 'game' && gameState) {
+      console.log('WS reconnected, pulling latest game state...');
+      const syncOnReconnect = async () => {
+        try {
+          const state = await getGameState(gameState.gameId, playerName);
+          setGameState(state);
+          if (state.phase === 'battle') {
+            setWaitingForBattle(false);
+          }
+          if (state.phase === 'shop') {
+            setWaitingForNextRound(false);
+          }
+        } catch (err) {
+          console.error('Reconnect sync failed:', err);
+        }
+      };
+      syncOnReconnect();
+    }
+  }, [connected]);
 
   // OFFLINE SOLO START
   const handleStartSolo = async () => {
