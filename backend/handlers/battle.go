@@ -1,13 +1,12 @@
 package handlers
 
 import (
-	"backend/engine"
 	"encoding/json"
-	"math/rand"
 	"net/http"
+	"strings"
 )
 
-// HandleBattle runs the battle simulation for the current round.
+// HandleBattle runs the battle simulation for the current round once all human players click battle.
 // POST /api/tournament/battle
 func HandleBattle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -16,11 +15,16 @@ func HandleBattle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		GameID string `json:"gameId"`
+		GameID     string `json:"gameId"`
+		PlayerName string `json:"playerName"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if req.PlayerName == "" {
+		req.PlayerName = "PLAYER_ONE"
 	}
 
 	gs, ok := getGame(req.GameID)
@@ -37,47 +41,36 @@ func HandleBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(gs.Player.Deck) == 0 {
-		writeError(w, http.StatusBadRequest, "Player has no cards in deck")
+	// Mark caller as ready for battle
+	gs.ReadyPlayers[req.PlayerName] = true
+
+	// Check if all human players are ready
+	humanCount := 0
+	readyCount := 0
+	for _, p := range gs.Players {
+		if !p.IsNPC {
+			humanCount++
+			if gs.ReadyPlayers[p.Name] {
+				readyCount++
+			}
+		}
+	}
+
+	// If not all human players are ready, keep them in standby
+	if readyCount < humanCount {
+		gs.Mu.Unlock()
+		WritePlayerGameState(w, gs, req.PlayerName)
+		gs.Mu.Lock()
 		return
 	}
 
-	// Select opponent: round-robin based on current round
-	opponentIndex := (gs.CurrentRound - 1) % len(gs.NPCs)
+	// Symmetrical: all human players are ready! Run all matchups for the round
+	resolveRound(gs)
 
-	gs.Phase = "battle"
-
-	// Prepare decks — clone and shuffle
-	playerDeck := gs.Player.CloneDeck()
-	gs.Player.ShuffleDeck()
-	rand.Shuffle(len(playerDeck), func(i, j int) {
-		playerDeck[i], playerDeck[j] = playerDeck[j], playerDeck[i]
-	})
-
-	cpuDeck := gs.NPCs[opponentIndex].CloneDeck()
-	rand.Shuffle(len(cpuDeck), func(i, j int) {
-		cpuDeck[i], cpuDeck[j] = cpuDeck[j], cpuDeck[i]
-	})
-
-	// Run the battle
-	result := engine.RunBattle(playerDeck, cpuDeck)
-
-	// Update standings based on result
-	if result.Winner == "player" {
-		gs.Player.Wins++
-		gs.Player.Fans += result.FansGained
-	} else {
-		gs.NPCs[opponentIndex].Wins++
-		gs.NPCs[opponentIndex].Fans += result.FansGained
-	}
-
-	// Run NPC vs NPC battles for the remaining NPCs
-	npcResults := engine.RunNPCBattles(gs.NPCs, opponentIndex)
-	_ = npcResults
-
-	gs.BattleLog = result.Log
-	gs.LastResult = &result
-	gs.Phase = "results"
-	WriteFullGameState(w, gs)
+	WritePlayerGameState(w, gs, req.PlayerName)
 }
 
+// Simple string replacement helper
+func replaceStrings(s, old, new string) string {
+	return strings.ReplaceAll(s, old, new)
+}

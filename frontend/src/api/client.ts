@@ -34,20 +34,11 @@ interface RawGameState {
   standings: any[];
   battleLog: any[];
   lastResult?: RawBattleResult;
+  opponent?: string;
+  battleResult?: string;
 }
 
 function mapGameState(raw: RawGameState): GameState {
-  // Determine opponent name
-  let opponent = '';
-  let battleResult = '';
-  if (raw.lastResult) {
-    const isPlayerWinner = raw.lastResult.winner === 'PLAYER_ONE';
-    opponent = isPlayerWinner ? raw.lastResult.loser : raw.lastResult.winner;
-    battleResult = isPlayerWinner 
-      ? `VICTORY: Decrypted ${opponent}'s defense grid. (+${raw.lastResult.fansGained} Fans)`
-      : `DEFEAT: Synaptic link hijacked by ${opponent}. (No fans gained)`;
-  }
-
   return {
     gameId: raw.gameId,
     round: raw.currentRound,
@@ -58,8 +49,8 @@ function mapGameState(raw: RawGameState): GameState {
     shopCards: raw.shop ? raw.shop.cards || [] : [],
     standings: raw.standings || [],
     battleLog: raw.battleLog || (raw.lastResult ? raw.lastResult.log : []) || [],
-    battleResult,
-    opponent,
+    battleResult: raw.battleResult || '',
+    opponent: raw.opponent || '',
   };
 }
 
@@ -70,61 +61,112 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`API Error ${res.status}: ${text}`);
+    let msg = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.error === 'string') {
+        msg = parsed.error;
+      }
+    } catch (_) {}
+    throw new Error(msg);
   }
   return res.json();
 }
 
+// SOLO / OFFLINE ENTRYPOINT
 export async function createNewGame(): Promise<GameState> {
   const raw = await apiFetch<RawGameState>('/api/game/new', { method: 'POST' });
   return mapGameState(raw);
 }
 
-export async function getGameState(gameId: string): Promise<GameState> {
-  const raw = await apiFetch<RawGameState>(`/api/game/state?gameId=${gameId}`);
+// MULTIPLAYER COMPATIBLE ENDPOINTS
+export async function getGameState(gameId: string, playerName: string): Promise<GameState> {
+  const raw = await apiFetch<RawGameState>(`/api/game/state?gameId=${gameId}&playerName=${encodeURIComponent(playerName)}`);
   return mapGameState(raw);
 }
 
-export async function getShop(gameId: string): Promise<{ cards: Card[]; credits: number }> {
-  return apiFetch<{ cards: Card[]; credits: number }>(`/api/shop?gameId=${gameId}`);
+export async function getShop(gameId: string, playerName: string): Promise<{ cards: Card[]; credits: number }> {
+  return apiFetch<{ cards: Card[]; credits: number }>(`/api/shop?gameId=${gameId}&playerName=${encodeURIComponent(playerName)}`);
 }
 
-export async function buyCard(gameId: string, cardIndex: number): Promise<GameState> {
+export async function buyCard(gameId: string, cardIndex: number, playerName: string): Promise<GameState> {
   const raw = await apiFetch<RawGameState>('/api/shop/buy', {
     method: 'POST',
-    body: JSON.stringify({ gameId, cardIndex }),
+    body: JSON.stringify({ gameId, cardIndex, playerName }),
   });
   return mapGameState(raw);
 }
 
-export async function rerollShop(gameId: string): Promise<GameState> {
+export async function rerollShop(gameId: string, playerName: string): Promise<GameState> {
   const raw = await apiFetch<RawGameState>('/api/shop/reroll', {
     method: 'POST',
-    body: JSON.stringify({ gameId }),
+    body: JSON.stringify({ gameId, playerName }),
   });
   return mapGameState(raw);
 }
 
-export async function deleteCard(gameId: string, cardIndex: number): Promise<GameState> {
+export async function deleteCard(gameId: string, cardIndex: number, playerName: string): Promise<GameState> {
   const raw = await apiFetch<RawGameState>('/api/shop/delete', {
     method: 'POST',
-    body: JSON.stringify({ gameId, cardIndex }),
+    body: JSON.stringify({ gameId, cardIndex, playerName }),
   });
   return mapGameState(raw);
 }
 
-export async function startBattle(gameId: string): Promise<GameState> {
+export async function startBattle(gameId: string, playerName: string): Promise<GameState> {
   const raw = await apiFetch<RawGameState>('/api/tournament/battle', {
     method: 'POST',
-    body: JSON.stringify({ gameId }),
+    body: JSON.stringify({ gameId, playerName }),
   });
   return mapGameState(raw);
 }
 
-export async function nextRound(gameId: string): Promise<GameState> {
+export async function nextRound(gameId: string, playerName: string): Promise<GameState> {
   const raw = await apiFetch<RawGameState>('/api/tournament/next-round', {
     method: 'POST',
-    body: JSON.stringify({ gameId }),
+    body: JSON.stringify({ gameId, playerName }),
   });
   return mapGameState(raw);
+}
+
+// LOBBY REST OPERATIONS
+export interface RawLobbyState {
+  code: string;
+  players: { name: string; isNpc: boolean }[];
+  host: string;
+}
+
+export async function createLobby(playerName: string): Promise<{ code: string; host: string }> {
+  return apiFetch<{ code: string; host: string }>('/api/lobby/create', {
+    method: 'POST',
+    body: JSON.stringify({ playerName }),
+  });
+}
+
+export async function joinLobby(code: string, playerName: string): Promise<RawLobbyState> {
+  return apiFetch<RawLobbyState>('/api/lobby/join', {
+    method: 'POST',
+    body: JSON.stringify({ code, playerName }),
+  });
+}
+
+export async function addNPC(code: string): Promise<void> {
+  return apiFetch<void>('/api/lobby/add-npc', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function removeNPC(code: string, npcName: string): Promise<void> {
+  return apiFetch<void>('/api/lobby/remove-npc', {
+    method: 'POST',
+    body: JSON.stringify({ code, npcName }),
+  });
+}
+
+export async function startGame(code: string): Promise<{ gameId: string }> {
+  return apiFetch<{ gameId: string }>('/api/lobby/start', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
 }

@@ -1,16 +1,31 @@
 import { useState } from 'react';
-import { Zap, Terminal } from 'lucide-react';
+import { Zap, Terminal, Plus, ArrowRight } from 'lucide-react';
 
 interface TitleScreenProps {
-  onStart: () => void;
+  onStartSolo: () => void;
+  onCreateLobby: (name: string) => void;
+  onJoinLobby: (code: string, name: string) => void;
   loading: boolean;
 }
 
-function TitleScreen({ onStart, loading }: TitleScreenProps) {
-  const [hovered, setHovered] = useState(false);
+function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: TitleScreenProps) {
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [hoveredSolo, setHoveredSolo] = useState(false);
+  const [hoveredCreate, setHoveredCreate] = useState(false);
+  const [hoveredJoin, setHoveredJoin] = useState(false);
+
+  const getActiveName = () => name.trim() || 'PLAYER_ONE';
+
+  const handleJoinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) return;
+    onJoinLobby(code.toUpperCase().trim(), getActiveName());
+  };
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden cyber-grid">
+    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden cyber-grid p-4">
       {/* Animated grid background */}
       <div
         className="absolute inset-0 animate-grid-move pointer-events-none"
@@ -36,19 +51,19 @@ function TitleScreen({ onStart, loading }: TitleScreenProps) {
       <div className="absolute bottom-4 right-4 w-16 h-16 border-r-2 border-b-2 border-neon-magenta/30" />
 
       {/* Main content */}
-      <div className="relative z-10 text-center animate-fade-in">
+      <div className="relative z-10 text-center animate-fade-in w-full max-w-lg">
         {/* Pre-title */}
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Terminal size={14} className="text-neon-cyan" />
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <Terminal size={14} className="text-neon-cyan animate-pulse" />
           <span className="text-[10px] uppercase tracking-[0.5em] text-neon-cyan/60 font-bold">
             /// System Online ///
           </span>
-          <Terminal size={14} className="text-neon-cyan" />
+          <Terminal size={14} className="text-neon-cyan animate-pulse" />
         </div>
 
         {/* Main title - CYBER-DOME */}
         <h1
-          className="text-6xl sm:text-8xl md:text-9xl font-black tracking-wider mb-2 text-neon-cyan animate-flicker text-glow-cyan select-none"
+          className="text-6xl sm:text-8xl md:text-8xl font-black tracking-wider mb-1 text-neon-cyan animate-flicker text-glow-cyan select-none"
           style={{
             fontFamily: 'system-ui, -apple-system, sans-serif',
             WebkitTextStroke: '1px rgba(0,240,255,0.3)',
@@ -61,72 +76,161 @@ function TitleScreen({ onStart, loading }: TitleScreenProps) {
 
         {/* Subtitle */}
         <h2
-          className="text-2xl sm:text-3xl md:text-4xl font-light tracking-[0.3em] text-neon-magenta text-glow-magenta mb-2"
+          className="text-xl sm:text-2xl md:text-3xl font-light tracking-[0.3em] text-neon-magenta text-glow-magenta mb-4"
           style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
         >
           Neon Automata
         </h2>
 
-        {/* Decorative line */}
-        <div className="flex items-center justify-center gap-3 my-6">
-          <div className="w-24 h-px bg-gradient-to-r from-transparent to-neon-cyan/50" />
-          <Zap size={16} className="text-neon-amber" />
-          <div className="w-24 h-px bg-gradient-to-l from-transparent to-neon-cyan/50" />
+        {/* Name input card */}
+        <div className="bg-cyber-surface/10 border border-cyber-border/40 p-4 rounded-md backdrop-blur-sm mb-6 max-w-sm mx-auto text-left relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-2 h-full bg-neon-cyan/40" />
+          <label className="block text-[9px] font-mono uppercase tracking-[0.25em] text-neon-cyan text-glow-cyan mb-1.5 font-bold">
+            Inject Combatant ID (Display Name)
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value.substring(0, 16))}
+            placeholder="COMBATANT_ONE"
+            className="w-full bg-cyber-darker border border-cyber-border/60 rounded px-3 py-2 text-xs text-neon-cyan text-glow-cyan font-mono focus:outline-none focus:border-neon-cyan focus:ring-1 focus:ring-neon-cyan/20 transition-all uppercase placeholder-cyber-border/50"
+          />
         </div>
 
-        {/* Tagline */}
-        <p className="text-xs sm:text-sm text-cyber-text-dim tracking-wider mb-12 max-w-md mx-auto">
-          Enter the arena. Build your deck. Dominate the grid.
-        </p>
+        {/* Actions panel */}
+        <div className="flex flex-col gap-4 max-w-sm mx-auto">
+          {/* Jack In Solo */}
+          <button
+            onClick={onStartSolo}
+            onMouseEnter={() => setHoveredSolo(true)}
+            onMouseLeave={() => setHoveredSolo(false)}
+            disabled={loading}
+            className={`
+              w-full py-3.5 rounded border-2 border-neon-cyan
+              text-neon-cyan font-bold text-xs tracking-[0.2em] uppercase
+              transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer
+              ${loading ? 'opacity-50 cursor-wait' : ''}
+              ${hoveredSolo ? 'bg-neon-cyan/15 scale-[1.03]' : 'bg-cyber-darker/60'}
+            `}
+            style={{
+              boxShadow: hoveredSolo
+                ? '0 0 15px rgba(0,240,255,0.3), inset 0 0 10px rgba(0,240,255,0.1)'
+                : '0 0 5px rgba(0,240,255,0.1)',
+            }}
+          >
+            <Zap size={14} className="animate-pulse" />
+            Jack In (Solo Mode)
+          </button>
 
-        {/* JACK IN Button */}
-        <button
-          onClick={onStart}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          disabled={loading}
-          className={`
-            relative group px-12 py-4 rounded border-2 border-neon-cyan
-            text-neon-cyan font-bold text-lg tracking-[0.3em] uppercase
-            transition-all duration-300
-            ${loading ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
-            ${hovered ? 'bg-neon-cyan/10 scale-105' : 'bg-transparent'}
-          `}
-          style={{
-            boxShadow: hovered
-              ? '0 0 20px rgba(0,240,255,0.4), 0 0 40px rgba(0,240,255,0.2), inset 0 0 20px rgba(0,240,255,0.1)'
-              : '0 0 10px rgba(0,240,255,0.2), 0 0 20px rgba(0,240,255,0.1)',
-          }}
-        >
-          {/* Button scanline */}
-          <div className="absolute inset-0 rounded overflow-hidden pointer-events-none">
-            <div
-              className="absolute w-full h-px bg-neon-cyan/20"
-              style={{ animation: 'scanline 3s linear infinite' }}
-            />
+          <div className="flex items-center gap-3 my-1">
+            <div className="flex-1 h-px bg-cyber-border/10" />
+            <span className="text-[9px] font-mono text-cyber-border uppercase tracking-widest">Multiplayer Matrix</span>
+            <div className="flex-1 h-px bg-cyber-border/10" />
           </div>
 
-          {loading ? (
-            <span className="flex items-center gap-3 justify-center">
-              <span className="animate-spin">⟳</span>
-              Initializing...
-            </span>
-          ) : (
-            <>
-              <Zap size={18} className="inline mr-2 -mt-0.5" />
-              Jack In
-            </>
-          )}
-        </button>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Create Arena */}
+            <button
+              onClick={() => onCreateLobby(getActiveName())}
+              onMouseEnter={() => setHoveredCreate(true)}
+              onMouseLeave={() => setHoveredCreate(false)}
+              disabled={loading}
+              className={`
+                py-3 rounded border border-neon-magenta
+                text-neon-magenta font-bold text-[10px] tracking-[0.2em] uppercase
+                transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer
+                ${loading ? 'opacity-50 cursor-wait' : ''}
+                ${hoveredCreate ? 'bg-neon-magenta/15 scale-[1.03]' : 'bg-cyber-darker/60'}
+              `}
+              style={{
+                boxShadow: hoveredCreate
+                  ? '0 0 12px rgba(255,0,255,0.25)'
+                  : 'none',
+              }}
+            >
+              <Plus size={12} />
+              Create Arena
+            </button>
+
+            {/* Join Arena */}
+            <button
+              onClick={() => setShowJoinModal(true)}
+              onMouseEnter={() => setHoveredJoin(true)}
+              onMouseLeave={() => setHoveredJoin(false)}
+              disabled={loading}
+              className={`
+                py-3 rounded border border-neon-cyan
+                text-neon-cyan font-bold text-[10px] tracking-[0.2em] uppercase
+                transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer
+                ${loading ? 'opacity-50 cursor-wait' : ''}
+                ${hoveredJoin ? 'bg-neon-cyan/15 scale-[1.03]' : 'bg-cyber-darker/60'}
+              `}
+              style={{
+                boxShadow: hoveredJoin
+                  ? '0 0 12px rgba(0,240,255,0.25)'
+                  : 'none',
+              }}
+            >
+              <ArrowRight size={12} />
+              Join Arena
+            </button>
+          </div>
+        </div>
 
         {/* Version info */}
-        <div className="mt-8 text-[10px] text-cyber-border tracking-widest">
-          v1.0.0 // NEURAL-LINK ACTIVE
+        <div className="mt-12 text-[10px] text-cyber-border tracking-widest">
+          v1.1.0 // MULTIPLAYER GRID LAYER ACTIVE
         </div>
       </div>
 
-      {/* Bottom decorative bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-neon-cyan/20 to-transparent" />
+      {/* JOIN ARENA CODE MODAL */}
+      {showJoinModal && (
+        <div className="fixed inset-0 z-50 bg-cyber-dark/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <form
+            onSubmit={handleJoinSubmit}
+            className="w-full max-w-sm bg-cyber-darker border border-neon-cyan/50 p-6 rounded shadow-2xl relative animate-slide-in"
+          >
+            <div className="absolute top-4 left-4 w-4 h-4 border-l-2 border-t-2 border-neon-cyan" />
+            <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-neon-cyan" />
+
+            <h3 className="text-sm uppercase tracking-[0.2em] text-neon-cyan text-glow-cyan font-bold mb-4 flex items-center gap-2">
+              <Terminal size={14} />
+              Connect to Arena Key
+            </h3>
+
+            <label className="block text-[8px] font-mono uppercase tracking-widest text-cyber-text-dim mb-1">
+              Enter 6-Character Arena Code
+            </label>
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase().substring(0, 6))}
+              placeholder="CYB-X9"
+              className="w-full bg-cyber-dark border border-neon-cyan/30 rounded px-3 py-2 text-center text-xl font-bold tracking-[0.3em] text-neon-cyan text-glow-cyan focus:outline-none focus:border-neon-cyan font-mono uppercase mb-4"
+              autoFocus
+            />
+
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowJoinModal(false);
+                  setCode('');
+                }}
+                className="px-4 py-2 border border-cyber-border text-cyber-text-dim rounded text-xs uppercase hover:bg-cyber-surface/10 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2 bg-neon-cyan text-cyber-dark font-bold rounded text-xs uppercase hover:bg-neon-cyan/80 cursor-pointer flex items-center gap-1.5"
+              >
+                Connect <ArrowRight size={12} />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

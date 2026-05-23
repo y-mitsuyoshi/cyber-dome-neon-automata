@@ -125,23 +125,27 @@ type BattleResult struct {
 
 // StandingsEntry represents a row in the standings table.
 type StandingsEntry struct {
-	Name   string `json:"name"`
-	Wins   int    `json:"wins"`
-	Fans   int    `json:"fans"`
-	IsPlayer bool `json:"isPlayer"`
+	Name     string `json:"name"`
+	Wins     int    `json:"wins"`
+	Fans     int    `json:"fans"`
+	IsPlayer bool   `json:"isPlayer"`
 }
 
 // GameState holds all data for a single game/tournament session.
 type GameState struct {
-	Mu           sync.Mutex     `json:"-"`
-	GameID       string         `json:"gameId"`
-	CurrentRound int            `json:"currentRound"`
-	MaxRounds    int            `json:"maxRounds"`
-	Phase        string         `json:"phase"` // shop, battle, results
-	Player       Player         `json:"player"`
-	NPCs         []Player       `json:"npcs"`
-	Shop         ShopState      `json:"shop"`
-	Standings    []StandingsEntry `json:"standings"`
-	BattleLog    []BattleLogEntry `json:"battleLog"`
-	LastResult   *BattleResult  `json:"lastResult,omitempty"`
+	Mu           sync.Mutex                  `json:"-"`
+	GameID       string                      `json:"gameId"`
+	LobbyCode    string                      `json:"lobbyCode,omitempty"`
+	HostName     string                      `json:"hostName"`
+	CurrentRound int                         `json:"currentRound"`
+	MaxRounds    int                         `json:"maxRounds"`
+	Phase        string                      `json:"phase"` // shop, battle, results
+	Players      []Player                    `json:"players"` // Size 3-8: mixture of humans and NPCs
+	Shops        map[string]*ShopState       `json:"shops"` // Keyed by player name
+	ReadyPlayers map[string]bool             `json:"readyPlayers"` // Keyed by player name, tracks ready status
+	Matchups     [][2]int                    `json:"matchups"` // Pairings of player indexes for the round
+	BattleLogs   map[string][]BattleLogEntry `json:"battleLogs"` // Keyed by player name
+	LastResults  map[string]*BattleResult    `json:"lastResults"` // Keyed by player name
+	Standings    []StandingsEntry            `json:"standings"`
 }
+

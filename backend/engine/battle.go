@@ -577,20 +577,38 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 	bs := newBattleState(playerDeck, cpuDeck)
 
 	// Phase 1: Player reveals first card to claim the flag
-	card, ok := drawCard(&bs.PlayerDeck, bs.LockedCards["player"])
+	// Symmetrical: Cointoss to determine who claims the flag first
+	startingSide := "player"
+	otherSide := "cpu"
+	if rand.Intn(2) == 0 {
+		startingSide = "cpu"
+		otherSide = "player"
+	}
+
+	var startDeck *[]models.Card
+	var lockedKey string
+	if startingSide == "player" {
+		startDeck = &bs.PlayerDeck
+		lockedKey = "player"
+	} else {
+		startDeck = &bs.CPUDeck
+		lockedKey = "cpu"
+	}
+
+	card, ok := drawCard(startDeck, bs.LockedCards[lockedKey])
 	if !ok {
 		return models.BattleResult{
-			Winner: "cpu", Loser: "player", Reason: "Player has no cards",
+			Winner: otherSide, Loser: startingSide, Reason: fmt.Sprintf("%s has no cards", startingSide),
 			Log: bs.Log, FansGained: 1,
 		}
 	}
 
 	effectivePower := card.Power
-	effect := bs.applyOnRevealEffects(&card, "player", &effectivePower)
-	bs.FlagHolder = "player"
+	effect := bs.applyOnRevealEffects(&card, startingSide, &effectivePower)
+	bs.FlagHolder = startingSide
 	bs.FlagPower = effectivePower
-	bs.PrevCardAttr["player"] = card.Attribute
-	bs.logEntry("reveal", "player", &card, bs.FlagPower, effect, bs.FlagHolder, "Player claims the flag")
+	bs.PrevCardAttr[startingSide] = card.Attribute
+	bs.logEntry("reveal", startingSide, &card, bs.FlagPower, effect, bs.FlagHolder, fmt.Sprintf("%s claims the flag", startingSide))
 
 	// Main battle loop
 	for {
@@ -712,12 +730,16 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 			// Apply defend effects from cards in the defender's memory
 			for _, slot := range *defenderMem {
 				for _, mc := range slot.Cards {
-					if mc.EffectType == "redirect_30pct" || mc.EffectType == "lock_enemy_highest" {
+					isDefendEffect := mc.EffectType == "redirect_30pct" || mc.EffectType == "redirect_50pct" ||
+						mc.EffectType == "lock_enemy_highest" || mc.EffectType == "lock_enemy_highest_x2" ||
+						mc.EffectType == "lock_enemy_lowest"
+					if isDefendEffect {
 						dEffect := bs.applyOnDefendEffect(mc, oldFlagHolder)
 						if dEffect != "" {
 							bs.logEntry("defend_effect", oldFlagHolder, nil, 0, dEffect,
 								newFlagHolder, "Defend effect from memory")
-							if mc.EffectType == "redirect_30pct" && len(dEffect) > 0 && dEffect[len(dEffect)-4:] == "back" {
+							isRedirect := mc.EffectType == "redirect_30pct" || mc.EffectType == "redirect_50pct"
+							if isRedirect && len(dEffect) > 0 && len(dEffect) >= 4 && dEffect[len(dEffect)-4:] == "back" {
 								// Redirect succeeded — swap back
 								newFlagHolder = oldFlagHolder
 								bs.logEntry("redirect", oldFlagHolder, nil, bs.FlagPower, "Flag redirected!",
@@ -788,4 +810,44 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 			}
 		}
 	}
+}
+
+// GetMatchups generates round-robin tournament matchups for T players (where T is 3-8) for a given round.
+// It returns a list of index pairs representing matches.
+// If the number of players is odd, a dummy index -1 is used to represent a BYE.
+func GetMatchups(round int, numPlayers int) [][2]int {
+	isOdd := numPlayers%2 != 0
+	n := numPlayers
+	if isOdd {
+		n = numPlayers + 1
+	}
+
+	r := round - 1 // 0-indexed round
+	pairs := make([][2]int, 0, n/2)
+
+	// Circle method rotation
+	temp := make([]int, n)
+	temp[0] = 0
+	for i := 1; i < n; i++ {
+		temp[i] = 1 + (i-1+r)%(n-1)
+	}
+
+	// Pair elements: temp[i] with temp[n-1-i]
+	for i := 0; i < n/2; i++ {
+		p1 := temp[i]
+		p2 := temp[n-1-i]
+
+		// Map dummy player to -1
+		if isOdd {
+			if p1 == n-1 {
+				p1 = -1
+			}
+			if p2 == n-1 {
+				p2 = -1
+			}
+		}
+
+		pairs = append(pairs, [2]int{p1, p2})
+	}
+	return pairs
 }

@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"backend/engine"
+	"backend/lobby"
 	"backend/models"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 )
 
 // GameStore is the in-memory store for all active games.
@@ -40,21 +43,15 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// buildStandings computes sorted standings from the current game state.
-func buildStandings(gs *models.GameState) []models.StandingsEntry {
-	entries := make([]models.StandingsEntry, 0, 8)
-	entries = append(entries, models.StandingsEntry{
-		Name:     gs.Player.Name,
-		Wins:     gs.Player.Wins,
-		Fans:     gs.Player.Fans,
-		IsPlayer: true,
-	})
-	for _, npc := range gs.NPCs {
+// buildStandings computes sorted standings from the current game state for a specific player view.
+func buildStandings(gs *models.GameState, activePlayer string) []models.StandingsEntry {
+	entries := make([]models.StandingsEntry, 0, len(gs.Players))
+	for _, p := range gs.Players {
 		entries = append(entries, models.StandingsEntry{
-			Name:     npc.Name,
-			Wins:     npc.Wins,
-			Fans:     npc.Fans,
-			IsPlayer: false,
+			Name:     p.Name,
+			Wins:     p.Wins,
+			Fans:     p.Fans,
+			IsPlayer: p.Name == activePlayer,
 		})
 	}
 	sort.Slice(entries, func(i, j int) bool {
@@ -66,7 +63,7 @@ func buildStandings(gs *models.GameState) []models.StandingsEntry {
 	return entries
 }
 
-// getGame retrieves a game state by ID from the request.
+// getGame retrieves a game state by ID.
 func getGame(gameID string) (*models.GameState, bool) {
 	GameStore.RLock()
 	defer GameStore.RUnlock()
@@ -74,9 +71,106 @@ func getGame(gameID string) (*models.GameState, bool) {
 	return gs, ok
 }
 
-// WriteFullGameState returns the complete game state to the client.
-func WriteFullGameState(w http.ResponseWriter, gs *models.GameState) {
-	gs.Standings = buildStandings(gs)
+// WritePlayerGameState returns the sliced game state tailored to a specific player's view.
+func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerName string) {
+	standings := buildStandings(gs, playerName)
+
+	// Find the player
+	var player models.Player
+	found := false
+	for _, p := range gs.Players {
+		if p.Name == playerName {
+			player = p
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		writeError(w, http.StatusNotFound, "Player not found in game state")
+		return
+	}
+
+	// Extract shop
+	var shop models.ShopState
+	if s, ok := gs.Shops[playerName]; ok && s != nil {
+		shop = *s
+	} else {
+		shop = models.ShopState{Cards: []models.Card{}, Credits: player.Credits}
+	}
+
+	// Determine opponent name
+	opponentName := ""
+	playerIdx := -1
+	for idx, p := range gs.Players {
+		if p.Name == playerName {
+			playerIdx = idx
+			break
+		}
+	}
+
+	if playerIdx != -1 && len(gs.Matchups) > 0 {
+		for _, pair := range gs.Matchups {
+			if pair[0] == playerIdx {
+				if pair[1] == -1 {
+					opponentName = "BYE"
+				} else {
+					opponentName = gs.Players[pair[1]].Name
+				}
+				break
+			} else if pair[1] == playerIdx {
+				if pair[0] == -1 {
+					opponentName = "BYE"
+				} else {
+					opponentName = gs.Players[pair[0]].Name
+				}
+				break
+			}
+		}
+	}
+
+	// Determine battle log and result
+	var lastResult *models.BattleResult = nil
+	if res, ok := gs.LastResults[playerName]; ok {
+		lastResult = res
+	}
+	var battleLog []models.BattleLogEntry = nil
+	if l, ok := gs.BattleLogs[playerName]; ok {
+		battleLog = l
+	}
+
+	// Format battleResult text
+	battleResultText := ""
+	if lastResult != nil {
+		if lastResult.Winner == "BYE" {
+			battleResultText = "BYE: Automatic win! (+1 Fan)"
+		} else {
+			isWinner := lastResult.Winner == playerName
+			if isWinner {
+				battleResultText = "VICTORY: Decrypted " + opponentName + "'s defense grid. (+" + fmt.Sprintf("%d", lastResult.FansGained) + " Fans)"
+			} else {
+				battleResultText = "DEFEAT: Synaptic link hijacked by " + opponentName + ". (No fans gained)"
+			}
+		}
+	} else if opponentName == "BYE" && gs.Phase == "results" {
+		battleResultText = "BYE: Automatic win! (+1 Fan)"
+	}
+
+	// Build summarized list of other players
+	npcs := make([]map[string]interface{}, 0, len(gs.Players)-1)
+	for _, p := range gs.Players {
+		if p.Name != playerName {
+			npcs = append(npcs, map[string]interface{}{
+				"name":       p.Name,
+				"strategy":   p.AIStrategy,
+				"deckSize":   len(p.Deck),
+				"wins":       p.Wins,
+				"fans":       p.Fans,
+				"isNpc":      p.IsNPC,
+				"ready":      gs.ReadyPlayers[p.Name],
+			})
+		}
+	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"gameId":       gs.GameID,
@@ -84,21 +178,38 @@ func WriteFullGameState(w http.ResponseWriter, gs *models.GameState) {
 		"maxRounds":    gs.MaxRounds,
 		"phase":        gs.Phase,
 		"player": map[string]interface{}{
-			"name":     gs.Player.Name,
-			"credits":  gs.Player.Credits,
-			"deck":     gs.Player.Deck,
-			"deckSize": len(gs.Player.Deck),
-			"wins":     gs.Player.Wins,
-			"fans":     gs.Player.Fans,
+			"name":     player.Name,
+			"credits":  player.Credits,
+			"deck":     player.Deck,
+			"deckSize": len(player.Deck),
+			"wins":     player.Wins,
+			"fans":     player.Fans,
 		},
-		"shop":       gs.Shop,
-		"standings":  gs.Standings,
-		"npcs":       npcSummaries(gs.NPCs),
-		"lastResult": gs.LastResult,
+		"shop":         shop,
+		"standings":    standings,
+		"npcs":         npcs,
+		"battleLog":    battleLog,
+		"lastResult":   lastResult,
+		"opponent":     opponentName,
+		"battleResult": battleResultText,
 	})
 }
 
-// HandleNewGame creates a new tournament game.
+// BroadcastGameStateBroadcast broadcasts a phase transition update via WS.
+func BroadcastGameStateBroadcast(lobbyCode string, phase string, round int) {
+	if lobbyCode == "" {
+		return
+	}
+	lobby.GlobalHub.Broadcast(lobbyCode, map[string]interface{}{
+		"type": "state_update",
+		"data": map[string]interface{}{
+			"phase":        phase,
+			"currentRound": round,
+		},
+	})
+}
+
+// HandleNewGame handles starting a solo offline game (backward compatible).
 // POST /api/game/new
 func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -108,7 +219,7 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 
 	gameID := generateID()
 
-	// Create player with starting deck
+	// Create single player
 	pool := engine.AllCards()
 	startDeck := make([]models.Card, 6)
 	for i := 0; i < 6; i++ {
@@ -124,42 +235,47 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 		IsNPC:   false,
 	}
 
-	npcs := engine.CreateNPCs()
-	shop := engine.GenerateShop(player.Credits)
+	// Create 7 NPCs to fill the tournament to 8 (solo mode)
+	players := make([]models.Player, 8)
+	players[0] = player
+
+	for i := 1; i <= 7; i++ {
+		name := engine.NPCNames[(i-1)%len(engine.NPCNames)]
+		strat := engine.NPCStrategies[(i-1)%len(engine.NPCStrategies)]
+		players[i] = engine.CreateNPC(name, strat)
+	}
+
+	shops := make(map[string]*models.ShopState)
+	for _, p := range players {
+		shop := engine.GenerateShop(10)
+		shops[p.Name] = &shop
+	}
+
+	matchups := engine.GetMatchups(1, len(players))
 
 	gs := &models.GameState{
 		GameID:       gameID,
+		HostName:     "PLAYER_ONE",
 		CurrentRound: 1,
 		MaxRounds:    7,
 		Phase:        "shop",
-		Player:       player,
-		NPCs:         npcs,
-		Shop:         shop,
+		Players:      players,
+		Shops:        shops,
+		ReadyPlayers: make(map[string]bool),
+		Matchups:     matchups,
+		BattleLogs:   make(map[string][]models.BattleLogEntry),
+		LastResults:  make(map[string]*models.BattleResult),
 	}
 
 	GameStore.Lock()
 	GameStore.Games[gameID] = gs
 	GameStore.Unlock()
 
-	WriteFullGameState(w, gs)
+	WritePlayerGameState(w, gs, "PLAYER_ONE")
 }
 
-func npcSummaries(npcs []models.Player) []map[string]interface{} {
-	result := make([]map[string]interface{}, len(npcs))
-	for i, npc := range npcs {
-		result[i] = map[string]interface{}{
-			"name":       npc.Name,
-			"strategy":   npc.AIStrategy,
-			"deckSize":   len(npc.Deck),
-			"wins":       npc.Wins,
-			"fans":       npc.Fans,
-		}
-	}
-	return result
-}
-
-// HandleGameState returns the current game state.
-// GET /api/game/state?gameId=XXX
+// HandleGameState returns the current player-centric game state.
+// GET /api/game/state?gameId=XXX&playerName=YYY
 func HandleGameState(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "GET required")
@@ -167,9 +283,14 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gameID := r.URL.Query().Get("gameId")
+	playerName := r.URL.Query().Get("playerName")
 	if gameID == "" {
 		writeError(w, http.StatusBadRequest, "gameId required")
 		return
+	}
+
+	if playerName == "" {
+		playerName = "PLAYER_ONE" // fallback for solo mode
 	}
 
 	gs, ok := getGame(gameID)
@@ -181,10 +302,10 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 	gs.Mu.Lock()
 	defer gs.Mu.Unlock()
 
-	WriteFullGameState(w, gs)
+	WritePlayerGameState(w, gs, playerName)
 }
 
-// HandleNextRound advances to the next round.
+// HandleNextRound advances to the next round once all human players are ready.
 // POST /api/tournament/next-round
 func HandleNextRound(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -193,11 +314,16 @@ func HandleNextRound(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		GameID string `json:"gameId"`
+		GameID     string `json:"gameId"`
+		PlayerName string `json:"playerName"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if req.PlayerName == "" {
+		req.PlayerName = "PLAYER_ONE"
 	}
 
 	gs, ok := getGame(req.GameID)
@@ -214,28 +340,288 @@ func HandleNextRound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if gs.CurrentRound >= gs.MaxRounds {
-		// Tournament is over
-		gs.CurrentRound++ // Let round exceed maxRounds to trigger GameOver screen on frontend
-		gs.Phase = "results"
-		WriteFullGameState(w, gs)
+	// Mark current human player as ready
+	gs.ReadyPlayers[req.PlayerName] = true
+
+	// Count humans and ready humans
+	humanCount := 0
+	readyCount := 0
+	for _, p := range gs.Players {
+		if !p.IsNPC {
+			humanCount++
+			if gs.ReadyPlayers[p.Name] {
+				readyCount++
+			}
+		}
+	}
+
+	// If all humans are ready, advance the round
+	if readyCount >= humanCount {
+		advanceRound(gs)
+	}
+	WritePlayerGameState(w, gs, req.PlayerName)
+}
+
+// HandleKickPlayer converts an unresponsive human player in an active game into an NPC, letting the game continue.
+// POST /api/game/kick
+func HandleKickPlayer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
 		return
 	}
 
-	gs.CurrentRound++
-	gs.Phase = "shop"
-
-	// Give player credits for new round
-	gs.Player.Credits += 10
-
-	// NPC shop phase — each NPC gains cards
-	for i := range gs.NPCs {
-		engine.NPCShopPhase(&gs.NPCs[i])
+	var req struct {
+		GameID     string `json:"gameId"`
+		HostName   string `json:"hostName"`
+		TargetName string `json:"targetName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
 	}
 
-	gs.Shop = engine.GenerateShop(gs.Player.Credits)
-	gs.LastResult = nil
+	gs, ok := getGame(req.GameID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "Game not found")
+		return
+	}
 
-	WriteFullGameState(w, gs)
+	gs.Mu.Lock()
+	defer gs.Mu.Unlock()
+
+	// Verify hostName is indeed the host of the GameState
+	if gs.HostName != req.HostName {
+		writeError(w, http.StatusForbidden, "Only the host can execute kick commands")
+		return
+	}
+
+	// Find the target player
+	targetIdx := -1
+	for idx, p := range gs.Players {
+		if p.Name == req.TargetName {
+			targetIdx = idx
+			break
+		}
+	}
+
+	if targetIdx == -1 {
+		writeError(w, http.StatusNotFound, "Target player not found in game")
+		return
+	}
+
+	targetPlayer := &gs.Players[targetIdx]
+	if targetPlayer.IsNPC {
+		writeError(w, http.StatusBadRequest, "Target is already an NPC bot")
+		return
+	}
+
+	// Notify the kicked player via WebSocket before converting them
+	if gs.LobbyCode != "" {
+		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, req.TargetName, map[string]interface{}{
+			"type": "player_kicked",
+			"data": map[string]string{
+				"reason": "Kicked by host",
+			},
+		})
+	}
+
+	// Convert them to an NPC
+	targetPlayer.IsNPC = true
+	// Choose a strategy randomly
+	targetPlayer.AIStrategy = engine.NPCStrategies[rand.Intn(len(engine.NPCStrategies))]
+	
+	// Mark them as ready in current round standby so they don't block
+	gs.ReadyPlayers[req.TargetName] = true
+
+	// Check if this conversion triggers the battle resolution or next round transition!
+	humanCount := 0
+	readyCount := 0
+	for _, p := range gs.Players {
+		if !p.IsNPC {
+			humanCount++
+			if gs.ReadyPlayers[p.Name] {
+				readyCount++
+			}
+		}
+	}
+
+	if gs.Phase == "shop" {
+		// If everyone is now ready, run battles
+		if readyCount >= humanCount {
+			resolveRound(gs)
+		}
+	} else if gs.Phase == "results" {
+		// If everyone is now ready, advance round
+		if readyCount >= humanCount {
+			advanceRound(gs)
+		}
+	}
+
+	WritePlayerGameState(w, gs, req.HostName)
 }
 
+// resolveRound runs the round battle simulation and transitions the phase to results.
+func resolveRound(gs *models.GameState) {
+	gs.Phase = "battle"
+
+	source := rand.NewSource(time.Now().UnixNano())
+	rng := rand.New(source)
+
+	for _, pair := range gs.Matchups {
+		p1Idx := pair[0]
+		p2Idx := pair[1]
+
+		// 1. Handle Bye Match
+		if p1Idx == -1 || p2Idx == -1 {
+			activeIdx := p1Idx
+			if activeIdx == -1 {
+				activeIdx = p2Idx
+			}
+
+			p := &gs.Players[activeIdx]
+			p.Wins++
+			p.Fans++
+
+			res := models.BattleResult{
+				Winner:     p.Name,
+				Loser:      "BYE",
+				Reason:     "No opponent matched this round (Bye)",
+				FansGained: 1,
+				Log: []models.BattleLogEntry{
+					{
+						Step:            1,
+						Action:          "bye",
+						Player:          p.Name,
+						CurrentPower:    0,
+						EffectTriggered: "none",
+						Details:         p.Name + " received a bye in this round.",
+					},
+				},
+			}
+
+			gs.LastResults[p.Name] = &res
+			gs.BattleLogs[p.Name] = res.Log
+			continue
+		}
+
+		// 2. Handle Human/NPC vs Human/NPC Match
+		p1 := &gs.Players[p1Idx]
+		p2 := &gs.Players[p2Idx]
+
+		// Ensure decks are not empty
+		if len(p1.Deck) == 0 {
+			p1.Deck = append(p1.Deck, engine.AllCards()[0].Clone())
+		}
+		if len(p2.Deck) == 0 {
+			p2.Deck = append(p2.Deck, engine.AllCards()[0].Clone())
+		}
+
+		// Prepare cloned and shuffled decks
+		deck1 := p1.CloneDeck()
+		rng.Shuffle(len(deck1), func(i, j int) { deck1[i], deck1[j] = deck1[j], deck1[i] })
+
+		deck2 := p2.CloneDeck()
+		rng.Shuffle(len(deck2), func(i, j int) { deck2[i], deck2[j] = deck2[j], deck2[i] })
+
+		// Run simulation
+		result := engine.RunBattle(deck1, deck2)
+
+		winnerName := p1.Name
+		loserName := p2.Name
+
+		if result.Winner == "player" { // deck1 won
+			p1.Wins++
+			p1.Fans += result.FansGained
+		} else { // deck2 won
+			p2.Wins++
+			p2.Fans += result.FansGained
+			winnerName = p2.Name
+			loserName = p1.Name
+		}
+
+		// Build mapped logs replacing generic "player" / "cpu" with real names
+		mappedLog := make([]models.BattleLogEntry, len(result.Log))
+		for j, entry := range result.Log {
+			mEntry := entry
+			if entry.Player == "player" {
+				mEntry.Player = p1.Name
+			} else if entry.Player == "cpu" {
+				mEntry.Player = p2.Name
+			}
+
+			if entry.FlagHolder == "player" {
+				mEntry.FlagHolder = p1.Name
+			} else if entry.FlagHolder == "cpu" {
+				mEntry.FlagHolder = p2.Name
+			}
+
+			// Map names in details
+			if entry.Details != "" {
+				mEntry.Details = replaceStrings(entry.Details, "player", p1.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "PLAYER", p1.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "cpu", p2.Name)
+				mEntry.Details = replaceStrings(mEntry.Details, "CPU", p2.Name)
+			}
+			mappedLog[j] = mEntry
+		}
+
+		battleRes := models.BattleResult{
+			Winner:     winnerName,
+			Loser:      loserName,
+			Reason:     result.Reason,
+			FansGained: result.FansGained,
+			Log:        mappedLog,
+		}
+
+		// Save results for both combatants
+		gs.LastResults[p1.Name] = &battleRes
+		gs.BattleLogs[p1.Name] = mappedLog
+
+		gs.LastResults[p2.Name] = &battleRes
+		gs.BattleLogs[p2.Name] = mappedLog
+	}
+
+	// Advance phase to results and reset ready players for the standings screen
+	gs.Phase = "results"
+	gs.ReadyPlayers = make(map[string]bool)
+
+	// Broadcast transition event to all connected clients
+	go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+}
+
+// advanceRound increments the tournament round and transitions the phase to shop.
+func advanceRound(gs *models.GameState) {
+	if gs.CurrentRound >= gs.MaxRounds {
+		gs.CurrentRound++ // Let round exceed maxRounds to trigger GameOver screen
+		gs.Phase = "results"
+	} else {
+		gs.CurrentRound++
+		gs.Phase = "shop"
+
+		// Reset ready players and results maps for the new round
+		gs.ReadyPlayers = make(map[string]bool)
+		gs.BattleLogs = make(map[string][]models.BattleLogEntry)
+		gs.LastResults = make(map[string]*models.BattleResult)
+
+		// Process shop phase start for everyone
+		for i := range gs.Players {
+			p := &gs.Players[i]
+			p.Credits += 10 // Gain 10 shop credits
+
+			if p.IsNPC {
+				// Simulate symmetrical shop AI for NPCs!
+				engine.NPCShopPhase(p)
+			} else {
+				// Generate fresh shop for human players
+				shop := engine.GenerateShop(p.Credits)
+				gs.Shops[p.Name] = &shop
+			}
+		}
+
+		// Generate matchups for the new round
+		gs.Matchups = engine.GetMatchups(gs.CurrentRound, len(gs.Players))
+	}
+
+	// Broadcast new round state update to all players
+	go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+}
