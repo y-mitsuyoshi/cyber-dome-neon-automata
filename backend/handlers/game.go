@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"sort"
 	"sync"
-	"time"
 )
 
 // GameStore is the in-memory store for all active games.
@@ -172,6 +171,11 @@ func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerNam
 		}
 	}
 
+	var battleSession *models.BattleSession = nil
+	if session, ok := gs.BattleSessions[playerName]; ok {
+		battleSession = session
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"gameId":       gs.GameID,
 		"currentRound": gs.CurrentRound,
@@ -181,17 +185,19 @@ func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerNam
 			"name":     player.Name,
 			"credits":  player.Credits,
 			"deck":     player.Deck,
+			"hand":     player.Hand,
 			"deckSize": len(player.Deck),
 			"wins":     player.Wins,
 			"fans":     player.Fans,
 		},
-		"shop":         shop,
-		"standings":    standings,
-		"npcs":         npcs,
-		"battleLog":    battleLog,
-		"lastResult":   lastResult,
-		"opponent":     opponentName,
-		"battleResult": battleResultText,
+		"shop":          shop,
+		"standings":     standings,
+		"npcs":          npcs,
+		"battleLog":     battleLog,
+		"lastResult":    lastResult,
+		"opponent":      opponentName,
+		"battleResult":  battleResultText,
+		"battleSession": battleSession,
 	})
 }
 
@@ -220,11 +226,7 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 	gameID := generateID()
 
 	// Create single player
-	pool := engine.AllCards()
-	startDeck := make([]models.Card, 6)
-	for i := 0; i < 6; i++ {
-		startDeck[i] = pool[rand.Intn(len(pool))].Clone()
-	}
+	startDeck := engine.StarterDeck()
 
 	player := models.Player{
 		Name:    "PLAYER_ONE",
@@ -254,17 +256,18 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 	matchups := engine.GetMatchups(1, len(players))
 
 	gs := &models.GameState{
-		GameID:       gameID,
-		HostName:     "PLAYER_ONE",
-		CurrentRound: 1,
-		MaxRounds:    7,
-		Phase:        "shop",
-		Players:      players,
-		Shops:        shops,
-		ReadyPlayers: make(map[string]bool),
-		Matchups:     matchups,
-		BattleLogs:   make(map[string][]models.BattleLogEntry),
-		LastResults:  make(map[string]*models.BattleResult),
+		GameID:         gameID,
+		HostName:       "PLAYER_ONE",
+		CurrentRound:   1,
+		MaxRounds:      7,
+		Phase:          "shop",
+		Players:        players,
+		Shops:          shops,
+		ReadyPlayers:   make(map[string]bool),
+		Matchups:       matchups,
+		BattleLogs:     make(map[string][]models.BattleLogEntry),
+		LastResults:    make(map[string]*models.BattleResult),
+		BattleSessions: make(map[string]*models.BattleSession),
 	}
 
 	GameStore.Lock()
@@ -460,18 +463,16 @@ func HandleKickPlayer(w http.ResponseWriter, r *http.Request) {
 	WritePlayerGameState(w, gs, req.HostName)
 }
 
-// resolveRound runs the round battle simulation and transitions the phase to results.
+// resolveRound starts the interactive battle phase and initializes BattleSessions for all matchups.
 func resolveRound(gs *models.GameState) {
 	gs.Phase = "battle"
-
-	source := rand.NewSource(time.Now().UnixNano())
-	rng := rand.New(source)
+	gs.ReadyPlayers = make(map[string]bool)
 
 	for _, pair := range gs.Matchups {
 		p1Idx := pair[0]
 		p2Idx := pair[1]
 
-		// 1. Handle Bye Match
+		// 1. Handle Bye Match (No active match, instant victory)
 		if p1Idx == -1 || p2Idx == -1 {
 			activeIdx := p1Idx
 			if activeIdx == -1 {
@@ -508,85 +509,48 @@ func resolveRound(gs *models.GameState) {
 		p1 := &gs.Players[p1Idx]
 		p2 := &gs.Players[p2Idx]
 
-		// Ensure decks are not empty
-		if len(p1.Deck) == 0 {
-			p1.Deck = append(p1.Deck, engine.AllCards()[0].Clone())
-		}
-		if len(p2.Deck) == 0 {
-			p2.Deck = append(p2.Deck, engine.AllCards()[0].Clone())
-		}
+		// Symmetrical: Initialize hands directly from current decks
+		p1.Hand = p1.CloneDeck()
+		p2.Hand = p2.CloneDeck()
 
-		// Prepare cloned and shuffled decks
-		deck1 := p1.CloneDeck()
-		rng.Shuffle(len(deck1), func(i, j int) { deck1[i], deck1[j] = deck1[j], deck1[i] })
+		// Shuffle hands to randomize ordering
+		rand.Shuffle(len(p1.Hand), func(i, j int) { p1.Hand[i], p1.Hand[j] = p1.Hand[j], p1.Hand[i] })
+		rand.Shuffle(len(p2.Hand), func(i, j int) { p2.Hand[i], p2.Hand[j] = p2.Hand[j], p2.Hand[i] })
 
-		deck2 := p2.CloneDeck()
-		rng.Shuffle(len(deck2), func(i, j int) { deck2[i], deck2[j] = deck2[j], deck2[i] })
+		// Clear original decks (as they are fully in hand now)
+		p1.Deck = []models.Card{}
+		p2.Deck = []models.Card{}
 
-		// Run simulation
-		result := engine.RunBattle(deck1, deck2)
+		sessionID := generateID()
+		session := engine.InitializeBattleSession(sessionID, p1.Name, p2.Name, p1.Hand, p2.Hand)
 
-		winnerName := p1.Name
-		loserName := p2.Name
-
-		if result.Winner == "player" { // deck1 won
-			p1.Wins++
-			p1.Fans += result.FansGained
-		} else { // deck2 won
-			p2.Wins++
-			p2.Fans += result.FansGained
-			winnerName = p2.Name
-			loserName = p1.Name
-		}
-
-		// Build mapped logs replacing generic "player" / "cpu" with real names
-		mappedLog := make([]models.BattleLogEntry, len(result.Log))
-		for j, entry := range result.Log {
-			mEntry := entry
-			if entry.Player == "player" {
-				mEntry.Player = p1.Name
-			} else if entry.Player == "cpu" {
-				mEntry.Player = p2.Name
-			}
-
-			if entry.FlagHolder == "player" {
-				mEntry.FlagHolder = p1.Name
-			} else if entry.FlagHolder == "cpu" {
-				mEntry.FlagHolder = p2.Name
-			}
-
-			// Map names in details
-			if entry.Details != "" {
-				mEntry.Details = replaceStrings(entry.Details, "player", p1.Name)
-				mEntry.Details = replaceStrings(mEntry.Details, "PLAYER", p1.Name)
-				mEntry.Details = replaceStrings(mEntry.Details, "cpu", p2.Name)
-				mEntry.Details = replaceStrings(mEntry.Details, "CPU", p2.Name)
-			}
-			mappedLog[j] = mEntry
-		}
-
-		battleRes := models.BattleResult{
-			Winner:     winnerName,
-			Loser:      loserName,
-			Reason:     result.Reason,
-			FansGained: result.FansGained,
-			Log:        mappedLog,
-		}
-
-		// Save results for both combatants
-		gs.LastResults[p1.Name] = &battleRes
-		gs.BattleLogs[p1.Name] = mappedLog
-
-		gs.LastResults[p2.Name] = &battleRes
-		gs.BattleLogs[p2.Name] = mappedLog
+		gs.BattleSessions[p1.Name] = session
+		gs.BattleSessions[p2.Name] = session
 	}
 
-	// Advance phase to results and reset ready players for the standings screen
-	gs.Phase = "results"
-	gs.ReadyPlayers = make(map[string]bool)
+	// Symmetrical: Check if everyone instantly completed (all got BYEs)
+	checkAndAdvanceResults(gs)
 
 	// Broadcast transition event to all connected clients
 	go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+}
+
+// checkAndAdvanceResults checks if all active battles have finished and advances the phase to results.
+func checkAndAdvanceResults(gs *models.GameState) {
+	activeBattlesLeft := false
+	for _, session := range gs.BattleSessions {
+		if !session.IsFinished {
+			activeBattlesLeft = true
+			break
+		}
+	}
+
+	if !activeBattlesLeft && len(gs.BattleSessions) > 0 {
+		gs.Phase = "results"
+		gs.ReadyPlayers = make(map[string]bool)
+		gs.BattleSessions = make(map[string]*models.BattleSession) // Clear sessions
+		go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+	}
 }
 
 // advanceRound increments the tournament round and transitions the phase to shop.

@@ -436,3 +436,19 @@ func CardsByArchetype(arch string) []models.Card {
 	}
 	return result
 }
+
+// StarterDeck returns the symmetrical 10-card starting deck for all players.
+func StarterDeck() []models.Card {
+	return []models.Card{
+		{ID: "starter_virus_1", Name: "Glitch Worm Jr.", Attribute: "Virus", Archetype: "Aggro", Power: 3, Rarity: "Common", Effect: "Simple offensive code", EffectType: "none", Cost: 2},
+		{ID: "starter_virus_2", Name: "Buffer Overflow Jr.", Attribute: "Virus", Archetype: "Aggro", Power: 4, Rarity: "Common", Effect: "Simple offensive code", EffectType: "none", Cost: 2},
+		{ID: "starter_ai_1", Name: "Linear Regressor", Attribute: "AI", Archetype: "Combo", Power: 3, Rarity: "Common", Effect: "Simple learning model", EffectType: "none", Cost: 2},
+		{ID: "starter_ai_2", Name: "Heuristic Helper", Attribute: "AI", Archetype: "Combo", Power: 4, Rarity: "Common", Effect: "Simple learning model", EffectType: "none", Cost: 2},
+		{ID: "starter_hw_1", Name: "Copper Busbar", Attribute: "Hardware", Archetype: "Control", Power: 3, Rarity: "Common", Effect: "Simple thermal conductor", EffectType: "none", Cost: 2},
+		{ID: "starter_hw_2", Name: "Standard Shield", Attribute: "Hardware", Archetype: "Control", Power: 4, Rarity: "Common", Effect: "Simple physical shield", EffectType: "none", Cost: 2},
+		{ID: "starter_nr_1", Name: "Grid Rookie", Attribute: "Netrunner", Archetype: "Control", Power: 3, Rarity: "Common", Effect: "Simple network trace", EffectType: "none", Cost: 2},
+		{ID: "starter_nr_2", Name: "Proxy Node", Attribute: "Netrunner", Archetype: "Control", Power: 4, Rarity: "Common", Effect: "Simple routing hop", EffectType: "none", Cost: 2},
+		{ID: "starter_net_1", Name: "Data Pipeline", Attribute: "Netrunner", Archetype: "Control", Power: 5, Rarity: "Common", Effect: "Simple transmission pipeline", EffectType: "none", Cost: 2},
+		{ID: "starter_ai_3", Name: "Logic Node", Attribute: "AI", Archetype: "Combo", Power: 5, Rarity: "Common", Effect: "Simple decision tree", EffectType: "none", Cost: 2},
+	}
+}

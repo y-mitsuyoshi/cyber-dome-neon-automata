@@ -373,6 +373,18 @@ const uiDict: Record<Locale, Record<string, string>> = {
 
 // Card Translation Map (80 unique card IDs)
 const cardDictJa: Record<string, { name: string; effect: string }> = {
+  // === Starter Cards ===
+  starter_virus_1: { name: "グリッチワーム・ジュニア", effect: "シンプルな攻撃コード（効果なし）" },
+  starter_virus_2: { name: "バッファオーバーフロー・ジュニア", effect: "シンプルな攻撃コード（効果なし）" },
+  starter_ai_1: { name: "線形回帰モデル", effect: "シンプルな学習モデル（効果なし）" },
+  starter_ai_2: { name: "ヒューリスティック・ヘルパー", effect: "シンプルな学習モデル（効果なし）" },
+  starter_hw_1: { name: "銅製バスバー", effect: "シンプルな熱伝導体（効果なし）" },
+  starter_hw_2: { name: "標準シールド", effect: "シンプルな物理シールド（効果なし）" },
+  starter_nr_1: { name: "グリッド・ルーキー", effect: "シンプルなネットワークトレース（効果なし）" },
+  starter_nr_2: { name: "プロキシ・ノード", effect: "シンプルなルーティングホップ（効果なし）" },
+  starter_net_1: { name: "データ・パイプライン", effect: "シンプルな情報転送ライン（効果なし）" },
+  starter_ai_3: { name: "ロジック・ノード", effect: "シンプルな決定木（効果なし）" },
+
   // === Virus (virus_001 to virus_020) ===
   virus_001: { name: "グリッチワーム", effect: "公開時：敵の先頭カードパワーを -2" },
   virus_002: { name: "データリーチ", effect: "勝利時：敵のデッキからトップカードを永久に削除" },
@@ -484,6 +496,18 @@ const rarityJa: Record<string, string> = {
 
 // English Card Name to Japanese Card Name mapping (80 unique cards)
 const enCardNameToJa: Record<string, string> = {
+  // Starter Cards
+  "Glitch Worm Jr.": "グリッチワーム・ジュニア",
+  "Buffer Overflow Jr.": "バッファオーバーフロー・ジュニア",
+  "Linear Regressor": "線形回帰モデル",
+  "Heuristic Helper": "ヒューリスティック・ヘルパー",
+  "Copper Busbar": "銅製バスバー",
+  "Standard Shield": "標準シールド",
+  "Grid Rookie": "グリッド・ルーキー",
+  "Proxy Node": "プロキシ・ノード",
+  "Data Pipeline": "データ・パイプライン",
+  "Logic Node": "ロジック・ノード",
+
   // Virus
   "Glitch Worm": "グリッチワーム",
   "Data Leech": "データリーチ",
@@ -631,8 +655,15 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     // Apply translations recursively based on phrases
     const phrases = [
+      // Hand play interactive logs
+      { en: "Clash! (.*) \\((\\d+) POW\\) vs (.*) \\((\\d+) POW\\)", ja: "アリーナ激突：$1 ($2 POW) vs $3 ($4 POW)" },
+      { en: "(.*) played (.*) \\((\\d+) POW\\)\\. (.*) discarded\\.", ja: "$1 が $2 ($3 POW) をアリーナに展開。$4 は手札を廃棄。" },
+      { en: "Both players chose to discard\\. Grid matrix is stagnant\\.", ja: "双方とも手札を廃棄。電脳アリーナのエネルギーは膠着しています。" },
+      { en: "Memory Overflow! (.*) has exhausted unique memory capacity limit\\.", ja: "メモリオーバーフロー！$1 はユニークメモリの許容限界に達しました。" },
+      { en: "Tournament Grid Exhausted\\. (.*) claims absolute dominance!", ja: "電脳グリッド完全消費。$1 がアリーナの支配権を掌握しました！" },
+
       { en: "claims the flag", ja: "がフラグを確保しました" },
-      { en: "Challenger cumulative power:", ja: "挑戦者の累積パワー：" },
+      { en: "Challerger cumulative power:", ja: "挑戦者の累積パワー：" },
       { en: "vs flag:", ja: "対 フラグパワー：" },
       { en: "cannot draw", ja: "がカードを引けません" },
       { en: "No cards left", ja: "残りカードがありません" },

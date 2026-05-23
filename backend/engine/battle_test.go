@@ -181,3 +181,58 @@ func TestGetMatchupsOdd(t *testing.T) {
 		}
 	}
 }
+
+func TestInteractiveBattle(t *testing.T) {
+	p1Deck := StarterDeck()
+	p2Deck := StarterDeck()
+
+	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
+
+	if len(session.Player1Hand) != 10 {
+		t.Errorf("Expected 10 starting cards in P1 hand, got %d", len(session.Player1Hand))
+	}
+	if len(session.Player2Hand) != 10 {
+		t.Errorf("Expected 10 starting cards in P2 hand, got %d", len(session.Player2Hand))
+	}
+
+	// 1. Commit actions: P1 plays Glitch Worm Jr. (starter_virus_1), P2 plays Linear Regressor (starter_ai_1)
+	session.PendingActions["P1"] = &models.BattleAction{
+		PlayerName: "P1",
+		ActionType: "PLAY",
+		CardID:     "starter_virus_1",
+	}
+	session.PendingActions["P2"] = &models.BattleAction{
+		PlayerName: "P2",
+		ActionType: "PLAY",
+		CardID:     "starter_ai_1",
+	}
+
+	StepBattle(session)
+
+	// Since both are Power 3, Tie breaker applies and P1 wins flag (as default)
+	if session.FlagHolder != "P1" {
+		t.Errorf("Expected P1 to hold flag, got %s", session.FlagHolder)
+	}
+	if len(session.Player1Hand) != 9 {
+		t.Errorf("Expected 9 cards in P1 hand, got %d", len(session.Player1Hand))
+	}
+	if len(session.Player1Mem) != 1 {
+		t.Errorf("Expected 1 slot in P1 memory, got %d", len(session.Player1Mem))
+	}
+	if session.Step != 1 {
+		t.Errorf("Expected Step to be 1, got %d", session.Step)
+	}
+}
+
+func TestNPCBestMove(t *testing.T) {
+	hand := []models.Card{
+		{ID: "starter_virus_1", Name: "Glitch Worm Jr.", Attribute: "Virus", Power: 3},
+		{ID: "starter_ai_3", Name: "Logic Node", Attribute: "AI", Power: 5},
+	}
+	
+	// Combo strategy NPC should prefer AI card (Logic Node, Power 5) over Virus
+	action := EvaluateBestMove(hand, "Combo", []models.MemorySlot{}, []models.MemorySlot{}, 0, false)
+	if action.ActionType != "PLAY" || action.CardID != "starter_ai_3" {
+		t.Errorf("Expected playing starter_ai_3, got %s:%s", action.ActionType, action.CardID)
+	}
+}
