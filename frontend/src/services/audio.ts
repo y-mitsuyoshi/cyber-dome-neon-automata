@@ -32,6 +32,8 @@ class ProceduralAudioEngine {
   // Keep track of active oscillators for smooth BGM drone crossfades
   private activeDrones: OscillatorNode[] = [];
   private droneGain: GainNode | null = null;
+  private activeLfos: OscillatorNode[] = [];
+  private lfoGains: GainNode[] = [];
 
   constructor() {
     // Load mute state from localStorage
@@ -216,6 +218,38 @@ class ProceduralAudioEngine {
 
         noise.start(now);
         noise.stop(now + 0.16);
+
+        // Glitch distortion element — square wave through waveshaper
+        const glitchOsc = this.ctx.createOscillator();
+        const glitchGain = this.ctx.createGain();
+        const shaper = this.ctx.createWaveShaper();
+
+        glitchOsc.type = 'square';
+        glitchOsc.frequency.setValueAtTime(800, now);
+        glitchOsc.frequency.exponentialRampToValueAtTime(50, now + 0.12);
+
+        // Simple hard-clip distortion curve
+        const makeDistCurve = (amount: number) => {
+          const samples = 256;
+          const curve = new Float32Array(samples);
+          for (let i = 0; i < samples; i++) {
+            const x = (i * 2) / samples - 1;
+            curve[i] = ((Math.PI + amount) * x) / (Math.PI + amount * Math.abs(x));
+          }
+          return curve;
+        };
+        shaper.curve = makeDistCurve(50);
+        shaper.oversample = '2x';
+
+        glitchGain.gain.setValueAtTime(0.15, now);
+        glitchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+        glitchOsc.connect(shaper);
+        shaper.connect(glitchGain);
+        glitchGain.connect(this.seGain);
+
+        glitchOsc.start(now);
+        glitchOsc.stop(now + 0.15);
         break;
       }
 
@@ -529,6 +563,14 @@ class ProceduralAudioEngine {
           }
         });
         this.activeDrones = [];
+
+        this.activeLfos.forEach(lfo => {
+          try { lfo.stop(); } catch {
+            // Already stopped
+          }
+        });
+        this.activeLfos = [];
+        this.lfoGains = [];
         
         // Restore BGM gain only if no new theme has started in the meantime
         if (this.currentBgm === 'none' && this.ctx && this.bgmGain) {
@@ -577,7 +619,39 @@ class ProceduralAudioEngine {
           
           osc.start();
           this.activeDrones.push(osc);
+
+          // LFO modulates frequency for slow vibrato — 0.15Hz sine, ~3Hz depth
+          const lfo = this.ctx.createOscillator();
+          lfo.type = 'sine';
+          lfo.frequency.setValueAtTime(0.15, this.ctx.currentTime);
+
+          const lfoGain = this.ctx.createGain();
+          lfoGain.gain.setValueAtTime(3, this.ctx.currentTime);
+
+          lfo.connect(lfoGain);
+          lfoGain.connect(osc.frequency);
+
+          lfo.start();
+          this.activeLfos.push(lfo);
+          this.lfoGains.push(lfoGain);
         };
+
+        // Create a separate LFO for drone gain breathing effect (slow volume pulse)
+        const breathLfo = this.ctx.createOscillator();
+        breathLfo.type = 'sine';
+        breathLfo.frequency.setValueAtTime(0.08, now);
+
+        const breathGain = this.ctx.createGain();
+        breathGain.gain.setValueAtTime(0.12, now);
+
+        breathLfo.connect(breathGain);
+        if (this.droneGain) {
+          breathGain.connect(this.droneGain.gain);
+        }
+
+        breathLfo.start();
+        this.activeLfos.push(breathLfo);
+        this.lfoGains.push(breathGain);
 
         // Deep 55Hz (A1) and detuned 55.3Hz, and 110Hz (A2) drone
         createDrone(55);

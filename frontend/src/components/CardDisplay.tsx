@@ -63,7 +63,7 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
 
   return (
     <div
-      onClick={disabled ? undefined : () => { playSE('click'); onClick?.(); }}
+      onClick={disabled ? undefined : onClick}
       onMouseEnter={() => {
         if (disabled) return;
         const now = Date.now();
