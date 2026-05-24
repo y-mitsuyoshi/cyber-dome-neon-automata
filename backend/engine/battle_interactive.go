@@ -8,6 +8,10 @@ import (
 
 // InitializeBattleSession creates a fresh interactive battle session between two players.
 func InitializeBattleSession(sessionID string, p1Name, p2Name string, p1Deck, p2Deck []models.Card) *models.BattleSession {
+	// Defensive copy to avoid mutating caller's slices
+	p1Deck = append([]models.Card(nil), p1Deck...)
+	p2Deck = append([]models.Card(nil), p2Deck...)
+
 	// Shuffle decks to randomize initial order
 	rand.Shuffle(len(p1Deck), func(i, j int) { p1Deck[i], p1Deck[j] = p1Deck[j], p1Deck[i] })
 	rand.Shuffle(len(p2Deck), func(i, j int) { p2Deck[i], p2Deck[j] = p2Deck[j], p2Deck[i] })

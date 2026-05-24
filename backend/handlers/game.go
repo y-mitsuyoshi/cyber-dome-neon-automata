@@ -537,6 +537,13 @@ func resolveRound(gs *models.GameState) {
 			if session.Step < 3 {
 				fansGained = 1
 			}
+			// Memory overflow awards 3 fans (highest stakes finish)
+			for _, entry := range session.Log {
+				if entry.Action == "memory_overflow" {
+					fansGained = 3
+					break
+				}
+			}
 
 			for i := range gs.Players {
 				if gs.Players[i].Name == winnerName {
