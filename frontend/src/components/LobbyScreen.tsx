@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Users, User, ShieldAlert, Cpu, Send, Clipboard, Check } from 'lucide-react';
 import { useTranslation } from '../context/TranslationContext';
+import { useAudio } from '../context/AudioContext';
 import type { LobbyState, ChatMessage } from '../hooks/useWebSocket';
 
 interface LobbyScreenProps {
@@ -26,6 +27,7 @@ function LobbyScreen({
   onStartGame,
   loading,
 }: LobbyScreenProps) {
+  const { playSE } = useAudio();
   const [chatInput, setChatInput] = useState('');
   const [copied, setCopied] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -34,6 +36,9 @@ function LobbyScreen({
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatMessages.length > 0) {
+      playSE('click');
+    }
   }, [chatMessages]);
 
   if (!lobbyState) {
@@ -50,6 +55,7 @@ function LobbyScreen({
   }
 
   const handleCopyCode = () => {
+    playSE('click');
     navigator.clipboard.writeText(lobbyState.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -58,6 +64,7 @@ function LobbyScreen({
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
+    playSE('click');
     onSendChat(chatInput);
     setChatInput('');
   };
@@ -108,6 +115,7 @@ function LobbyScreen({
             </span>
             <button
               onClick={handleCopyCode}
+              onMouseEnter={() => playSE('hover')}
               className="flex items-center gap-2 bg-cyber-darker/80 border border-neon-cyan/40 px-4 py-2 rounded font-mono text-xl font-bold tracking-widest text-neon-cyan text-glow-cyan hover:bg-neon-cyan/15 hover:border-neon-cyan transition-all duration-300 relative group cursor-pointer"
             >
               {lobbyState.code}
@@ -176,7 +184,8 @@ function LobbyScreen({
                   {/* Remove NPC option for Host */}
                   {isHost && p.isNpc && (
                     <button
-                      onClick={() => onRemoveNPC(p.name)}
+                      onClick={() => { playSE('discard'); onRemoveNPC(p.name); }}
+                      onMouseEnter={() => playSE('hover')}
                       className="text-[9px] font-bold uppercase tracking-wider border border-red-500/40 text-neon-red px-2 py-0.5 rounded hover:bg-red-500/10 transition-colors cursor-pointer font-mono"
                     >
                       {t('purgeBtn')}
@@ -200,7 +209,8 @@ function LobbyScreen({
           {/* Add NPC Panel for Host */}
           {isHost && totalPlayers < 8 && (
             <button
-              onClick={onAddNPC}
+              onClick={() => { playSE('click'); onAddNPC(); }}
+              onMouseEnter={() => playSE('hover')}
               className="mt-3 w-full border border-neon-amber/40 text-neon-amber py-2 rounded text-xs font-bold uppercase tracking-wider hover:bg-neon-amber/15 hover:border-neon-amber transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-neon-amber/5 font-mono"
             >
               <Cpu size={14} className="animate-pulse" />
@@ -242,6 +252,7 @@ function LobbyScreen({
             />
             <button
               type="submit"
+              onMouseEnter={() => playSE('hover')}
               className="bg-neon-cyan text-cyber-dark p-2 rounded hover:bg-neon-cyan/80 transition-colors flex items-center justify-center cursor-pointer"
             >
               <Send size={14} />
@@ -254,7 +265,8 @@ function LobbyScreen({
           {isHost ? (
             <div className="text-center w-full max-w-md font-mono">
               <button
-                onClick={onStartGame}
+                onClick={() => { playSE('click'); onStartGame(); }}
+                onMouseEnter={() => { if (canStart && !loading) playSE('hover'); }}
                 disabled={!canStart || loading}
                 className={`
                   w-full py-4 rounded border-2 font-black tracking-[0.2em] text-sm uppercase transition-all duration-300 cursor-pointer hover:scale-[1.02]

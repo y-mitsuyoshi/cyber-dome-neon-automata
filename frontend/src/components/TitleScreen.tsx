@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Zap, Terminal, Plus, ArrowRight, BookOpen } from 'lucide-react';
 import { useTranslation } from '../context/TranslationContext';
+import { useAudio } from '../context/AudioContext';
 import ManualModal from './ManualModal';
 
 interface TitleScreenProps {
@@ -11,6 +12,7 @@ interface TitleScreenProps {
 }
 
 function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: TitleScreenProps) {
+  const { playSE } = useAudio();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -27,6 +29,7 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
   const handleJoinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) return;
+    playSE('click');
     onJoinLobby(code.toUpperCase().trim(), getActiveName());
   };
 
@@ -111,8 +114,8 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
         <div className="flex flex-col gap-4 max-w-sm mx-auto">
           {/* Jack In Solo */}
           <button
-            onClick={onStartSolo}
-            onMouseEnter={() => setHoveredSolo(true)}
+            onClick={() => { playSE('click'); onStartSolo(); }}
+            onMouseEnter={() => { setHoveredSolo(true); playSE('hover'); }}
             onMouseLeave={() => setHoveredSolo(false)}
             disabled={loading}
             className={`
@@ -143,8 +146,8 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
           <div className="grid grid-cols-2 gap-3">
             {/* Create Arena */}
             <button
-              onClick={() => onCreateLobby(getActiveName())}
-              onMouseEnter={() => setHoveredCreate(true)}
+              onClick={() => { playSE('click'); onCreateLobby(getActiveName()); }}
+              onMouseEnter={() => { setHoveredCreate(true); playSE('hover'); }}
               onMouseLeave={() => setHoveredCreate(false)}
               disabled={loading}
               className={`
@@ -166,8 +169,8 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
 
             {/* Join Arena */}
             <button
-              onClick={() => setShowJoinModal(true)}
-              onMouseEnter={() => setHoveredJoin(true)}
+              onClick={() => { playSE('click'); setShowJoinModal(true); }}
+              onMouseEnter={() => { setHoveredJoin(true); playSE('hover'); }}
               onMouseLeave={() => setHoveredJoin(false)}
               disabled={loading}
               className={`
@@ -189,8 +192,8 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
           </div>
 
           <button
-            onClick={() => setShowManualModal(true)}
-            onMouseEnter={() => setHoveredManual(true)}
+            onClick={() => { playSE('click'); setShowManualModal(true); }}
+            onMouseEnter={() => { setHoveredManual(true); playSE('hover'); }}
             onMouseLeave={() => setHoveredManual(false)}
             className={`
               mt-2 py-3 rounded border border-cyber-border/60
@@ -241,6 +244,7 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
               <button
                 type="button"
                 onClick={() => {
+                  playSE('click');
                   setShowJoinModal(false);
                   setCode('');
                 }}

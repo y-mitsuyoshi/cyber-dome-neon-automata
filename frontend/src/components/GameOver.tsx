@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react';
 import { Trophy, Star, Zap, RotateCcw, User } from 'lucide-react';
 import type { Standing } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
+import { useAudio } from '../context/AudioContext';
 
 interface GameOverProps {
   standings: Standing[];
@@ -8,6 +10,8 @@ interface GameOverProps {
 }
 
 function GameOver({ standings, onRestart }: GameOverProps) {
+  const { playSE } = useAudio();
+  const playedEndRef = useRef(false);
   const sorted = [...standings].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.fans - a.fans;
@@ -19,6 +23,14 @@ function GameOver({ standings, onRestart }: GameOverProps) {
   const playerStanding = sorted.find(s => s.isPlayer);
   const playerRank = sorted.findIndex(s => s.isPlayer) + 1;
   const isPlayerWinner = playerRank === 1;
+
+  // Play fanfare or defeat on mount (once)
+  useEffect(() => {
+    if (playedEndRef.current) return;
+    playedEndRef.current = true;
+    if (isPlayerWinner) playSE('fanfare');
+    else playSE('defeat');
+  }, [isPlayerWinner, playSE]);
 
   return (
     <div className="min-h-screen bg-cyber-dark relative overflow-hidden flex items-center justify-center">
@@ -150,6 +162,7 @@ function GameOver({ standings, onRestart }: GameOverProps) {
         {/* Restart button */}
         <button
           onClick={onRestart}
+          onMouseEnter={() => playSE('hover')}
           className="inline-flex items-center gap-2 px-10 py-4 rounded border-2 border-neon-cyan text-neon-cyan font-bold text-lg uppercase tracking-wider
             hover:bg-cyan-900/20 hover:scale-105 transition-all duration-300 cursor-pointer animate-slide-in font-mono"
           style={{
