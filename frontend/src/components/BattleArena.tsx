@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Flag, Zap, User, Cpu, AlertTriangle, Trash2, Send, Layers } from 'lucide-react';
+import { Flag, Zap, User, Cpu, AlertTriangle, Trash2, Send, Layers, Crosshair, Activity, Clock, Shield, Flame } from 'lucide-react';
 import type { BattleLogEntry, BattleSession, Card, BattleLogCard } from '../types/game';
 import MemorySlots from './MemorySlots';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
-import { submitBattleAction } from '../api/client';
+// Battle action is now handled via App.tsx to keep gameState synchronized
 import DeckViewerModal from './DeckViewerModal';
 import { useAudio } from '../context/AudioContext';
 
@@ -34,16 +34,20 @@ interface BattleArenaProps {
   opponent: string;
   onComplete: () => void;
   deck: Card[];
+  onSubmitAction: (actionType: 'PLAY' | 'DISCARD', cardId: string) => Promise<void>;
+  loading: boolean;
 }
 
 function BattleArena({
-  gameId,
+  gameId: _gameId,
   playerName,
   battleSession,
   battleLog,
   opponent,
   onComplete,
   deck,
+  onSubmitAction,
+  loading,
 }: BattleArenaProps) {
   const { playSE } = useAudio();
   const [showDeckModal, setShowDeckModal] = useState(false);
@@ -154,12 +158,12 @@ function BattleArena({
 
   // 3. Handle Action submission (PLAY or DISCARD)
   const handleAction = async (actionType: 'PLAY' | 'DISCARD') => {
-    if (!selectedCardId || submitting || !battleSession) return;
+    if (!selectedCardId || submitting || !battleSession || loading) return;
     setSubmitting(true);
     setError(null);
 
     try {
-      await submitBattleAction(gameId, playerName, actionType, selectedCardId);
+      await onSubmitAction(actionType, selectedCardId);
       playSE(actionType === 'PLAY' ? 'play' : 'discard');
       setSelectedCardId(null);
     } catch (err: unknown) {
@@ -217,6 +221,49 @@ function BattleArena({
             <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('discardMatrix')}</div>
             <div className="text-sm font-bold text-neon-cyan">{myDiscard.length} Units</div>
           </div>
+
+          {/* Battle Timeline */}
+          {battleSession && battleSession.log && battleSession.log.length > 0 && (
+            <div className="border border-neon-cyan/20 rounded p-2.5 bg-cyan-950/10 max-h-48 overflow-y-auto">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Clock size={10} className="text-neon-cyan" />
+                <span className="text-[9px] text-neon-cyan uppercase tracking-widest font-bold">Turn Log</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                {battleSession.log.map((log) => {
+                  const myCard = isP1 ? log.p1Card : log.p2Card;
+                  const oppCard = isP1 ? log.p2Card : log.p1Card;
+                  const myAction = isP1 ? log.p1Action : log.p2Action;
+                  const oppAction = isP1 ? log.p2Action : log.p1Action;
+
+                  return (
+                    <div key={log.step} className="border-l-2 border-cyber-border/30 pl-2 py-0.5">
+                      <div className="text-[9px] text-cyber-text-dim mb-0.5">Step {log.step}</div>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-1 h-1 rounded-full ${myAction === 'PLAY' ? 'bg-neon-cyan' : 'bg-neon-red'}`} />
+                          <span className="text-[9px] text-neon-cyan truncate">{myAction === 'PLAY' ? myCard?.name || '?' : 'DISCARD'}</span>
+                          {myAction === 'PLAY' && <span className="text-[8px] text-cyber-text-dim">{myCard?.power}P</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-1 h-1 rounded-full ${oppAction === 'PLAY' ? 'bg-neon-magenta' : 'bg-neon-red'}`} />
+                          <span className="text-[9px] text-neon-magenta truncate">{oppAction === 'PLAY' ? oppCard?.name || '?' : 'DISCARD'}</span>
+                          {oppAction === 'PLAY' && <span className="text-[8px] text-cyber-text-dim">{oppCard?.power}P</span>}
+                        </div>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <Flag size={8} className={log.flagHolder === playerName ? 'text-neon-cyan' : 'text-neon-magenta'} />
+                        <span className="text-[8px] text-cyber-text-dim">
+                          {log.flagHolder === playerName ? 'You' : opponentName} +{log.currentPower}P
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={() => setShowDeckModal(true)}
             className="flex items-center justify-center gap-2 border border-neon-cyan/45 hover:border-neon-cyan rounded p-2 bg-cyber-surface/30 text-neon-cyan font-bold hover:bg-neon-cyan/10 transition-all text-xs cursor-pointer uppercase tracking-wider font-mono shadow-[0_0_8px_rgba(0,240,255,0.1)]"
@@ -237,36 +284,41 @@ function BattleArena({
 
               {/* Flag status */}
               <div
-                className={`flex items-center gap-2 mb-6 px-4 py-1.5 rounded border transition-all duration-300 ${
+                className={`flex flex-col items-center gap-1 mb-6 px-6 py-2 rounded-lg border transition-all duration-500 ${
                   battleSession.flagHolder === playerName
-                    ? 'border-neon-cyan/50 bg-cyan-900/10 text-neon-cyan'
+                    ? 'border-neon-cyan/60 bg-cyan-900/15 text-neon-cyan'
                     : battleSession.flagHolder === opponentName
-                    ? 'border-neon-magenta/50 bg-purple-900/10 text-neon-magenta'
+                    ? 'border-neon-magenta/60 bg-purple-900/15 text-neon-magenta'
                     : 'border-cyber-border bg-cyber-surface/30 text-cyber-text-dim'
                 }`}
                 style={{
                   boxShadow:
                     battleSession.flagHolder === playerName
-                      ? '0 0 12px rgba(0,240,255,0.15)'
+                      ? '0 0 20px rgba(0,240,255,0.25), inset 0 0 10px rgba(0,240,255,0.05)'
                       : battleSession.flagHolder === opponentName
-                      ? '0 0 12px rgba(255,0,255,0.15)'
+                      ? '0 0 20px rgba(255,0,255,0.25), inset 0 0 10px rgba(255,0,255,0.05)'
                       : 'none',
                 }}
               >
-                <Flag size={14} className={battleSession.flagHolder === playerName ? 'text-neon-cyan' : 'text-neon-magenta'} />
-                <span className="text-[10px] font-bold uppercase tracking-wider">
-                  {t('accessLabel')}{
-                    battleSession.flagHolder === playerName 
-                      ? t('playerSelf') 
-                      : battleSession.flagHolder === opponentName 
-                      ? opponentName 
-                      : battleSession.flagHolder || t('noneLabel')
-                  }
-                </span>
-                {battleSession.flagPower > 0 && (
-                  <span className="text-[10px] border-l border-current/30 pl-2 ml-1 font-mono font-black">
-                    {battleSession.flagPower} POW
+                <div className="flex items-center gap-2">
+                  <Flame size={14} className={battleSession.flagHolder === playerName ? 'text-neon-cyan animate-pulse' : 'text-neon-magenta animate-pulse'} />
+                  <span className="text-[11px] font-black uppercase tracking-[0.2em]">
+                    {t('accessLabel')}{
+                      battleSession.flagHolder === playerName
+                        ? t('playerSelf')
+                        : battleSession.flagHolder === opponentName
+                        ? opponentName
+                        : battleSession.flagHolder || t('noneLabel')
+                    }
                   </span>
+                </div>
+                {battleSession.flagPower > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Zap size={10} className="opacity-60" />
+                    <span className="text-sm font-mono font-black tracking-wider">
+                      {battleSession.flagPower} POW
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -294,23 +346,31 @@ function BattleArena({
                       <div className="scale-95">
                         <CardDisplay card={selectedCard} />
                       </div>
-                      <div className="flex items-center gap-3 font-mono">
-                        <button
-                          onClick={() => handleAction('PLAY')}
-                          disabled={submitting}
-                          className="flex items-center gap-1.5 px-5 py-2 rounded border border-neon-cyan bg-cyan-950/20 text-neon-cyan text-xs font-bold uppercase tracking-wider hover:bg-neon-cyan/10 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,240,255,0.1)]"
-                        >
-                          <Send size={12} />
-                          {t('readyForBattle')}
-                        </button>
-                        <button
-                          onClick={() => handleAction('DISCARD')}
-                          disabled={submitting}
-                          className="flex items-center gap-1.5 px-5 py-2 rounded border border-neon-red bg-red-950/20 text-neon-red text-xs font-bold uppercase tracking-wider hover:bg-neon-red/10 transition-all cursor-pointer shadow-[0_0_10px_rgba(255,0,80,0.1)]"
-                        >
-                          <Trash2 size={12} />
-                          {t('discardBtn')}
-                        </button>
+                      <div className="flex flex-col items-center gap-3 font-mono">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleAction('PLAY')}
+                            disabled={submitting || loading}
+                            className="flex items-center gap-1.5 px-5 py-2 rounded border border-neon-cyan bg-cyan-950/20 text-neon-cyan text-xs font-bold uppercase tracking-wider hover:bg-neon-cyan/10 transition-all cursor-pointer shadow-[0_0_10px_rgba(0,240,255,0.1)] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Send size={12} />
+                            {t('readyForBattle')}
+                          </button>
+                          <button
+                            onClick={() => handleAction('DISCARD')}
+                            disabled={submitting || loading}
+                            className="flex items-center gap-1.5 px-5 py-2 rounded border border-neon-red bg-red-950/20 text-neon-red text-xs font-bold uppercase tracking-wider hover:bg-neon-red/10 transition-all cursor-pointer shadow-[0_0_10px_rgba(255,0,80,0.1)] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 size={12} />
+                            {t('discardBtn')}
+                          </button>
+                        </div>
+                        {(submitting || loading) && (
+                          <div className="flex items-center gap-2 text-[10px] text-neon-cyan animate-pulse">
+                            <div className="w-3 h-3 rounded-full border-2 border-t-transparent border-neon-cyan animate-spin" />
+                            <span>TRANSMITTING NEURAL PACKET...</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -362,6 +422,56 @@ function BattleArena({
             <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('discardMatrix')}</div>
             <div className="text-sm font-bold text-neon-magenta">{opponentDiscardCount} Units</div>
           </div>
+
+          {/* Latest Clash Replay Panel */}
+          {resolvedLog && (
+            <div className="border border-neon-amber/30 rounded p-3 bg-amber-950/10">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Crosshair size={10} className="text-neon-amber" />
+                <span className="text-[9px] text-neon-amber uppercase tracking-widest font-bold">Latest Clash / 最新の激突</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {/* My latest move */}
+                <div className="flex items-center gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full ${resolvedLog.p1Action === 'PLAY' ? 'bg-neon-cyan' : 'bg-neon-red'}`} />
+                  <span className="text-[10px] text-cyber-text truncate">
+                    {isP1
+                      ? (resolvedLog.p1Action === 'PLAY' ? resolvedLog.p1Card?.name || '—' : 'DISCARD')
+                      : (resolvedLog.p2Action === 'PLAY' ? resolvedLog.p2Card?.name || '—' : 'DISCARD')}
+                  </span>
+                  <span className="text-[9px] text-neon-cyan ml-auto">
+                    {isP1
+                      ? (resolvedLog.p1Action === 'PLAY' ? `${resolvedLog.p1Card?.power || 0} POW` : '—')
+                      : (resolvedLog.p2Action === 'PLAY' ? `${resolvedLog.p2Card?.power || 0} POW` : '—')}
+                  </span>
+                </div>
+                {/* Opponent latest move */}
+                <div className="flex items-center gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full ${(isP1 ? resolvedLog.p2Action : resolvedLog.p1Action) === 'PLAY' ? 'bg-neon-magenta' : 'bg-neon-red'}`} />
+                  <span className="text-[10px] text-cyber-text truncate">
+                    {isP1
+                      ? (resolvedLog.p2Action === 'PLAY' ? resolvedLog.p2Card?.name || '—' : 'DISCARD')
+                      : (resolvedLog.p1Action === 'PLAY' ? resolvedLog.p1Card?.name || '—' : 'DISCARD')}
+                  </span>
+                  <span className="text-[9px] text-neon-magenta ml-auto">
+                    {isP1
+                      ? (resolvedLog.p2Action === 'PLAY' ? `${resolvedLog.p2Card?.power || 0} POW` : '—')
+                      : (resolvedLog.p1Action === 'PLAY' ? `${resolvedLog.p1Card?.power || 0} POW` : '—')}
+                  </span>
+                </div>
+                {/* Flag after clash */}
+                <div className="mt-1 pt-1 border-t border-cyber-border/20 flex items-center gap-1.5">
+                  <Flag size={10} className={resolvedLog.flagHolder === playerName ? 'text-neon-cyan' : 'text-neon-magenta'} />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">
+                    {resolvedLog.flagHolder === playerName ? 'You hold flag' : `${opponentName} holds flag`}
+                  </span>
+                  {resolvedLog.currentPower > 0 && (
+                    <span className="text-[9px] text-cyber-text-dim ml-auto">{resolvedLog.currentPower} POW</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -410,34 +520,57 @@ function BattleArena({
 
       {/* 4. Bottom Feed Log */}
       {(battleLog || []).length > 0 && (
-        <div className="relative z-10 max-w-3xl mx-auto w-full mt-4 border border-cyber-border/20 rounded-lg p-2.5 bg-cyber-surface/40 max-h-24 overflow-y-auto font-mono text-[10px]">
-          <div className="text-[9px] text-cyber-text-dim uppercase tracking-widest mb-1.5 font-bold">
-            {t('combatLogHeader')}
+        <div className="relative z-10 max-w-4xl mx-auto w-full mt-4 border border-cyber-border/30 rounded-lg p-3 bg-cyber-surface/50 max-h-32 overflow-y-auto font-mono text-[10px] shadow-inner">
+          <div className="flex items-center gap-2 mb-2 border-b border-cyber-border/20 pb-1">
+            <Activity size={12} className="text-neon-green" />
+            <span className="text-[9px] text-neon-green uppercase tracking-widest font-bold">
+              {t('combatLogHeader')}
+            </span>
+            <span className="text-[9px] text-cyber-text-dim ml-auto">
+              {battleLog.length} events
+            </span>
           </div>
-          {(battleLog || [])
-            .slice(0)
-            .reverse()
-            .map((log, i) => {
-              const displayLogAction = translateBattleDetail(log.details || log.action);
-              const displayLogEffect = log.effectTriggered ? translateBattleDetail(log.effectTriggered) : '';
+          <div className="flex flex-col gap-1">
+            {(battleLog || [])
+              .slice(0)
+              .reverse()
+              .map((log, i) => {
+                const displayLogAction = translateBattleDetail(log.details || log.action);
+                const displayLogEffect = log.effectTriggered ? translateBattleDetail(log.effectTriggered) : '';
+                const isPlayer = log.player === playerName;
+                const isSystem = !log.player || log.player === 'SYSTEM';
 
-              return (
-                <div
-                  key={i}
-                  className={`py-0.5 border-b border-cyber-border/5 last:border-0 ${
-                    i === 0 ? 'text-cyber-text' : 'text-cyber-text-dim/60'
-                  }`}
-                >
-                  <span className={`font-bold ${log.player === playerName ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
-                    [{log.player || 'SYSTEM'}]
-                  </span>{' '}
-                  {displayLogAction}
-                  {log.effectTriggered && log.effectTriggered !== 'None' && log.effectTriggered !== '' && (
-                    <span className="text-neon-green ml-2">⚡ {displayLogEffect}</span>
-                  )}
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2 py-1 px-1.5 rounded ${
+                      i === 0 ? 'bg-cyber-surface/40 border border-cyber-border/10' : ''
+                    }`}
+                  >
+                    <div className={`mt-0.5 min-w-[14px] ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
+                      {isSystem ? <Shield size={10} /> : <Crosshair size={10} />}
+                    </div>
+                    <div className="flex-1">
+                      <span className={`font-bold ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
+                        {isSystem ? '[SYS]' : `[${log.player}]`}
+                      </span>{' '}
+                      <span className={i === 0 ? 'text-cyber-text' : 'text-cyber-text-dim/70'}>
+                        {displayLogAction}
+                      </span>
+                      {log.effectTriggered && log.effectTriggered !== 'None' && log.effectTriggered !== '' && (
+                        <span className="text-neon-green ml-1.5 inline-flex items-center gap-1">
+                          <Zap size={8} />
+                          {displayLogEffect}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-cyber-text-dim/40 whitespace-nowrap">
+                      Step {log.step}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       )}
 

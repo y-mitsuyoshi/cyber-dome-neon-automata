@@ -17,6 +17,7 @@ import {
   rerollShop,
   deleteCard,
   startBattle,
+  submitBattleAction,
   nextRound,
   createLobby,
   joinLobby,
@@ -338,7 +339,7 @@ function App() {
     try {
       const state = await startBattle(gameState.gameId, playerName);
       setGameState(state);
-      
+
       // If multiplayer and server returns shop phase (it means not everyone is ready), show standby overlay
       if (lobbyCode && state.phase === 'shop') {
         setWaitingForBattle(true);
@@ -346,6 +347,21 @@ function App() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Neural network overflow.';
       setError(`SIMULATION_FAILED: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitBattleAction = async (actionType: 'PLAY' | 'DISCARD', cardId: string) => {
+    if (!gameState) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await submitBattleAction(gameState.gameId, playerName, actionType, cardId);
+      setGameState(state);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Neural network overflow.';
+      setError(`ACTION_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -490,6 +506,8 @@ function App() {
               opponent={gameState.opponent}
               onComplete={handleBattleComplete}
               deck={gameState.player.deck}
+              onSubmitAction={handleSubmitBattleAction}
+              loading={loading}
             />
           ) : (
             <Standings
