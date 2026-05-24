@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { audioService } from '../services/audio';
 import type { SoundEffectType, BGMThemeType } from '../services/audio';

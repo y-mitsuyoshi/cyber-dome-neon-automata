@@ -22,7 +22,7 @@ class ProceduralAudioEngine {
   
   private isMuted: boolean = false;
   private currentBgm: BGMThemeType = 'none';
-  private bgmIntervalId: any = null;
+  private bgmIntervalId: ReturnType<typeof setInterval> | null = null;
   private bgmTickCount: number = 0;
   
   // Keep track of active oscillators for smooth BGM drone crossfades
@@ -40,13 +40,23 @@ class ProceduralAudioEngine {
     if (this.ctx) return;
 
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtx();
       
       // Master volume node
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.8, this.ctx.currentTime);
-      this.masterGain.connect(this.ctx.destination);
+
+      // Master compressor to glue the BGM and SE mixes together and prevent digital clipping
+      const compressor = this.ctx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-16, this.ctx.currentTime); // start compressing at -16dB
+      compressor.knee.setValueAtTime(12, this.ctx.currentTime);      // soft knee curve
+      compressor.ratio.setValueAtTime(4, this.ctx.currentTime);       // 4:1 compression ratio
+      compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);  // 3ms attack time
+      compressor.release.setValueAtTime(0.22, this.ctx.currentTime);  // 220ms release time
+
+      this.masterGain.connect(compressor);
+      compressor.connect(this.ctx.destination);
 
       // BGM volume node
       this.bgmGain = this.ctx.createGain();
@@ -388,7 +398,9 @@ class ProceduralAudioEngine {
       
       setTimeout(() => {
         this.activeDrones.forEach(osc => {
-          try { osc.stop(); } catch (e) {}
+          try { osc.stop(); } catch {
+            // Already stopped or inactive
+          }
         });
         this.activeDrones = [];
       }, 200);
