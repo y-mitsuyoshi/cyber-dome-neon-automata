@@ -86,7 +86,7 @@ export const useWebSocket = (code: string | null, name: string | null) => {
               // Safe ignored message type
               break;
           }
-        } catch (err) {
+        } catch (_err) {
           // Silent JSON parsing error handling
         }
       }

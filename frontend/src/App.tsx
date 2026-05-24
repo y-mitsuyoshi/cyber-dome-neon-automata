@@ -109,8 +109,9 @@ function App() {
           resetGameId();
           setWaitingForBattle(false);
           setWaitingForNextRound(false);
-        } catch (err: any) {
-          setError(`SYNC_FAILED: ${err.message || 'Failed to pull arena state.'}`);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Failed to pull arena state.';
+          setError(`SYNC_FAILED: ${msg}`);
         } finally {
           setLoading(false);
         }
@@ -133,7 +134,7 @@ function App() {
           if (state.phase === 'shop') {
             setWaitingForNextRound(false);
           }
-        } catch (err: any) {
+        } catch (_err) {
           // Silent fallback on desync
         } finally {
           resetTrigger();
@@ -150,7 +151,7 @@ function App() {
         try {
           const state = await getGameState(gameState.gameId, playerName);
           setGameState(state);
-        } catch (err) {
+        } catch (_err) {
           // Silent fallback on battle sync
         } finally {
           resetBattleTrigger();
@@ -173,7 +174,7 @@ function App() {
           if (state.phase === 'shop') {
             setWaitingForNextRound(false);
           }
-        } catch (err) {
+        } catch (_err) {
           // Silent fallback on reconnect pull
         }
       };
@@ -192,8 +193,9 @@ function App() {
       const state = await createNewGame();
       setGameState(state);
       setScreen('game');
-    } catch (err: any) {
-      setError(`INITIALIZATION_FAILED: ${err.message || 'Network timeout.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Network timeout.';
+      setError(`INITIALIZATION_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -209,8 +211,9 @@ function App() {
       setPlayerName(name);
       setLobbyCode(res.code);
       setScreen('lobby');
-    } catch (err: any) {
-      setError(`LOBBY_CREATION_FAILED: ${err.message || 'Sector breach.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Sector breach.';
+      setError(`LOBBY_CREATION_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -226,8 +229,9 @@ function App() {
       setPlayerName(name);
       setLobbyCode(code);
       setScreen('lobby');
-    } catch (err: any) {
-      setError(`LOBBY_JOIN_FAILED: ${err.message || 'Key refused by core gateway.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Key refused by core gateway.';
+      setError(`LOBBY_JOIN_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -239,8 +243,9 @@ function App() {
     playSE('click');
     try {
       await addNPC(lobbyCode);
-    } catch (err: any) {
-      setError(`NPC_DEPLOY_FAILED: ${err.message || 'Memory bank full.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Memory bank full.';
+      setError(`NPC_DEPLOY_FAILED: ${msg}`);
     }
   };
 
@@ -249,8 +254,9 @@ function App() {
     playSE('click');
     try {
       await removeNPC(lobbyCode, npcName);
-    } catch (err: any) {
-      setError(`NPC_PURGE_FAILED: ${err.message || 'Connection locked.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Connection locked.';
+      setError(`NPC_PURGE_FAILED: ${msg}`);
     }
   };
 
@@ -261,8 +267,9 @@ function App() {
     setError(null);
     try {
       await startGame(lobbyCode);
-    } catch (err: any) {
-      setError(`TOURNAMENT_START_FAILED: ${err.message || 'Matrix mismatch.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Matrix mismatch.';
+      setError(`TOURNAMENT_START_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -278,8 +285,9 @@ function App() {
     try {
       const state = await buyCard(gameState.gameId, index, playerName);
       setGameState(state);
-    } catch (err: any) {
-      setError(`TRANSACTION_FAILED: ${err.message || 'Refused by core protocol.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Refused by core protocol.';
+      setError(`TRANSACTION_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -293,8 +301,9 @@ function App() {
     try {
       const state = await rerollShop(gameState.gameId, playerName);
       setGameState(state);
-    } catch (err: any) {
-      setError(`REROLL_FAILED: ${err.message || 'Grid connection instability.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Grid connection instability.';
+      setError(`REROLL_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -308,8 +317,9 @@ function App() {
     try {
       const state = await deleteCard(gameState.gameId, index, playerName);
       setGameState(state);
-    } catch (err: any) {
-      setError(`DELETE_FAILED: ${err.message || 'Memory core locked.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Memory core locked.';
+      setError(`DELETE_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -328,8 +338,9 @@ function App() {
       if (lobbyCode && state.phase === 'shop') {
         setWaitingForBattle(true);
       }
-    } catch (err: any) {
-      setError(`SIMULATION_FAILED: ${err.message || 'Neural network overflow.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Neural network overflow.';
+      setError(`SIMULATION_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -362,8 +373,9 @@ function App() {
       if (lobbyCode && state.phase === 'results') {
         setWaitingForNextRound(true);
       }
-    } catch (err: any) {
-      setError(`ROUND_ADVANCE_FAILED: ${err.message || 'Sector breach detected.'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Sector breach detected.';
+      setError(`ROUND_ADVANCE_FAILED: ${msg}`);
     } finally {
       setLoading(false);
     }
