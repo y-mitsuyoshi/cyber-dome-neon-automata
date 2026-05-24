@@ -549,6 +549,7 @@ func (bs *BattleState) logEntry(action, side string, card *models.Card, power in
 	var logCard *models.BattleLogCard
 	if card != nil {
 		logCard = &models.BattleLogCard{
+			ID:        card.ID,
 			Name:      card.Name,
 			Power:     card.Power,
 			Attribute: card.Attribute,

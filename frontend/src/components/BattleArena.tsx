@@ -1,12 +1,30 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Flag, Zap, User, Cpu, AlertTriangle, Trash2, Send, Layers } from 'lucide-react';
-import type { BattleLogEntry, BattleSession, Card } from '../types/game';
+import type { BattleLogEntry, BattleSession, Card, BattleLogCard } from '../types/game';
 import MemorySlots from './MemorySlots';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
 import { submitBattleAction } from '../api/client';
 import DeckViewerModal from './DeckViewerModal';
 import { useAudio } from '../context/AudioContext';
+
+const convertToFullCard = (logCard: BattleLogCard): Card => {
+  const attribute = (['Virus', 'AI', 'Hardware', 'Netrunner'].includes(logCard.attribute)
+    ? logCard.attribute
+    : 'Virus') as 'Virus' | 'AI' | 'Hardware' | 'Netrunner';
+
+  return {
+    id: logCard.id || 'default',
+    name: logCard.name,
+    attribute,
+    archetype: 'Control',
+    power: logCard.power,
+    rarity: 'Common',
+    effect: '',
+    effectType: '',
+    cost: 0,
+  };
+};
 
 interface BattleArenaProps {
   gameId: string;
@@ -35,6 +53,8 @@ function BattleArena({
 
   const [lastStep, setLastStep] = useState<number>(0);
   const [lastFinished, setLastFinished] = useState<boolean>(false);
+  const [acknowledgedStep, setAcknowledgedStep] = useState<number>(0);
+  const [showClashOverlay, setShowClashOverlay] = useState<boolean>(false);
 
   const { t, translateBattleDetail } = useTranslation();
 
@@ -43,7 +63,9 @@ function BattleArena({
     if (battleSession && battleSession.step > lastStep) {
       playSE('clash');
       setLastStep(battleSession.step);
+      setShowClashOverlay(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battleSession?.step, lastStep, playSE]);
 
   // Play victory/defeat SE on battle finished
@@ -56,28 +78,40 @@ function BattleArena({
       }
       setLastFinished(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battleSession?.isFinished, battleSession?.winner, lastFinished, playerName, playSE]);
+
+  // Retrieve details of the clash that just finished
+  const resolvedLog = useMemo(() => {
+    if (!battleSession) return null;
+    const stepToFind = acknowledgedStep + 1;
+    const log = battleSession.log || [];
+    return log.find((l) => l.step === stepToFind) || null;
+  }, [battleSession, acknowledgedStep]);
 
   // 1. Symmetrical: Extract player and opponent datasets from session
   const isP1 = battleSession?.player1Name === playerName;
   
   const myHand = useMemo(() => {
     if (!battleSession) return [];
-    return isP1 ? battleSession.player1Hand : battleSession.player2Hand;
+    const hand = isP1 ? battleSession.player1Hand : battleSession.player2Hand;
+    return hand || [];
   }, [battleSession, isP1]);
 
   const myMem = useMemo(() => {
     if (!battleSession) return [];
-    return isP1 ? battleSession.player1Mem : battleSession.player2Mem;
+    const mem = isP1 ? battleSession.player1Mem : battleSession.player2Mem;
+    return mem || [];
   }, [battleSession, isP1]);
 
   const myMemSlots = useMemo(() => {
-    return myMem.map(slot => Array(slot.count).fill(slot.cardName));
+    return (myMem || []).map(slot => Array(slot.count || 0).fill(slot.cardName));
   }, [myMem]);
 
   const myDiscard = useMemo(() => {
     if (!battleSession) return [];
-    return isP1 ? battleSession.player1Discard : battleSession.player2Discard;
+    const discard = isP1 ? battleSession.player1Discard : battleSession.player2Discard;
+    return discard || [];
   }, [battleSession, isP1]);
 
   const opponentName = useMemo(() => {
@@ -87,21 +121,24 @@ function BattleArena({
 
   const opponentHandCount = useMemo(() => {
     if (!battleSession) return 0;
-    return isP1 ? battleSession.player2Hand.length : battleSession.player1Hand.length;
+    const hand = isP1 ? battleSession.player2Hand : battleSession.player1Hand;
+    return hand ? hand.length : 0;
   }, [battleSession, isP1]);
 
   const opponentMem = useMemo(() => {
     if (!battleSession) return [];
-    return isP1 ? battleSession.player2Mem : battleSession.player1Mem;
+    const mem = isP1 ? battleSession.player2Mem : battleSession.player1Mem;
+    return mem || [];
   }, [battleSession, isP1]);
 
   const opponentMemSlots = useMemo(() => {
-    return opponentMem.map(slot => Array(slot.count).fill(slot.cardName));
+    return (opponentMem || []).map(slot => Array(slot.count || 0).fill(slot.cardName));
   }, [opponentMem]);
 
   const opponentDiscardCount = useMemo(() => {
     if (!battleSession) return 0;
-    return isP1 ? battleSession.player2Discard.length : battleSession.player1Discard.length;
+    const discard = isP1 ? battleSession.player2Discard : battleSession.player1Discard;
+    return discard ? discard.length : 0;
   }, [battleSession, isP1]);
 
   // 2. Identify if local player has already committed this step
@@ -372,12 +409,12 @@ function BattleArena({
       </div>
 
       {/* 4. Bottom Feed Log */}
-      {battleLog.length > 0 && (
+      {(battleLog || []).length > 0 && (
         <div className="relative z-10 max-w-3xl mx-auto w-full mt-4 border border-cyber-border/20 rounded-lg p-2.5 bg-cyber-surface/40 max-h-24 overflow-y-auto font-mono text-[10px]">
           <div className="text-[9px] text-cyber-text-dim uppercase tracking-widest mb-1.5 font-bold">
             {t('combatLogHeader')}
           </div>
-          {battleLog
+          {(battleLog || [])
             .slice(0)
             .reverse()
             .map((log, i) => {
@@ -410,6 +447,121 @@ function BattleArena({
         deck={deck}
         deleteModeSupported={false}
       />
+
+      {/* 5. Symmetrical Clash Visualizer Overlay */}
+      {showClashOverlay && resolvedLog && (
+        <div className="fixed inset-0 z-50 bg-cyber-dark/95 backdrop-blur-md flex flex-col justify-between p-6 animate-fade-in font-mono">
+          {/* Scanning lines */}
+          <div className="absolute inset-0 cyber-grid pointer-events-none opacity-30" />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle at 50% 50%, rgba(255,0,255,0.06) 0%, transparent 70%)',
+            }}
+          />
+
+          {/* Header */}
+          <div className="text-center relative z-10">
+            <h3 className="text-lg font-black tracking-[0.3em] uppercase text-neon-magenta text-glow-magenta animate-pulse">
+              MATRIX CLASH RESOLVED
+            </h3>
+            <span className="text-[10px] text-cyber-text-dim uppercase tracking-widest block mt-1">
+              SECURE SECTOR ACCESS - STEP {resolvedLog.step}
+            </span>
+          </div>
+
+          {/* Main Visualizer */}
+          <div className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-8 my-4 relative z-10 max-w-5xl mx-auto w-full">
+            {/* Player 1 Card (YOU) */}
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[10px] text-neon-cyan font-bold uppercase tracking-wider">
+                {playerName} (YOU)
+              </span>
+              {resolvedLog.p1Action === 'PLAY' && resolvedLog.p1Card ? (
+                <div className="animate-card-reveal transform scale-105">
+                  <CardDisplay card={convertToFullCard(resolvedLog.p1Card)} />
+                </div>
+              ) : (
+                <div className="w-48 h-72 rounded-lg border-2 border-dashed border-neon-red/35 bg-red-950/10 flex flex-col items-center justify-center p-4 text-center text-neon-red opacity-60">
+                  <span className="text-xs font-black tracking-widest uppercase mb-1">DISCARDED</span>
+                  <span className="text-[9px] text-cyber-text-dim uppercase">Module Bypassed</span>
+                </div>
+              )}
+            </div>
+
+            {/* VS Emblem & Effects */}
+            <div className="flex flex-col items-center text-center max-w-xs px-4">
+              <div className="relative w-16 h-16 flex items-center justify-center mb-3">
+                <div className="absolute inset-0 rounded-full border-2 border-neon-magenta animate-ping opacity-25" />
+                <div className="w-12 h-12 rounded-full border-2 border-neon-magenta bg-cyber-darker flex items-center justify-center font-black text-neon-magenta text-glow-magenta text-sm">
+                  VS
+                </div>
+              </div>
+
+              {/* Clash details */}
+              <p className="text-xs text-white uppercase font-bold tracking-wider leading-relaxed border-y border-cyber-border/20 py-2.5 w-full">
+                {translateBattleDetail(resolvedLog.details)}
+              </p>
+
+              {/* Triggered effects */}
+              {resolvedLog.effectTriggered && resolvedLog.effectTriggered !== 'None' && resolvedLog.effectTriggered !== '' && (
+                <div className="mt-3 bg-neon-green/5 border border-neon-green/30 text-neon-green text-[10px] px-3 py-1.5 rounded animate-flicker w-full">
+                  <span className="font-black uppercase tracking-wider block mb-0.5">⚡ SYSTEM EFFECT</span>
+                  {translateBattleDetail(resolvedLog.effectTriggered)}
+                </div>
+              )}
+
+              {/* Flag holder update */}
+              <div className="mt-4 flex flex-col items-center gap-1.5">
+                <span className="text-[9px] text-cyber-text-dim uppercase tracking-wider">CURRENT FLAG ACCESS</span>
+                <div className={`flex items-center gap-2 px-3 py-1 rounded border text-[11px] font-bold ${
+                  resolvedLog.flagHolder === playerName
+                    ? 'border-neon-cyan text-neon-cyan bg-cyan-950/15'
+                    : resolvedLog.flagHolder === opponentName
+                    ? 'border-neon-magenta text-neon-magenta bg-purple-950/15'
+                    : 'border-cyber-border text-cyber-text-dim'
+                }`}>
+                  <Flag size={12} />
+                  <span className="uppercase">{resolvedLog.flagHolder === playerName ? 'PLAYER (YOU)' : resolvedLog.flagHolder || 'NONE'}</span>
+                  {resolvedLog.currentPower > 0 && <span className="font-mono">({resolvedLog.currentPower} POW)</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Player 2 Card (OPPONENT) */}
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[10px] text-neon-magenta font-bold uppercase tracking-wider">
+                {opponentName}
+              </span>
+              {resolvedLog.p2Action === 'PLAY' && resolvedLog.p2Card ? (
+                <div className="animate-card-reveal transform scale-105" style={{ animationDelay: '0.2s' }}>
+                  <CardDisplay card={convertToFullCard(resolvedLog.p2Card)} />
+                </div>
+              ) : (
+                <div className="w-48 h-72 rounded-lg border-2 border-dashed border-neon-red/35 bg-red-950/10 flex flex-col items-center justify-center p-4 text-center text-neon-red opacity-60">
+                  <span className="text-xs font-black tracking-widest uppercase mb-1">DISCARDED</span>
+                  <span className="text-[9px] text-cyber-text-dim uppercase">Module Bypassed</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action button */}
+          <div className="text-center pb-4 relative z-10">
+            <button
+              onClick={() => {
+                if (!battleSession) return;
+                playSE('click');
+                setAcknowledgedStep(battleSession.step);
+                setShowClashOverlay(false);
+              }}
+              className="px-8 py-3 rounded-lg border-2 border-neon-green text-neon-green font-bold text-xs uppercase tracking-widest hover:bg-neon-green/10 transition-all cursor-pointer shadow-[0_0_15px_rgba(0,255,102,0.15)] animate-pulse"
+            >
+              {battleSession?.isFinished ? 'CONCLUDE SIMULATION / シミュレーション完了' : 'PROCEED TO NEXT PROTOCOL / 次のターンへ'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

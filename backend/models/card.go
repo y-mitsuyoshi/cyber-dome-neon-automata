@@ -94,6 +94,7 @@ type ShopState struct {
 
 // BattleLogCard is a minimal card representation for the battle log.
 type BattleLogCard struct {
+	ID        string `json:"id,omitempty"`
 	Name      string `json:"name"`
 	Power     int    `json:"power"`
 	Attribute string `json:"attribute"`
@@ -105,6 +106,10 @@ type BattleLogEntry struct {
 	Action           string          `json:"action"`
 	Player           string          `json:"player"`
 	Card             *BattleLogCard  `json:"card,omitempty"`
+	P1Card           *BattleLogCard  `json:"p1Card,omitempty"`
+	P2Card           *BattleLogCard  `json:"p2Card,omitempty"`
+	P1Action         string          `json:"p1Action,omitempty"`
+	P2Action         string          `json:"p2Action,omitempty"`
 	CurrentPower     int             `json:"currentPower"`
 	EffectTriggered  string          `json:"effectTriggered"`
 	PlayerMemSlots   []string        `json:"playerMemSlots"`
