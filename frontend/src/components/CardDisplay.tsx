@@ -27,6 +27,26 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
   // Translate the card details for rendering
   const displayCard = useMemo(() => translateCard(card), [card, translateCard]);
 
+  const cardImagePath = useMemo(() => {
+    const id = card.id;
+    if (id.startsWith('starter_')) {
+      const mapping: Record<string, string> = {
+        starter_virus_1: 'virus_001',
+        starter_virus_2: 'virus_002',
+        starter_ai_1: 'ai_001',
+        starter_ai_2: 'ai_002',
+        starter_hw_1: 'hw_001',
+        starter_hw_2: 'hw_002',
+        starter_nr_1: 'nr_001',
+        starter_nr_2: 'nr_002',
+        starter_net_1: 'nr_003',
+        starter_ai_3: 'ai_003',
+      };
+      return `/images/cards/${mapping[id] || 'default'}.png`;
+    }
+    return `/images/cards/${id}.png`;
+  }, [card.id]);
+
   // Use original English values for style lookups
   const attr = attributeConfig[card.attribute];
   const AttrIcon = attr.icon;
@@ -111,7 +131,7 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
       {/* Card Image */}
       <div className="relative w-full h-24 mb-3 rounded overflow-hidden border border-cyber-border/40 bg-cyber-darker group-hover:border-neon-cyan/30 transition-colors">
         <img
-          src={`/images/cards/${card.id}.png`}
+          src={cardImagePath}
           alt={displayCard.name}
           className="w-full h-full object-cover"
           onError={(e) => {

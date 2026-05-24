@@ -170,7 +170,7 @@ const uiDict: Record<Locale, Record<string, string>> = {
     discardMatrix: "Discard Matrix",
     handModules: "Hand Modules",
     yourAugmentationHand: "Your Augmentation Hand ({count} Modules Remaining)",
-    noDrawAdvice: "No draw. Play or Discard wisely.",
+    noDrawAdvice: "Draw 1 card each step. Play or Discard wisely.",
     noHandRemaining: "No Augmentations Remaining in Hand Matrix.",
     viewManual: "System Manual",
     
@@ -358,7 +358,7 @@ const uiDict: Record<Locale, Record<string, string>> = {
     discardMatrix: "廃棄マトリクス",
     handModules: "ハンドモジュール",
     yourAugmentationHand: "あなたのオーグメンテーションハンド（残り {count} モジュール）",
-    noDrawAdvice: "ドローはありません。慎重にプレイまたは廃棄してください。",
+    noDrawAdvice: "毎ターン1枚ドローします。手札から慎重にプレイまたは廃棄してください。",
     noHandRemaining: "ハンドマトリクスに残りオーグメンテーションがありません。",
     viewManual: "システムマニュアル",
     
