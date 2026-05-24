@@ -39,7 +39,7 @@ function LobbyScreen({
     if (chatMessages.length > 0) {
       playSE('click');
     }
-  }, [chatMessages]);
+  }, [chatMessages, playSE]);
 
   if (!lobbyState) {
     return (

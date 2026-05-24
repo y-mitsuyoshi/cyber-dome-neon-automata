@@ -509,23 +509,73 @@ func resolveRound(gs *models.GameState) {
 		p1 := &gs.Players[p1Idx]
 		p2 := &gs.Players[p2Idx]
 
-		// Symmetrical: Initialize hands directly from current decks
-		p1.Hand = p1.CloneDeck()
-		p2.Hand = p2.CloneDeck()
-
-		// Shuffle hands to randomize ordering
-		rand.Shuffle(len(p1.Hand), func(i, j int) { p1.Hand[i], p1.Hand[j] = p1.Hand[j], p1.Hand[i] })
-		rand.Shuffle(len(p2.Hand), func(i, j int) { p2.Hand[i], p2.Hand[j] = p2.Hand[j], p2.Hand[i] })
-
-		// Clear original decks (as they are fully in hand now)
-		p1.Deck = []models.Card{}
-		p2.Deck = []models.Card{}
-
 		sessionID := generateID()
-		session := engine.InitializeBattleSession(sessionID, p1.Name, p2.Name, p1.Hand, p2.Hand)
+		// Clone decks to initialize the session (InitializeBattleSession shuffles and draws internally)
+		session := engine.InitializeBattleSession(sessionID, p1.Name, p2.Name, p1.CloneDeck(), p2.CloneDeck())
 
-		gs.BattleSessions[p1.Name] = session
-		gs.BattleSessions[p2.Name] = session
+		// Symmetrical: If BOTH are NPCs, fully simulate the battle session to completion instantly!
+		if p1.IsNPC && p2.IsNPC {
+			for !session.IsFinished {
+				// NPC 1 move
+				p1Action := engine.EvaluateBestMove(session.Player1Hand, p1.AIStrategy, session.Player1Mem, session.Player2Mem, session.FlagPower, session.FlagHolder == p2.Name)
+				p1Action.PlayerName = p1.Name
+				session.PendingActions[p1.Name] = &p1Action
+
+				// NPC 2 move
+				p2Action := engine.EvaluateBestMove(session.Player2Hand, p2.AIStrategy, session.Player2Mem, session.Player1Mem, session.FlagPower, session.FlagHolder == p1.Name)
+				p2Action.PlayerName = p2.Name
+				session.PendingActions[p2.Name] = &p2Action
+
+				// Step battle
+				engine.StepBattle(session)
+			}
+
+			// Apply wins and fans gained
+			winnerName := session.Winner
+			loserName := session.Loser
+			fansGained := 2
+			if session.Step < 3 {
+				fansGained = 1
+			}
+			// Memory overflow awards 3 fans (highest stakes finish)
+			for _, entry := range session.Log {
+				if entry.Action == "memory_overflow" {
+					fansGained = 3
+					break
+				}
+			}
+
+			for i := range gs.Players {
+				if gs.Players[i].Name == winnerName {
+					gs.Players[i].Wins++
+					gs.Players[i].Fans += fansGained
+				}
+			}
+
+			battleRes := models.BattleResult{
+				Winner:     winnerName,
+				Loser:      loserName,
+				Reason:     fmt.Sprintf("%s was bypassed or suffered fatal synaptic overflow.", loserName),
+				FansGained: fansGained,
+				Log:        session.Log,
+			}
+
+			gs.LastResults[session.Player1Name] = &battleRes
+			gs.BattleLogs[session.Player1Name] = session.Log
+
+			gs.LastResults[session.Player2Name] = &battleRes
+			gs.BattleLogs[session.Player2Name] = session.Log
+		} else {
+			// Symmetrical: Human is involved, keep active session in the map
+			gs.BattleSessions[p1.Name] = session
+			gs.BattleSessions[p2.Name] = session
+
+			// Synchronize player Hand and Deck in game state
+			p1.Hand = session.Player1Hand
+			p1.Deck = session.Player1Deck
+			p2.Hand = session.Player2Hand
+			p2.Deck = session.Player2Deck
+		}
 	}
 
 	// Symmetrical: Check if everyone instantly completed (all got BYEs)

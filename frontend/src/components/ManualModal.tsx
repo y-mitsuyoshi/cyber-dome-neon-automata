@@ -55,15 +55,15 @@ export default function ManualModal({ onClose }: ManualModalProps) {
           ) : (
             <ReactMarkdown
               components={{
-                h1: ({node, ...props}) => <h1 className="text-3xl font-black text-white tracking-widest mb-6 uppercase" {...props} />,
-                h2: ({node, ...props}) => <h2 className="text-xl font-bold text-neon-magenta mt-8 mb-4 border-b border-neon-magenta/30 pb-2 tracking-widest uppercase" {...props} />,
-                h3: ({node, ...props}) => <h3 className="text-lg font-bold text-neon-cyan mt-6 mb-3 tracking-wider" {...props} />,
-                h4: ({node, ...props}) => <h4 className="text-base font-bold text-white mt-4 mb-2" {...props} />,
-                ul: ({node, ...props}) => <ul className="list-disc pl-6 my-4 space-y-2 text-cyber-text-dim" {...props} />,
-                li: ({node, ...props}) => <li className="marker:text-neon-cyan" {...props} />,
-                p: ({node, ...props}) => <p className="mb-4 text-cyber-text leading-loose" {...props} />,
-                hr: ({node, ...props}) => <hr className="border-cyber-border/30 my-8" {...props} />,
-                strong: ({node, ...props}) => <strong className="text-neon-cyan font-bold" {...props} />,
+                h1: ({node: _node, ...props}) => <h1 className="text-3xl font-black text-white tracking-widest mb-6 uppercase" {...props} />,
+                h2: ({node: _node, ...props}) => <h2 className="text-xl font-bold text-neon-magenta mt-8 mb-4 border-b border-neon-magenta/30 pb-2 tracking-widest uppercase" {...props} />,
+                h3: ({node: _node, ...props}) => <h3 className="text-lg font-bold text-neon-cyan mt-6 mb-3 tracking-wider" {...props} />,
+                h4: ({node: _node, ...props}) => <h4 className="text-base font-bold text-white mt-4 mb-2" {...props} />,
+                ul: ({node: _node, ...props}) => <ul className="list-disc pl-6 my-4 space-y-2 text-cyber-text-dim" {...props} />,
+                li: ({node: _node, ...props}) => <li className="marker:text-neon-cyan" {...props} />,
+                p: ({node: _node, ...props}) => <p className="mb-4 text-cyber-text leading-loose" {...props} />,
+                hr: ({node: _node, ...props}) => <hr className="border-cyber-border/30 my-8" {...props} />,
+                strong: ({node: _node, ...props}) => <strong className="text-neon-cyan font-bold" {...props} />,
               }}
             >
               {content}

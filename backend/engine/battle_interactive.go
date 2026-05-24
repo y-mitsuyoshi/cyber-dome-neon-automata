@@ -8,15 +8,38 @@ import (
 
 // InitializeBattleSession creates a fresh interactive battle session between two players.
 func InitializeBattleSession(sessionID string, p1Name, p2Name string, p1Deck, p2Deck []models.Card) *models.BattleSession {
-	// Symmetrical hand layout: Entire deck (10 cards) is loaded directly into the starting hand.
-	p1Hand := make([]models.Card, len(p1Deck))
-	for i, c := range p1Deck {
-		p1Hand[i] = c.Clone()
+	// Defensive copy to avoid mutating caller's slices
+	p1Deck = append([]models.Card(nil), p1Deck...)
+	p2Deck = append([]models.Card(nil), p2Deck...)
+
+	// Shuffle decks to randomize initial order
+	rand.Shuffle(len(p1Deck), func(i, j int) { p1Deck[i], p1Deck[j] = p1Deck[j], p1Deck[i] })
+	rand.Shuffle(len(p2Deck), func(i, j int) { p2Deck[i], p2Deck[j] = p2Deck[j], p2Deck[i] })
+
+	p1HandSize := 5
+	if len(p1Deck) < p1HandSize {
+		p1HandSize = len(p1Deck)
+	}
+	p1Hand := make([]models.Card, p1HandSize)
+	for i := 0; i < p1HandSize; i++ {
+		p1Hand[i] = p1Deck[i].Clone()
+	}
+	p1RemainingDeck := make([]models.Card, len(p1Deck)-p1HandSize)
+	for i := p1HandSize; i < len(p1Deck); i++ {
+		p1RemainingDeck[i-p1HandSize] = p1Deck[i].Clone()
 	}
 
-	p2Hand := make([]models.Card, len(p2Deck))
-	for i, c := range p2Deck {
-		p2Hand[i] = c.Clone()
+	p2HandSize := 5
+	if len(p2Deck) < p2HandSize {
+		p2HandSize = len(p2Deck)
+	}
+	p2Hand := make([]models.Card, p2HandSize)
+	for i := 0; i < p2HandSize; i++ {
+		p2Hand[i] = p2Deck[i].Clone()
+	}
+	p2RemainingDeck := make([]models.Card, len(p2Deck)-p2HandSize)
+	for i := p2HandSize; i < len(p2Deck); i++ {
+		p2RemainingDeck[i-p2HandSize] = p2Deck[i].Clone()
 	}
 
 	return &models.BattleSession{
@@ -25,6 +48,8 @@ func InitializeBattleSession(sessionID string, p1Name, p2Name string, p1Deck, p2
 		Player2Name:    p2Name,
 		Player1Hand:    p1Hand,
 		Player2Hand:    p2Hand,
+		Player1Deck:    p1RemainingDeck,
+		Player2Deck:    p2RemainingDeck,
 		Player1Mem:     []models.MemorySlot{},
 		Player2Mem:     []models.MemorySlot{},
 		Player1Discard: []models.Card{},
@@ -183,8 +208,8 @@ func StepBattle(session *models.BattleSession) {
 
 	// 3. Map to BattleState for high-fidelity effect calculations (symmetrical compatibility)
 	bs := &BattleState{
-		PlayerDeck:   []models.Card{}, // No draw during hand play mode
-		CPUDeck:      []models.Card{},
+		PlayerDeck:   session.Player1Deck,
+		CPUDeck:      session.Player2Deck,
 		PlayerMem:    session.Player1Mem,
 		CPUMem:       session.Player2Mem,
 		FlagHolder:   "", // Temp mapping
@@ -379,9 +404,23 @@ func StepBattle(session *models.BattleSession) {
 		stepDetails = "Both players chose to discard. Grid matrix is stagnant."
 	}
 
-	// 4. Map back Memory slots from BattleState
+	// 4. Map back Memory slots and Decks from BattleState
 	session.Player1Mem = bs.PlayerMem
 	session.Player2Mem = bs.CPUMem
+	session.Player1Deck = bs.PlayerDeck
+	session.Player2Deck = bs.CPUDeck
+
+	// Draw a card for each player at the end of the step if they have cards in deck
+	if len(session.Player1Deck) > 0 {
+		draw := session.Player1Deck[0]
+		session.Player1Deck = session.Player1Deck[1:]
+		session.Player1Hand = append(session.Player1Hand, draw)
+	}
+	if len(session.Player2Deck) > 0 {
+		draw := session.Player2Deck[0]
+		session.Player2Deck = session.Player2Deck[1:]
+		session.Player2Hand = append(session.Player2Hand, draw)
+	}
 
 	// 5. Append step log entry
 	logEntry := models.BattleLogEntry{
@@ -393,8 +432,8 @@ func StepBattle(session *models.BattleSession) {
 		EffectTriggered: stepEffect,
 		PlayerMemSlots:  memSlotNames(session.Player1Mem),
 		CPUMemSlots:     memSlotNames(session.Player2Mem),
-		PlayerDeckCount: 0, // No draw
-		CPUDeckCount:    0,
+		PlayerDeckCount: len(session.Player1Deck),
+		CPUDeckCount:    len(session.Player2Deck),
 		PlayerHandCount: len(session.Player1Hand),
 		CPUHandCount:    len(session.Player2Hand),
 		FlagHolder:      session.FlagHolder,
@@ -402,8 +441,8 @@ func StepBattle(session *models.BattleSession) {
 	}
 	session.Log = append(session.Log, logEntry)
 
-	// 6. Check End conditions (when both hands empty)
-	if !session.IsFinished && len(session.Player1Hand) == 0 && len(session.Player2Hand) == 0 {
+	// 6. Check End conditions (when either hand empty)
+	if !session.IsFinished && (len(session.Player1Hand) == 0 || len(session.Player2Hand) == 0) {
 		session.IsFinished = true
 		if session.FlagHolder == session.Player1Name {
 			session.Winner = session.Player1Name

@@ -173,10 +173,10 @@ func HandleBattleAction(w http.ResponseWriter, r *http.Request) {
 		for i := range gs.Players {
 			if gs.Players[i].Name == session.Player1Name {
 				gs.Players[i].Hand = session.Player1Hand
-				gs.Players[i].Deck = []models.Card{}
+				gs.Players[i].Deck = session.Player1Deck
 			} else if gs.Players[i].Name == session.Player2Name {
 				gs.Players[i].Hand = session.Player2Hand
-				gs.Players[i].Deck = []models.Card{}
+				gs.Players[i].Deck = session.Player2Deck
 			}
 		}
 

@@ -131,6 +131,8 @@ type BattleSession struct {
 	Player2Name    string                   `json:"player2Name"`
 	Player1Hand    []Card                   `json:"player1Hand"`
 	Player2Hand    []Card                   `json:"player2Hand"`
+	Player1Deck    []Card                   `json:"player1Deck"`
+	Player2Deck    []Card                   `json:"player2Deck"`
 	Player1Mem     []MemorySlot             `json:"player1Mem"`
 	Player2Mem     []MemorySlot             `json:"player2Mem"`
 	Player1Discard []Card                   `json:"player1Discard"`

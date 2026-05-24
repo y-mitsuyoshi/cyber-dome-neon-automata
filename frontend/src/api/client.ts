@@ -1,4 +1,4 @@
-import type { GameState, Card, BattleSession } from '../types/game';
+import type { GameState, Card, BattleSession, Standing, BattleLogEntry } from '../types/game';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -21,7 +21,7 @@ interface RawBattleResult {
   winner: string;
   loser: string;
   reason: string;
-  log: any[];
+  log: unknown[];
   fansGained: number;
 }
 
@@ -32,9 +32,9 @@ interface RawGameState {
   phase: 'shop' | 'battle' | 'results';
   player: RawPlayer;
   shop: RawShop;
-  standings: any[];
-  npcs: any[];
-  battleLog: any[];
+  standings: unknown[];
+  npcs: unknown[];
+  battleLog: unknown[];
   lastResult?: RawBattleResult;
   opponent?: string;
   battleResult?: string;
@@ -60,9 +60,9 @@ function mapGameState(raw: RawGameState): GameState {
       cards: raw.shop.cards || [],
       credits: raw.shop.credits || 0,
     } : { cards: [], credits: 0 },
-    standings: raw.standings || [],
+    standings: (raw.standings || []) as Standing[],
     npcs: raw.npcs || [],
-    battleLog: raw.battleLog || (raw.lastResult ? raw.lastResult.log : []) || [],
+    battleLog: (raw.battleLog || (raw.lastResult ? raw.lastResult.log : []) || []) as BattleLogEntry[],
     lastResult: raw.lastResult || null,
     opponent: raw.opponent || '',
     battleResult: raw.battleResult || '',
@@ -83,7 +83,9 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
       if (parsed && typeof parsed.error === 'string') {
         msg = parsed.error;
       }
-    } catch (_) {}
+    } catch {
+      // ignore parse error, use raw text
+    }
     throw new Error(msg);
   }
   return res.json();
