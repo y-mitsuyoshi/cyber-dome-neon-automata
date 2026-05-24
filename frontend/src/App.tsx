@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Terminal, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Terminal, AlertCircle, ShieldAlert, Volume2, VolumeX } from 'lucide-react';
 import type { GameState } from './types/game';
 import TitleScreen from './components/TitleScreen';
 import LobbyScreen from './components/LobbyScreen';
@@ -9,6 +9,7 @@ import Standings from './components/Standings';
 import GameOver from './components/GameOver';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useTranslation } from './context/TranslationContext';
+import { useAudio } from './context/AudioContext';
 import {
   createNewGame,
   getGameState,
@@ -27,6 +28,7 @@ import {
 type Screen = 'title' | 'lobby' | 'game';
 
 function App() {
+  const { isMuted, toggleMute, playBGM, playSE } = useAudio();
   const [screen, setScreen] = useState<Screen>('title');
   const [playerName, setPlayerName] = useState<string>('PLAYER_ONE');
   const [lobbyCode, setLobbyCode] = useState<string | null>(null);
@@ -40,6 +42,21 @@ function App() {
   const [waitingForNextRound, setWaitingForNextRound] = useState<boolean>(false);
 
   const { locale, setLocale, t } = useTranslation();
+
+  // Procedural BGM Theme Sync Controller
+  useEffect(() => {
+    if (screen === 'title' || screen === 'lobby') {
+      playBGM('title');
+    } else if (screen === 'game' && gameState) {
+      if (gameState.phase === 'shop') {
+        playBGM('shop');
+      } else if (gameState.phase === 'battle') {
+        playBGM('battle');
+      } else {
+        playBGM('shop'); // Keep it chill for standings
+      }
+    }
+  }, [screen, gameState?.phase, playBGM]);
 
   // WebSocket Hook
   const {
@@ -154,6 +171,7 @@ function App() {
 
   // OFFLINE SOLO START
   const handleStartSolo = async () => {
+    playSE('click');
     setLoading(true);
     setError(null);
     setPlayerName('PLAYER_ONE');
@@ -171,6 +189,7 @@ function App() {
 
   // MULTIPLAYER CREATION
   const handleCreateLobby = async (name: string) => {
+    playSE('click');
     setLoading(true);
     setError(null);
     try {
@@ -187,6 +206,7 @@ function App() {
 
   // MULTIPLAYER JOIN
   const handleJoinLobby = async (code: string, name: string) => {
+    playSE('click');
     setLoading(true);
     setError(null);
     try {
@@ -204,6 +224,7 @@ function App() {
   // LOBBY NPC ACTIONS
   const handleAddNPC = async () => {
     if (!lobbyCode) return;
+    playSE('click');
     try {
       await addNPC(lobbyCode);
     } catch (err: any) {
@@ -213,6 +234,7 @@ function App() {
 
   const handleRemoveNPC = async (npcName: string) => {
     if (!lobbyCode) return;
+    playSE('click');
     try {
       await removeNPC(lobbyCode, npcName);
     } catch (err: any) {
@@ -222,6 +244,7 @@ function App() {
 
   const handleStartMultiplayerGame = async () => {
     if (!lobbyCode) return;
+    playSE('click');
     setLoading(true);
     setError(null);
     try {
@@ -236,6 +259,7 @@ function App() {
   // GAME CORE ACTIONS
   const handleBuyCard = async (index: number) => {
     if (!gameState) return;
+    playSE('purchase');
     setLoading(true);
     setError(null);
     try {
@@ -250,6 +274,7 @@ function App() {
 
   const handleRerollShop = async () => {
     if (!gameState) return;
+    playSE('roll');
     setLoading(true);
     setError(null);
     try {
@@ -264,6 +289,7 @@ function App() {
 
   const handleDeleteCard = async (index: number) => {
     if (!gameState) return;
+    playSE('discard');
     setLoading(true);
     setError(null);
     try {
@@ -278,6 +304,7 @@ function App() {
 
   const handleStartBattle = async () => {
     if (!gameState) return;
+    playSE('click');
     setLoading(true);
     setError(null);
     try {
@@ -311,6 +338,7 @@ function App() {
     if (gameState.currentRound >= gameState.maxRounds) {
       return;
     }
+    playSE('click');
     setLoading(true);
     setError(null);
     try {
@@ -329,6 +357,7 @@ function App() {
   };
 
   const handleRestart = () => {
+    playSE('click');
     setScreen('title');
     setLobbyCode(null);
     setGameState(null);
@@ -456,10 +485,13 @@ function App() {
             <span>Cyber-Dome Autonomous Grid System</span>
           </div>
           
-          {/* Cyber Lang Toggle Selector */}
+          {/* Cyber Lang & Audio Selector */}
           <div className="flex items-center gap-1 font-mono text-[9px]">
             <button
-              onClick={() => setLocale('en')}
+              onClick={() => {
+                playSE('click');
+                setLocale('en');
+              }}
               className={`px-1.5 py-0.5 rounded cursor-pointer transition-all ${
                 locale === 'en'
                   ? 'text-neon-cyan border border-neon-cyan/30 bg-neon-cyan/5 font-bold shadow-[0_0_8px_rgba(0,242,254,0.1)]'
@@ -470,7 +502,10 @@ function App() {
             </button>
             <span className="text-cyber-border/30">/</span>
             <button
-              onClick={() => setLocale('ja')}
+              onClick={() => {
+                playSE('click');
+                setLocale('ja');
+              }}
               className={`px-1.5 py-0.5 rounded cursor-pointer transition-all flex items-center gap-1 ${
                 locale === 'ja'
                   ? 'text-neon-magenta border border-neon-magenta/30 bg-neon-magenta/5 font-bold shadow-[0_0_8px_rgba(255,0,127,0.1)]'
@@ -478,6 +513,21 @@ function App() {
               }`}
             >
               🌐 日本語
+            </button>
+
+            {/* Audio Synth Control */}
+            <span className="text-cyber-border/30 mx-1">|</span>
+            <button
+              onClick={toggleMute}
+              className={`px-1.5 py-0.5 rounded cursor-pointer transition-all flex items-center gap-1 ${
+                isMuted
+                  ? 'text-neon-red border border-neon-red/30 bg-neon-red/5 font-bold shadow-[0_0_8px_rgba(255,0,0,0.1)] animate-pulse'
+                  : 'text-neon-green border border-neon-green/30 bg-neon-green/5 font-bold shadow-[0_0_8px_rgba(0,255,0,0.1)]'
+              }`}
+              title={isMuted ? 'Unmute Audio Context' : 'Mute Audio Context'}
+            >
+              {isMuted ? <VolumeX size={10} /> : <Volume2 size={10} />}
+              <span>{isMuted ? 'AUDIO_OFF' : 'AUDIO_ON'}</span>
             </button>
           </div>
         </div>

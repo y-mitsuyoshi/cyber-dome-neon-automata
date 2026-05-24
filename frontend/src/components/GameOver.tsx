@@ -1,6 +1,7 @@
 import { Trophy, Star, Zap, RotateCcw, User } from 'lucide-react';
 import type { Standing } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
+import { useAudio } from '../context/AudioContext';
 
 interface GameOverProps {
   standings: Standing[];
@@ -8,6 +9,7 @@ interface GameOverProps {
 }
 
 function GameOver({ standings, onRestart }: GameOverProps) {
+  const { playSE } = useAudio();
   const sorted = [...standings].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.fans - a.fans;
@@ -150,6 +152,7 @@ function GameOver({ standings, onRestart }: GameOverProps) {
         {/* Restart button */}
         <button
           onClick={onRestart}
+          onMouseEnter={() => playSE('hover')}
           className="inline-flex items-center gap-2 px-10 py-4 rounded border-2 border-neon-cyan text-neon-cyan font-bold text-lg uppercase tracking-wider
             hover:bg-cyan-900/20 hover:scale-105 transition-all duration-300 cursor-pointer animate-slide-in font-mono"
           style={{

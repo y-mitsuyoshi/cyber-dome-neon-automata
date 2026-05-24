@@ -3,6 +3,7 @@ import { X, Layers, Trash2, AlertCircle } from 'lucide-react';
 import type { Card } from '../types/game';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
+import { useAudio } from '../context/AudioContext';
 
 interface DeckViewerModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export default function DeckViewerModal({
   onDeleteCard,
   deleteModeSupported = false,
 }: DeckViewerModalProps) {
+  const { playSE } = useAudio();
   const { t } = useTranslation();
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
 
@@ -53,7 +55,8 @@ export default function DeckViewerModal({
             </span>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => { playSE('click'); onClose(); }}
+            onMouseEnter={() => playSE('hover')}
             className="p-1 text-cyber-border hover:text-neon-magenta hover:bg-neon-magenta/10 rounded transition-all cursor-pointer"
           >
             <X size={24} />
@@ -96,12 +99,14 @@ export default function DeckViewerModal({
                           <div className="flex gap-1 w-full animate-fade-in font-mono text-[10px]">
                             <button
                               onClick={() => handleConfirmDelete(i)}
+                              onMouseEnter={() => playSE('hover')}
                               className="flex-1 py-1 rounded bg-neon-red/25 border border-neon-red text-neon-red font-bold uppercase cursor-pointer hover:bg-neon-red/40 transition-all"
                             >
                               CONFIRM
                             </button>
                             <button
-                              onClick={() => setDeleteConfirmIndex(null)}
+                              onClick={() => { playSE('click'); setDeleteConfirmIndex(null); }}
+                              onMouseEnter={() => playSE('hover')}
                               className="px-2 py-1 rounded border border-cyber-border text-cyber-text hover:bg-cyber-surface transition-all cursor-pointer"
                             >
                               X
@@ -109,7 +114,8 @@ export default function DeckViewerModal({
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleDeleteClick(i)}
+                            onClick={() => { playSE('click'); handleDeleteClick(i); }}
+                            onMouseEnter={() => { if (canDelete) playSE('hover'); }}
                             disabled={!canDelete}
                             className={`w-full py-1 px-3 rounded border text-[10px] uppercase font-bold tracking-wider font-mono flex items-center justify-center gap-1.5 transition-all duration-300
                               ${canDelete

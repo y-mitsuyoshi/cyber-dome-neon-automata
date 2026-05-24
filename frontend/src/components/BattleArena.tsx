@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Flag, Zap, User, Cpu, AlertTriangle, Trash2, Send, Layers } from 'lucide-react';
 import type { BattleLogEntry, BattleSession, Card } from '../types/game';
 import MemorySlots from './MemorySlots';
@@ -6,6 +6,7 @@ import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
 import { submitBattleAction } from '../api/client';
 import DeckViewerModal from './DeckViewerModal';
+import { useAudio } from '../context/AudioContext';
 
 interface BattleArenaProps {
   gameId: string;
@@ -26,12 +27,36 @@ function BattleArena({
   onComplete,
   deck,
 }: BattleArenaProps) {
+  const { playSE } = useAudio();
   const [showDeckModal, setShowDeckModal] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [lastStep, setLastStep] = useState<number>(0);
+  const [lastFinished, setLastFinished] = useState<boolean>(false);
+
   const { t, translateBattleDetail } = useTranslation();
+
+  // Play clash SE on step increment
+  useEffect(() => {
+    if (battleSession && battleSession.step > lastStep) {
+      playSE('clash');
+      setLastStep(battleSession.step);
+    }
+  }, [battleSession?.step, lastStep, playSE]);
+
+  // Play victory/defeat SE on battle finished
+  useEffect(() => {
+    if (battleSession && battleSession.isFinished && !lastFinished) {
+      if (battleSession.winner === playerName) {
+        playSE('victory');
+      } else {
+        playSE('defeat');
+      }
+      setLastFinished(true);
+    }
+  }, [battleSession?.isFinished, battleSession?.winner, lastFinished, playerName, playSE]);
 
   // 1. Symmetrical: Extract player and opponent datasets from session
   const isP1 = battleSession?.player1Name === playerName;
@@ -98,6 +123,7 @@ function BattleArena({
 
     try {
       await submitBattleAction(gameId, playerName, actionType, selectedCardId);
+      playSE(actionType === 'PLAY' ? 'play' : 'discard');
       setSelectedCardId(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'GRID_LOCK: Failed to transmit action.';

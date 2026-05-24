@@ -3,6 +3,7 @@ import { RefreshCw, Trash2, Swords, CreditCard, Layers } from 'lucide-react';
 import type { Card } from '../types/game';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
+import { useAudio } from '../context/AudioContext';
 import DeckViewerModal from './DeckViewerModal';
 
 interface ShopProps {
@@ -19,6 +20,7 @@ interface ShopProps {
 }
 
 function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onDelete, onBattle, loading }: ShopProps) {
+  const { playSE } = useAudio();
   const [isDeckModalOpen, setIsDeckModalOpen] = useState(false);
   const [deleteModeSupportedInModal, setDeleteModeSupportedInModal] = useState(false);
   const { t } = useTranslation();
@@ -58,7 +60,8 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
 
           {/* Deck count */}
           <button
-            onClick={() => { setIsDeckModalOpen(true); setDeleteModeSupportedInModal(false); }}
+            onClick={() => { playSE('click'); setIsDeckModalOpen(true); setDeleteModeSupportedInModal(false); }}
+            onMouseEnter={() => playSE('hover')}
             className="flex items-center gap-2 border border-neon-magenta/30 rounded px-4 py-2 bg-cyber-surface/50 cursor-pointer hover:border-neon-magenta/60 transition-colors font-mono"
           >
             <Layers size={16} className="text-neon-magenta" />
@@ -91,6 +94,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
               />
               <button
                 onClick={() => onBuy(i)}
+                onMouseEnter={() => { if (credits >= card.cost && !loading) playSE('hover'); }}
                 disabled={loading || credits < card.cost}
                 className={`
                   mt-3 w-full py-2 rounded border text-xs uppercase tracking-wider font-bold font-mono
@@ -120,6 +124,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
         <div className="flex justify-center gap-4 mb-8 font-mono">
           <button
             onClick={onReroll}
+            onMouseEnter={() => { if (credits >= 1 && !loading) playSE('hover'); }}
             disabled={loading || credits < 1}
             className={`
               flex items-center gap-2 px-6 py-3 rounded border text-sm uppercase tracking-wider font-bold
@@ -135,7 +140,8 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
           </button>
 
           <button
-            onClick={() => { setIsDeckModalOpen(true); setDeleteModeSupportedInModal(true); }}
+            onClick={() => { playSE('click'); setIsDeckModalOpen(true); setDeleteModeSupportedInModal(true); }}
+            onMouseEnter={() => { if (deck.length > 0 && !loading) playSE('hover'); }}
             disabled={loading || deck.length === 0}
             className="flex items-center gap-2 px-6 py-3 rounded border border-neon-red/50 text-neon-red hover:bg-neon-red/10 cursor-pointer transition-all duration-300 font-mono shadow-[0_0_8px_rgba(255,0,80,0.1)]"
           >
@@ -145,6 +151,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
 
           <button
             onClick={onBattle}
+            onMouseEnter={() => { if (!loading) playSE('hover'); }}
             disabled={loading}
             className="flex items-center gap-2 px-8 py-3 rounded border-2 border-neon-green text-neon-green font-bold text-sm uppercase tracking-wider
               hover:bg-neon-green/10 hover:scale-105 transition-all duration-300 cursor-pointer"

@@ -1,6 +1,7 @@
 import { Trophy, Star, ChevronRight, User } from 'lucide-react';
 import type { Standing } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
+import { useAudio } from '../context/AudioContext';
 
 interface StandingsProps {
   standings: Standing[];
@@ -12,6 +13,7 @@ interface StandingsProps {
 }
 
 function Standings({ standings, round, maxRounds, battleResult, onNext, loading }: StandingsProps) {
+  const { playSE } = useAudio();
   const sorted = [...standings].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.fans - a.fans;
@@ -161,6 +163,7 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
         <div className="text-center mt-8 animate-slide-in" style={{ animationDelay: '0.5s' }}>
           <button
             onClick={onNext}
+            onMouseEnter={() => { if (!loading) playSE('hover'); }}
             disabled={loading}
             className={`
               inline-flex items-center gap-2 px-8 py-3 rounded border-2 font-bold text-sm uppercase tracking-wider

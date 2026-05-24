@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { X, BookOpen } from 'lucide-react';
+import { useAudio } from '../context/AudioContext';
 
 interface ManualModalProps {
   onClose: () => void;
 }
 
 export default function ManualModal({ onClose }: ManualModalProps) {
+  const { playSE } = useAudio();
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -36,7 +38,8 @@ export default function ManualModal({ onClose }: ManualModalProps) {
             </h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => { playSE('click'); onClose(); }}
+            onMouseEnter={() => playSE('hover')}
             className="p-1 text-cyber-border hover:text-neon-cyan hover:bg-neon-cyan/10 rounded transition-all cursor-pointer"
           >
             <X size={24} />
