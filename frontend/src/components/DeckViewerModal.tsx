@@ -29,7 +29,6 @@ export default function DeckViewerModal({
   if (!isOpen) return null;
 
   const handleDeleteClick = (index: number) => {
-    if (credits < 2) return;
     setDeleteConfirmIndex(index);
   };
 
@@ -87,7 +86,7 @@ export default function DeckViewerModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
               {deck.map((card, i) => {
                 const isConfirming = deleteConfirmIndex === i;
-                const canDelete = credits >= 2;
+                const canDelete = true;
 
                 return (
                   <div key={`${card.id}-${i}`} className="flex flex-col items-center gap-2 relative group animate-card-reveal">
@@ -125,7 +124,7 @@ export default function DeckViewerModal({
                             `}
                           >
                             <Trash2 size={10} />
-                            {t('deleteCardText') || 'Delete (2¢)'}
+                            {t('deleteCardText') || 'Delete (Free)'}
                           </button>
                         )}
                       </div>

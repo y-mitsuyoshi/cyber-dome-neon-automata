@@ -16,7 +16,7 @@ export type SoundEffectType =
   | 'fanfare'
   | 'coin';
 
-export type BGMThemeType = 'title' | 'shop' | 'battle' | 'none';
+export type BGMThemeType = 'title' | 'shop' | 'battle' | 'results' | 'none';
 
 class ProceduralAudioEngine {
   private ctx: AudioContext | null = null;
@@ -27,13 +27,15 @@ class ProceduralAudioEngine {
   private isMuted: boolean = false;
   private currentBgm: BGMThemeType = 'none';
   private bgmIntervalId: ReturnType<typeof setInterval> | null = null;
-  private bgmTickCount: number = 0;
   
   // Keep track of active oscillators for smooth BGM drone crossfades
   private activeDrones: OscillatorNode[] = [];
   private droneGain: GainNode | null = null;
   private activeLfos: OscillatorNode[] = [];
-  private lfoGains: GainNode[] = [];
+
+  // HTML5 Audio players for MP3 background tracks
+  private bgmPlayers: Record<string, HTMLAudioElement> = {};
+  private bgmGains: Record<string, GainNode> = {};
 
   constructor() {
     // Load mute state from localStorage
@@ -78,6 +80,38 @@ class ProceduralAudioEngine {
       this.droneGain = this.ctx.createGain();
       this.droneGain.gain.setValueAtTime(0, this.ctx.currentTime);
       this.droneGain.connect(this.bgmGain);
+
+      // Initialize HTML5 Audio elements for MP3 BGMs safely (non-blocking, test-safe)
+      const bgmFiles: Record<string, string> = {
+        title: '/sounds/Neural_Siege.mp3',
+        shop: '/sounds/Beneath_the_Concrete_Slab.mp3',
+        battle: '/sounds/Locked_Within_The_Iron.mp3',
+        results: '/sounds/Final_Tally_In_Sector_Seven.mp3'
+      };
+
+      if (typeof window !== 'undefined' && (window.Audio || (window as any).webkitAudioContext)) {
+        for (const [theme, filePath] of Object.entries(bgmFiles)) {
+          if (typeof Audio !== 'undefined' && typeof this.ctx.createMediaElementSource === 'function') {
+            try {
+              const audio = new Audio(filePath);
+              audio.loop = true;
+              audio.crossOrigin = 'anonymous';
+
+              const trackGain = this.ctx.createGain();
+              trackGain.gain.setValueAtTime(0, this.ctx.currentTime);
+              trackGain.connect(this.bgmGain);
+
+              const source = this.ctx.createMediaElementSource(audio);
+              source.connect(trackGain);
+
+              this.bgmPlayers[theme] = audio;
+              this.bgmGains[theme] = trackGain;
+            } catch (err) {
+              console.error(`Failed to initialize BGM element for ${theme}:`, err);
+            }
+          }
+        }
+      }
     } catch (e) {
       console.error('Web Audio API not supported in this browser', e);
     }
@@ -538,20 +572,14 @@ class ProceduralAudioEngine {
     }
   }
 
-  // Stop currently scheduled procedural BGM loop
+  // Stop currently playing BGM
   public stopBGM() {
     if (this.bgmIntervalId) {
       clearInterval(this.bgmIntervalId);
       this.bgmIntervalId = null;
     }
     
-    // Smooth gain fade-out before stopping oscillators
-    if (this.ctx && this.bgmGain) {
-      const now = this.ctx.currentTime;
-      this.bgmGain.gain.setTargetAtTime(0, now, 0.15);
-    }
-    
-    // Stop all active ambient drone oscillators after fade
+    // Stop all active ambient drone oscillators if any exist
     if (this.ctx && this.droneGain) {
       const now = this.ctx.currentTime;
       this.droneGain.gain.setTargetAtTime(0, now, 0.1);
@@ -570,19 +598,36 @@ class ProceduralAudioEngine {
           }
         });
         this.activeLfos = [];
-        this.lfoGains = [];
-        
-        // Restore BGM gain only if no new theme has started in the meantime
-        if (this.currentBgm === 'none' && this.ctx && this.bgmGain) {
-          this.bgmGain.gain.setValueAtTime(0.4, this.ctx.currentTime);
-        }
       }, 300);
+    }
+
+    // Handle HTML5 Audio BGM stopping with smooth fade-out
+    if (this.currentBgm !== 'none') {
+      const prevTheme = this.currentBgm;
+      const player = this.bgmPlayers[prevTheme];
+      const gainNode = this.bgmGains[prevTheme];
+      
+      if (player && gainNode && this.ctx) {
+        const now = this.ctx.currentTime;
+        gainNode.gain.cancelScheduledValues(now);
+        gainNode.gain.setTargetAtTime(0, now, 0.15);
+        
+        setTimeout(() => {
+          if (this.currentBgm !== prevTheme) {
+            try {
+              player.pause();
+            } catch (err) {
+              console.error(`Failed to pause BGM theme: ${prevTheme}`, err);
+            }
+          }
+        }, 500);
+      }
     }
     
     this.currentBgm = 'none';
   }
 
-  // Play a procedurally generated looped cyberpunk theme
+  // Play a looped cyberpunk theme from MP3
   public async playBGM(theme: BGMThemeType) {
     if (this.currentBgm === theme) return;
     
@@ -591,325 +636,23 @@ class ProceduralAudioEngine {
 
     this.stopBGM();
     this.currentBgm = theme;
-    this.bgmTickCount = 0;
 
-    const now = this.ctx.currentTime;
-
-    switch (theme) {
-      case 'title': {
-        // Procedural Title BGM: Atmospheric deep space cyberpunk pad drone
-        if (this.droneGain) {
-          this.droneGain.gain.setValueAtTime(0, now);
-          this.droneGain.gain.linearRampToValueAtTime(0.5, now + 2.0); // 2s fade in
-        }
-
-        const createDrone = (freq: number) => {
-          if (!this.ctx || !this.droneGain) return;
-          const osc = this.ctx.createOscillator();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-          
-          // Lowpass filter for smooth analog warmth
-          const filter = this.ctx.createBiquadFilter();
-          filter.type = 'lowpass';
-          filter.frequency.setValueAtTime(140, this.ctx.currentTime);
-
-          osc.connect(filter);
-          filter.connect(this.droneGain);
-          
-          osc.start();
-          this.activeDrones.push(osc);
-
-          // LFO modulates frequency for slow vibrato — 0.15Hz sine, ~3Hz depth
-          const lfo = this.ctx.createOscillator();
-          lfo.type = 'sine';
-          lfo.frequency.setValueAtTime(0.15, this.ctx.currentTime);
-
-          const lfoGain = this.ctx.createGain();
-          lfoGain.gain.setValueAtTime(3, this.ctx.currentTime);
-
-          lfo.connect(lfoGain);
-          lfoGain.connect(osc.frequency);
-
-          lfo.start();
-          this.activeLfos.push(lfo);
-          this.lfoGains.push(lfoGain);
-        };
-
-        // Create a separate LFO for drone gain breathing effect (slow volume pulse)
-        const breathLfo = this.ctx.createOscillator();
-        breathLfo.type = 'sine';
-        breathLfo.frequency.setValueAtTime(0.08, now);
-
-        const breathGain = this.ctx.createGain();
-        breathGain.gain.setValueAtTime(0.12, now);
-
-        breathLfo.connect(breathGain);
-        if (this.droneGain) {
-          breathGain.connect(this.droneGain.gain);
-        }
-
-        breathLfo.start();
-        this.activeLfos.push(breathLfo);
-        this.lfoGains.push(breathGain);
-
-        // Deep 55Hz (A1) and detuned 55.3Hz, and 110Hz (A2) drone
-        createDrone(55);
-        createDrone(55.3);
-        createDrone(110);
-
-        // Periodically schedule sparkling, slow holographic chimes
-        const scheduleChimes = () => {
-          if (this.currentBgm !== 'title' || !this.ctx || !this.bgmGain) return;
-          
-          const chimeNow = this.ctx.currentTime;
-          const frequencies = [440, 550, 660, 880, 1100]; // A minor pentatonic sparkling chimes
-          const freq = frequencies[Math.floor(Math.random() * frequencies.length)];
-
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          const delay = this.ctx.createDelay();
-          const delayGain = this.ctx.createGain();
-
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, chimeNow);
-
-          gain.gain.setValueAtTime(0, chimeNow);
-          gain.gain.linearRampToValueAtTime(0.08, chimeNow + 0.1);
-          gain.gain.exponentialRampToValueAtTime(0.001, chimeNow + 1.5);
-
-          // Digital delay loop for spatial reverb effect
-          delay.delayTime.setValueAtTime(0.3, chimeNow);
-          delayGain.gain.setValueAtTime(0.45, chimeNow);
-
-          osc.connect(gain);
-          gain.connect(this.bgmGain);
-
-          // Delay feedback connection
-          gain.connect(delay);
-          delay.connect(delayGain);
-          delayGain.connect(this.bgmGain);
-          delayGain.connect(delay); // feedback
-
-          osc.start(chimeNow);
-          osc.stop(chimeNow + 2.0);
-        };
-
-        // Sparkle chimes every 2.5 seconds
-        this.bgmIntervalId = setInterval(scheduleChimes, 2500);
-        break;
-      }
-
-      case 'shop': {
-        // Procedural Shop BGM: Cyber-lounge chill rhythmic ambient track
-        // Warm periodic chords + slow sub bass
-        const shopTempo = 250; // 60 BPM (ticks every 250ms)
-        const chordProgression = [
-          [130.81, 164.81, 196.00], // C major (C3, E3, G3)
-          [146.83, 174.61, 220.00], // D minor (D3, F3, A3)
-          [164.81, 196.00, 246.94], // E minor (E3, G3, B3)
-          [139.00, 174.61, 207.65], // F major (F3, A3, C3)
-        ];
-
-        const tickShop = () => {
-          if (!this.ctx || !this.bgmGain) return;
-          const tickNow = this.ctx.currentTime;
-          const measure = Math.floor(this.bgmTickCount / 16) % chordProgression.length;
-          const beatInMeasure = this.bgmTickCount % 16;
-
-          // 1. Play warm pad chord at the start of every 4 measures
-          if (beatInMeasure === 0) {
-            const chord = chordProgression[measure];
-            chord.forEach((freq) => {
-              if (!this.ctx || !this.bgmGain) return;
-              const osc = this.ctx.createOscillator();
-              const gain = this.ctx.createGain();
-              const filter = this.ctx.createBiquadFilter();
-
-              osc.type = 'triangle';
-              osc.frequency.setValueAtTime(freq, tickNow);
-
-              filter.type = 'lowpass';
-              filter.frequency.setValueAtTime(250, tickNow);
-              filter.frequency.linearRampToValueAtTime(600, tickNow + 1.5);
-              filter.frequency.exponentialRampToValueAtTime(150, tickNow + 3.8);
-
-              gain.gain.setValueAtTime(0, tickNow);
-              gain.gain.linearRampToValueAtTime(0.12, tickNow + 0.5);
-              gain.gain.exponentialRampToValueAtTime(0.001, tickNow + 3.9);
-
-              osc.connect(filter);
-              filter.connect(gain);
-              gain.connect(this.bgmGain);
-
-              osc.start(tickNow);
-              osc.stop(tickNow + 4.0);
-            });
-          }
-
-          // 2. Play warm sine bass notes on beats 0, 4, 8, 12
-          if (beatInMeasure % 4 === 0) {
-            const baseFreq = chordProgression[measure][0] / 2; // Bass (Sub) octave
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(baseFreq, tickNow);
-
-            gain.gain.setValueAtTime(0.24, tickNow);
-            gain.gain.exponentialRampToValueAtTime(0.01, tickNow + 0.85);
-
-            osc.connect(gain);
-            gain.connect(this.bgmGain);
-
-            osc.start(tickNow);
-            osc.stop(tickNow + 1.0);
-          }
-
-          // 3. Ambient crystal droplet melodies on odd beats (semi-randomized)
-          if (beatInMeasure % 2 === 1 && Math.random() < 0.35) {
-            const chord = chordProgression[measure];
-            const baseFreq = chord[Math.floor(Math.random() * chord.length)] * 2; // Melodic octave
-
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(baseFreq, tickNow);
-
-            gain.gain.setValueAtTime(0, tickNow);
-            gain.gain.linearRampToValueAtTime(0.06, tickNow + 0.05);
-            gain.gain.exponentialRampToValueAtTime(0.001, tickNow + 0.6);
-
-            osc.connect(gain);
-            gain.connect(this.bgmGain);
-
-            osc.start(tickNow);
-            osc.stop(tickNow + 0.7);
-          }
-
-          this.bgmTickCount++;
-        };
-
-        this.bgmIntervalId = setInterval(tickShop, shopTempo);
-        break;
-      }
-
-      case 'battle': {
-        // Procedural Battle BGM: Fast-paced dark-synth driving cyberpunk track (115 BPM)
-        const battleTempo = 130; // 115 BPM (ticks every 130ms)
-        const bassPattern = [
-          55, 55, 65.41, 65.41, 55, 55, 73.42, 73.42, // A1 -> C2 -> A1 -> D2
-          55, 55, 65.41, 65.41, 48.99, 48.99, 48.99, 48.99, // A1 -> C2 -> G1 -> G1
-        ];
-
-        const tickBattle = () => {
-          if (!this.ctx || !this.bgmGain) return;
-          const tickNow = this.ctx.currentTime;
-          const step = this.bgmTickCount % bassPattern.length;
-
-          // 1. Cyber Kick Drum on step 0, 4, 8, 12
-          if (step % 4 === 0) {
-            const kOsc = this.ctx.createOscillator();
-            const kGain = this.ctx.createGain();
-
-            kOsc.type = 'sine';
-            kOsc.frequency.setValueAtTime(160, tickNow);
-            kOsc.frequency.exponentialRampToValueAtTime(45, tickNow + 0.09);
-
-            kGain.gain.setValueAtTime(0.55, tickNow);
-            kGain.gain.exponentialRampToValueAtTime(0.001, tickNow + 0.11);
-
-            kOsc.connect(kGain);
-            kGain.connect(this.bgmGain);
-
-            kOsc.start(tickNow);
-            kOsc.stop(tickNow + 0.12);
-          }
-
-          // 2. Synthesized Snare/Clap on step 4, 12 (filtered noise blast)
-          if (step === 4 || step === 12) {
-            const bufferSize = this.ctx.sampleRate * 0.08;
-            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-              data[i] = Math.random() * 2 - 1;
-            }
-
-            const sNoise = this.ctx.createBufferSource();
-            sNoise.buffer = buffer;
-
-            const sFilter = this.ctx.createBiquadFilter();
-            sFilter.type = 'bandpass';
-            sFilter.frequency.setValueAtTime(1000, tickNow);
-
-            const sGain = this.ctx.createGain();
-            sGain.gain.setValueAtTime(0.26, tickNow);
-            sGain.gain.exponentialRampToValueAtTime(0.001, tickNow + 0.08);
-
-            sNoise.connect(sFilter);
-            sFilter.connect(sGain);
-            sGain.connect(this.bgmGain);
-
-            sNoise.start(tickNow);
-            sNoise.stop(tickNow + 0.09);
-          }
-
-          // 3. Driving driving 16th sawtooth Bassline on every step
-          const bassFreq = bassPattern[step];
-          const bOsc = this.ctx.createOscillator();
-          const bGain = this.ctx.createGain();
-          const bFilter = this.ctx.createBiquadFilter();
-
-          bOsc.type = 'sawtooth';
-          bOsc.frequency.setValueAtTime(bassFreq, tickNow);
-
-          bFilter.type = 'lowpass';
-          bFilter.frequency.setValueAtTime(280, tickNow);
-          bFilter.Q.setValueAtTime(3, tickNow);
-
-          // Rhythmic bass bounce
-          bGain.gain.setValueAtTime(0.18, tickNow);
-          bGain.gain.exponentialRampToValueAtTime(0.001, tickNow + 0.12);
-
-          bOsc.connect(bFilter);
-          bFilter.connect(bGain);
-          bGain.connect(this.bgmGain);
-
-          bOsc.start(tickNow);
-          bOsc.stop(tickNow + 0.13);
-
-          // 4. Randomized cyber-hacker sound bites or notes occasionally
-          if (step % 2 === 1 && Math.random() < 0.22) {
-            const leadOsc = this.ctx.createOscillator();
-            const leadGain = this.ctx.createGain();
-            const leadFilter = this.ctx.createBiquadFilter();
-            // Fast pentatonic blips
-            const scale = [220, 261.63, 293.66, 329.63, 392.00, 440.00];
-            const leadFreq = scale[Math.floor(Math.random() * scale.length)] * 2;
-
-            leadOsc.type = 'square';
-            leadOsc.frequency.setValueAtTime(leadFreq, tickNow);
-
-            leadFilter.type = 'bandpass';
-            leadFilter.frequency.setValueAtTime(1500, tickNow);
-
-            leadGain.gain.setValueAtTime(0.04, tickNow);
-            leadGain.gain.exponentialRampToValueAtTime(0.001, tickNow + 0.1);
-
-            leadOsc.connect(leadFilter);
-            leadFilter.connect(leadGain);
-            leadGain.connect(this.bgmGain);
-
-            leadOsc.start(tickNow);
-            leadOsc.stop(tickNow + 0.11);
-          }
-
-          this.bgmTickCount++;
-        };
-
-        this.bgmIntervalId = setInterval(tickBattle, battleTempo);
-        break;
+    if (theme === 'none') return;
+
+    const player = this.bgmPlayers[theme];
+    const gainNode = this.bgmGains[theme];
+
+    if (player && gainNode) {
+      try {
+        player.currentTime = 0;
+        await player.play();
+        
+        const now = this.ctx.currentTime;
+        gainNode.gain.cancelScheduledValues(now);
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(1, now + 1.0); // 1.0s fade in
+      } catch (err) {
+        console.error(`Failed to play BGM theme: ${theme}`, err);
       }
     }
   }

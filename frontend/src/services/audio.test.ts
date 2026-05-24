@@ -54,10 +54,10 @@ describe('ProceduralAudioEngine', () => {
     ;(audioService as any)['droneGain'] = null
     ;(audioService as any)['activeDrones'] = []
     ;(audioService as any)['activeLfos'] = []
-    ;(audioService as any)['lfoGains'] = []
     ;(audioService as any)['currentBgm'] = 'none'
     ;(audioService as any)['bgmIntervalId'] = null
-    ;(audioService as any)['bgmTickCount'] = 0
+    ;(audioService as any)['bgmPlayers'] = {}
+    ;(audioService as any)['bgmGains'] = {}
 
     const MockCtx = createMockAudioContext()
     vi.stubGlobal('AudioContext', vi.fn(() => MockCtx))
@@ -74,8 +74,8 @@ describe('ProceduralAudioEngine', () => {
   })
 
   it('exports all expected BGM theme types', () => {
-    const bgmTypes: BGMThemeType[] = ['title', 'shop', 'battle', 'none']
-    expect(bgmTypes).toHaveLength(4)
+    const bgmTypes: BGMThemeType[] = ['title', 'shop', 'battle', 'results', 'none']
+    expect(bgmTypes).toHaveLength(5)
   })
 
   it('initializes without throwing', () => {
@@ -113,6 +113,7 @@ describe('ProceduralAudioEngine', () => {
     await expect(audioService.playBGM('title')).resolves.not.toThrow()
     await expect(audioService.playBGM('shop')).resolves.not.toThrow()
     await expect(audioService.playBGM('battle')).resolves.not.toThrow()
+    await expect(audioService.playBGM('results')).resolves.not.toThrow()
   })
 
   it('stopBGM does not throw and resets currentBgm', () => {

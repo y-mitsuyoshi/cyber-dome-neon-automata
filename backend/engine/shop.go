@@ -52,16 +52,12 @@ func RerollShop(shop *models.ShopState, credits int) (int, string) {
 	return credits, ""
 }
 
-// DeleteCard removes a card from the player's deck at the given index. Costs 2 credits.
+// DeleteCard removes a card from the player's deck at the given index. Costs 0 credits (Free).
 func DeleteCard(deck *[]models.Card, credits int, cardIndex int) (int, *models.Card, string) {
 	if cardIndex < 0 || cardIndex >= len(*deck) {
 		return credits, nil, "Invalid card index"
 	}
-	if credits < 2 {
-		return credits, nil, "Not enough credits to delete (costs 2)"
-	}
 
-	credits -= 2
 	deleted := (*deck)[cardIndex]
 	*deck = append((*deck)[:cardIndex], (*deck)[cardIndex+1:]...)
 

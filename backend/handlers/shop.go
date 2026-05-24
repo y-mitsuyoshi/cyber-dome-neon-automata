@@ -203,7 +203,7 @@ func HandleRerollShop(w http.ResponseWriter, r *http.Request) {
 	WritePlayerGameState(w, gs, req.PlayerName)
 }
 
-// HandleDeleteCard removes a card from the player's deck. Costs 2 credits.
+// HandleDeleteCard removes a card from the player's deck. Costs 0 credits (Free).
 // POST /api/shop/delete
 func HandleDeleteCard(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

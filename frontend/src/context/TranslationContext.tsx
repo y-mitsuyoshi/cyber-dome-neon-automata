@@ -117,7 +117,7 @@ const uiDict: Record<Locale, Record<string, string>> = {
     tryRerolling: "Try rerolling for new stock",
     rerollText: "Reroll (1¢)",
     cancelDelete: "Cancel Delete",
-    deleteCardText: "Delete Card",
+    deleteCardText: "Delete Card (Free)",
     enterArenaBtn: "Enter the Arena",
     yourDeckCount: "Your Deck ({count} cards)",
     deckEmpty: "Your deck is empty",
@@ -125,7 +125,7 @@ const uiDict: Record<Locale, Record<string, string>> = {
     deckLabel: "Deck",
     viewDeckBtn: "View Deck",
     deckViewerModalTitle: "DECK COMPONENT MATRIX",
-    deleteInfoText: "EACH DELETION COSTS 2 CREDITS. REMOVED PERMANENTLY.",
+    deleteInfoText: "DELETION IS COMPLETELY FREE. REMOVED PERMANENTLY.",
     
     // CardDisplay / MemorySlots
     memoryLabel: "MEMORY: {filled}/{max}",
@@ -305,7 +305,7 @@ const uiDict: Record<Locale, Record<string, string>> = {
     tryRerolling: "リロールして在庫を更新してください",
     rerollText: "グリッド再ロール (1¢)",
     cancelDelete: "削除キャンセル",
-    deleteCardText: "カード削除 (2¢)",
+    deleteCardText: "カード削除 (無料)",
     enterArenaBtn: "アリーナへ突入する",
     yourDeckCount: "あなたのデッキ ({count} 枚)",
     deckEmpty: "デッキが空です",
@@ -313,7 +313,7 @@ const uiDict: Record<Locale, Record<string, string>> = {
     deckLabel: "デッキ残り",
     viewDeckBtn: "デッキ確認",
     deckViewerModalTitle: "デッキ構成モジュール一覧",
-    deleteInfoText: "1回の削除につき2クレジットを消費します。永久に削除されます。",
+    deleteInfoText: "カードの削除は完全に無料です。永久に削除されます。",
     
     // CardDisplay / MemorySlots
     memoryLabel: "メモリ容量: {filled}/{max}",

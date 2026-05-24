@@ -60,7 +60,9 @@ function App() {
     if (screen === 'title' || screen === 'lobby') {
       playBGM('title');
     } else if (screen === 'game' && gameState) {
-      if (gameState.phase === 'shop') {
+      if (gameState.currentRound > gameState.maxRounds && gameState.phase === 'results') {
+        playBGM('results');
+      } else if (gameState.phase === 'shop') {
         playBGM('shop');
         playSE('shuffle');
       } else if (gameState.phase === 'battle') {
@@ -70,7 +72,7 @@ function App() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, gameState?.phase, playBGM, playSE]);
+  }, [screen, gameState?.phase, gameState?.currentRound, gameState?.maxRounds, playBGM, playSE]);
 
   // WebSocket Hook
   const {
