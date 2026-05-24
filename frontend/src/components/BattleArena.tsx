@@ -85,7 +85,8 @@ function BattleArena({
   const resolvedLog = useMemo(() => {
     if (!battleSession) return null;
     const stepToFind = acknowledgedStep + 1;
-    return battleSession.log.find((l) => l.step === stepToFind) || null;
+    const log = battleSession.log || [];
+    return log.find((l) => l.step === stepToFind) || null;
   }, [battleSession, acknowledgedStep]);
 
   // 1. Symmetrical: Extract player and opponent datasets from session
@@ -93,21 +94,24 @@ function BattleArena({
   
   const myHand = useMemo(() => {
     if (!battleSession) return [];
-    return isP1 ? battleSession.player1Hand : battleSession.player2Hand;
+    const hand = isP1 ? battleSession.player1Hand : battleSession.player2Hand;
+    return hand || [];
   }, [battleSession, isP1]);
 
   const myMem = useMemo(() => {
     if (!battleSession) return [];
-    return isP1 ? battleSession.player1Mem : battleSession.player2Mem;
+    const mem = isP1 ? battleSession.player1Mem : battleSession.player2Mem;
+    return mem || [];
   }, [battleSession, isP1]);
 
   const myMemSlots = useMemo(() => {
-    return myMem.map(slot => Array(slot.count).fill(slot.cardName));
+    return (myMem || []).map(slot => Array(slot.count || 0).fill(slot.cardName));
   }, [myMem]);
 
   const myDiscard = useMemo(() => {
     if (!battleSession) return [];
-    return isP1 ? battleSession.player1Discard : battleSession.player2Discard;
+    const discard = isP1 ? battleSession.player1Discard : battleSession.player2Discard;
+    return discard || [];
   }, [battleSession, isP1]);
 
   const opponentName = useMemo(() => {
@@ -117,21 +121,24 @@ function BattleArena({
 
   const opponentHandCount = useMemo(() => {
     if (!battleSession) return 0;
-    return isP1 ? battleSession.player2Hand.length : battleSession.player1Hand.length;
+    const hand = isP1 ? battleSession.player2Hand : battleSession.player1Hand;
+    return hand ? hand.length : 0;
   }, [battleSession, isP1]);
 
   const opponentMem = useMemo(() => {
     if (!battleSession) return [];
-    return isP1 ? battleSession.player2Mem : battleSession.player1Mem;
+    const mem = isP1 ? battleSession.player2Mem : battleSession.player1Mem;
+    return mem || [];
   }, [battleSession, isP1]);
 
   const opponentMemSlots = useMemo(() => {
-    return opponentMem.map(slot => Array(slot.count).fill(slot.cardName));
+    return (opponentMem || []).map(slot => Array(slot.count || 0).fill(slot.cardName));
   }, [opponentMem]);
 
   const opponentDiscardCount = useMemo(() => {
     if (!battleSession) return 0;
-    return isP1 ? battleSession.player2Discard.length : battleSession.player1Discard.length;
+    const discard = isP1 ? battleSession.player2Discard : battleSession.player1Discard;
+    return discard ? discard.length : 0;
   }, [battleSession, isP1]);
 
   // 2. Identify if local player has already committed this step
@@ -402,12 +409,12 @@ function BattleArena({
       </div>
 
       {/* 4. Bottom Feed Log */}
-      {battleLog.length > 0 && (
+      {(battleLog || []).length > 0 && (
         <div className="relative z-10 max-w-3xl mx-auto w-full mt-4 border border-cyber-border/20 rounded-lg p-2.5 bg-cyber-surface/40 max-h-24 overflow-y-auto font-mono text-[10px]">
           <div className="text-[9px] text-cyber-text-dim uppercase tracking-widest mb-1.5 font-bold">
             {t('combatLogHeader')}
           </div>
-          {battleLog
+          {(battleLog || [])
             .slice(0)
             .reverse()
             .map((log, i) => {
