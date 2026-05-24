@@ -1,12 +1,30 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Flag, Zap, User, Cpu, AlertTriangle, Trash2, Send, Layers } from 'lucide-react';
-import type { BattleLogEntry, BattleSession, Card } from '../types/game';
+import type { BattleLogEntry, BattleSession, Card, BattleLogCard } from '../types/game';
 import MemorySlots from './MemorySlots';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
 import { submitBattleAction } from '../api/client';
 import DeckViewerModal from './DeckViewerModal';
 import { useAudio } from '../context/AudioContext';
+
+const convertToFullCard = (logCard: BattleLogCard): Card => {
+  const attribute = (['Virus', 'AI', 'Hardware', 'Netrunner'].includes(logCard.attribute)
+    ? logCard.attribute
+    : 'Virus') as 'Virus' | 'AI' | 'Hardware' | 'Netrunner';
+
+  return {
+    id: logCard.id || 'default',
+    name: logCard.name,
+    attribute,
+    archetype: 'Control',
+    power: logCard.power,
+    rarity: 'Common',
+    effect: '',
+    effectType: '',
+    cost: 0,
+  };
+};
 
 interface BattleArenaProps {
   gameId: string;
@@ -454,7 +472,7 @@ function BattleArena({
               </span>
               {resolvedLog.p1Action === 'PLAY' && resolvedLog.p1Card ? (
                 <div className="animate-card-reveal transform scale-105">
-                  <CardDisplay card={resolvedLog.p1Card} />
+                  <CardDisplay card={convertToFullCard(resolvedLog.p1Card)} />
                 </div>
               ) : (
                 <div className="w-48 h-72 rounded-lg border-2 border-dashed border-neon-red/35 bg-red-950/10 flex flex-col items-center justify-center p-4 text-center text-neon-red opacity-60">
@@ -510,7 +528,7 @@ function BattleArena({
               </span>
               {resolvedLog.p2Action === 'PLAY' && resolvedLog.p2Card ? (
                 <div className="animate-card-reveal transform scale-105" style={{ animationDelay: '0.2s' }}>
-                  <CardDisplay card={resolvedLog.p2Card} />
+                  <CardDisplay card={convertToFullCard(resolvedLog.p2Card)} />
                 </div>
               ) : (
                 <div className="w-48 h-72 rounded-lg border-2 border-dashed border-neon-red/35 bg-red-950/10 flex flex-col items-center justify-center p-4 text-center text-neon-red opacity-60">
@@ -525,13 +543,14 @@ function BattleArena({
           <div className="text-center pb-4 relative z-10">
             <button
               onClick={() => {
+                if (!battleSession) return;
                 playSE('click');
                 setAcknowledgedStep(battleSession.step);
                 setShowClashOverlay(false);
               }}
               className="px-8 py-3 rounded-lg border-2 border-neon-green text-neon-green font-bold text-xs uppercase tracking-widest hover:bg-neon-green/10 transition-all cursor-pointer shadow-[0_0_15px_rgba(0,255,102,0.15)] animate-pulse"
             >
-              {battleSession.isFinished ? 'CONCLUDE SIMULATION / シミュレーション完了' : 'PROCEED TO NEXT PROTOCOL / 次のターンへ'}
+              {battleSession?.isFinished ? 'CONCLUDE SIMULATION / シミュレーション完了' : 'PROCEED TO NEXT PROTOCOL / 次のターンへ'}
             </button>
           </div>
         </div>

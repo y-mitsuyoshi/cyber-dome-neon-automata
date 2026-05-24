@@ -10,11 +10,22 @@ export interface Card {
   cost: number;
 }
 
+export interface BattleLogCard {
+  id?: string;
+  name: string;
+  power: number;
+  attribute: 'Virus' | 'AI' | 'Hardware' | 'Netrunner' | string;
+}
+
 export interface BattleLogEntry {
   step: number;
   action: string;
   player: string;
-  card: { name: string; power: number; attribute: string } | null;
+  card: BattleLogCard | null;
+  p1Card: BattleLogCard | null;
+  p2Card: BattleLogCard | null;
+  p1Action: string;
+  p2Action: string;
   currentPower: number;
   effectTriggered: string;
   playerMemSlots: string[];

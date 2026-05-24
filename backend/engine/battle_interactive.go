@@ -360,7 +360,7 @@ func StepBattle(session *models.BattleSession) {
 
 	} else if p1Played {
 		// --- ONLY P1 PLAYED ---
-		stepCard = &models.BattleLogCard{Name: c1.Name, Power: p1Power, Attribute: c1.Attribute}
+		stepCard = &models.BattleLogCard{ID: c1.ID, Name: c1.Name, Power: p1Power, Attribute: c1.Attribute}
 		stepAction = "reveal"
 		stepPlayer = session.Player1Name
 		stepDetails = fmt.Sprintf("%s played %s (%d POW). %s discarded.", session.Player1Name, c1.Name, p1Power, session.Player2Name)
@@ -380,7 +380,7 @@ func StepBattle(session *models.BattleSession) {
 
 	} else if p2Played {
 		// --- ONLY P2 PLAYED ---
-		stepCard = &models.BattleLogCard{Name: c2.Name, Power: p2Power, Attribute: c2.Attribute}
+		stepCard = &models.BattleLogCard{ID: c2.ID, Name: c2.Name, Power: p2Power, Attribute: c2.Attribute}
 		stepAction = "reveal"
 		stepPlayer = session.Player2Name
 		stepDetails = fmt.Sprintf("%s played %s (%d POW). %s discarded.", session.Player2Name, c2.Name, p2Power, session.Player1Name)
@@ -422,13 +422,23 @@ func StepBattle(session *models.BattleSession) {
 		session.Player2Hand = append(session.Player2Hand, draw)
 	}
 
-	var p1CardPtr *models.Card
+	var p1CardPtr *models.BattleLogCard
 	if c1Found {
-		p1CardPtr = &c1
+		p1CardPtr = &models.BattleLogCard{
+			ID:        c1.ID,
+			Name:      c1.Name,
+			Power:     c1.Power,
+			Attribute: c1.Attribute,
+		}
 	}
-	var p2CardPtr *models.Card
+	var p2CardPtr *models.BattleLogCard
 	if c2Found {
-		p2CardPtr = &c2
+		p2CardPtr = &models.BattleLogCard{
+			ID:        c2.ID,
+			Name:      c2.Name,
+			Power:     c2.Power,
+			Attribute: c2.Attribute,
+		}
 	}
 
 	// 5. Append step log entry
