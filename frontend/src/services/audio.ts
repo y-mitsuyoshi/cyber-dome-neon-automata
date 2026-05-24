@@ -10,7 +10,11 @@ export type SoundEffectType =
   | 'clash'
   | 'victory'
   | 'defeat'
-  | 'roll';
+  | 'roll'
+  | 'shuffle'
+  | 'cardSelect'
+  | 'fanfare'
+  | 'coin';
 
 export type BGMThemeType = 'title' | 'shop' | 'battle' | 'none';
 
@@ -381,6 +385,122 @@ class ProceduralAudioEngine {
         }
         break;
       }
+
+      case 'shuffle': {
+        // Rapid card flicking sound — filtered noise with pitch sweep
+        const bufferSize = this.ctx.sampleRate * 0.2;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.setValueAtTime(4, now);
+        filter.frequency.setValueAtTime(400, now);
+        filter.frequency.exponentialRampToValueAtTime(2000, now + 0.15);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.linearRampToValueAtTime(0.18, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.seGain);
+
+        noise.start(now);
+        noise.stop(now + 0.22);
+        break;
+      }
+
+      case 'cardSelect': {
+        // Quick, glassy high-pitched ping for selecting a card from hand
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1800, now);
+        osc.frequency.exponentialRampToValueAtTime(3200, now + 0.04);
+
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(800, now);
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.08, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.seGain);
+
+        osc.start(now);
+        osc.stop(now + 0.14);
+        break;
+      }
+
+      case 'coin': {
+        // Bright coin-chime sparkle: two quick ascending tones
+        const playCoinPing = (delay: number, freq: number) => {
+          if (!this.ctx || !this.seGain) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + delay);
+          osc.frequency.exponentialRampToValueAtTime(freq * 2.5, now + delay + 0.06);
+
+          gain.gain.setValueAtTime(0, now + delay);
+          gain.gain.linearRampToValueAtTime(0.12, now + delay + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.15);
+
+          osc.connect(gain);
+          gain.connect(this.seGain);
+
+          osc.start(now + delay);
+          osc.stop(now + delay + 0.18);
+        };
+
+        playCoinPing(0, 880);
+        playCoinPing(0.06, 1320);
+        break;
+      }
+
+      case 'fanfare': {
+        // Grand ascending brass-like fanfare (square wave with filter)
+        const fanfareNotes = [392, 440, 523.25, 659.25, 783.99, 1046.5];
+        fanfareNotes.forEach((freq, i) => {
+          if (!this.ctx || !this.seGain) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+          const delay = i * 0.1;
+
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq, now + delay);
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(600, now + delay);
+          filter.frequency.linearRampToValueAtTime(2000, now + delay + 0.3);
+
+          gain.gain.setValueAtTime(0, now + delay);
+          gain.gain.linearRampToValueAtTime(0.15, now + delay + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.45);
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.seGain);
+
+          osc.start(now + delay);
+          osc.stop(now + delay + 0.5);
+        });
+        break;
+      }
     }
   }
 
@@ -391,7 +511,13 @@ class ProceduralAudioEngine {
       this.bgmIntervalId = null;
     }
     
-    // Stop all active ambient drone oscillators
+    // Smooth gain fade-out before stopping oscillators
+    if (this.ctx && this.bgmGain) {
+      const now = this.ctx.currentTime;
+      this.bgmGain.gain.setTargetAtTime(0, now, 0.15);
+    }
+    
+    // Stop all active ambient drone oscillators after fade
     if (this.ctx && this.droneGain) {
       const now = this.ctx.currentTime;
       this.droneGain.gain.setTargetAtTime(0, now, 0.1);
@@ -403,7 +529,12 @@ class ProceduralAudioEngine {
           }
         });
         this.activeDrones = [];
-      }, 200);
+        
+        // Restore BGM gain only if no new theme has started in the meantime
+        if (this.currentBgm === 'none' && this.ctx && this.bgmGain) {
+          this.bgmGain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        }
+      }, 300);
     }
     
     this.currentBgm = 'none';

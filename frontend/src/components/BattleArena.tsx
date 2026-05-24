@@ -346,7 +346,12 @@ function BattleArena({
               return (
                 <div
                   key={c.id}
-                  onClick={() => !myCommittedAction && setSelectedCardId(c.id)}
+                  onClick={() => {
+                    if (!myCommittedAction) {
+                      playSE('cardSelect');
+                      setSelectedCardId(c.id);
+                    }
+                  }}
                   className={`transition-all duration-300 relative rounded-lg ${
                     myCommittedAction ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'
                   }`}

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Trophy, Star, ChevronRight, User } from 'lucide-react';
 import type { Standing } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
@@ -14,6 +15,7 @@ interface StandingsProps {
 
 function Standings({ standings, round, maxRounds, battleResult, onNext, loading }: StandingsProps) {
   const { playSE } = useAudio();
+  const playedResultRef = useRef(false);
   const sorted = [...standings].sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     return b.fans - a.fans;
@@ -28,6 +30,14 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
   // Check victory/defeat status from original English string
   const isVictory = battleResult.toLowerCase().includes('win') || battleResult.toLowerCase().includes('victory');
   const isDefeat = battleResult.toLowerCase().includes('loss') || battleResult.toLowerCase().includes('lose') || battleResult.toLowerCase().includes('defeat');
+
+  // Play result SE on mount (once)
+  useEffect(() => {
+    if (playedResultRef.current) return;
+    playedResultRef.current = true;
+    if (isVictory) playSE('victory');
+    else if (isDefeat) playSE('defeat');
+  }, [isVictory, isDefeat, playSE]);
 
   return (
     <div className="min-h-screen bg-cyber-dark cyber-grid relative overflow-hidden flex items-center justify-center">

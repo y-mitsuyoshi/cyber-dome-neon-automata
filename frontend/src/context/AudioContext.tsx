@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { audioService } from '../services/audio';
 import type { SoundEffectType, BGMThemeType } from '../services/audio';
 
@@ -36,18 +36,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     const newMuteState = audioService.toggleMute();
     setIsMuted(newMuteState);
-  };
+  }, []);
 
-  const playSE = (type: SoundEffectType) => {
+  const playSE = useCallback((type: SoundEffectType) => {
     audioService.playSE(type);
-  };
+  }, []);
 
-  const playBGM = (theme: BGMThemeType) => {
+  const playBGM = useCallback((theme: BGMThemeType) => {
     audioService.playBGM(theme);
-  };
+  }, []);
 
   return (
     <AudioContext.Provider value={{ isMuted, toggleMute, playSE, playBGM }}>

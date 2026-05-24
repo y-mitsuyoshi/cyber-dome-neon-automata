@@ -37,7 +37,7 @@ function LobbyScreen({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     if (chatMessages.length > 0) {
-      playSE('hover');
+      playSE('click');
     }
   }, [chatMessages]);
 

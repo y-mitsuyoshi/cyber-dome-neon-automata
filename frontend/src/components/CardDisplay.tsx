@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Cpu, Bug, HardDrive, User, Zap } from 'lucide-react';
 import type { Card } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
+import { useAudio } from '../context/AudioContext';
 
 interface CardDisplayProps {
   card: Card;
@@ -20,6 +21,8 @@ const attributeConfig = {
 
 function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false }: CardDisplayProps) {
   const { translateCard, t } = useTranslation();
+  const { playSE } = useAudio();
+  const hoverGuard = useRef<number>(0);
   
   // Translate the card details for rendering
   const displayCard = useMemo(() => translateCard(card), [card, translateCard]);
@@ -60,7 +63,15 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
 
   return (
     <div
-      onClick={disabled ? undefined : onClick}
+      onClick={disabled ? undefined : () => { playSE('click'); onClick?.(); }}
+      onMouseEnter={() => {
+        if (disabled) return;
+        const now = Date.now();
+        if (now - hoverGuard.current > 80) {
+          hoverGuard.current = now;
+          playSE('hover');
+        }
+      }}
       className={`
         relative group rounded-lg border-2 ${rarityStyle.className}
         bg-cyber-surface/80 backdrop-blur-sm

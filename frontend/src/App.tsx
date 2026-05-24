@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Terminal, AlertCircle, ShieldAlert, Volume2, VolumeX } from 'lucide-react';
 import type { GameState } from './types/game';
 import TitleScreen from './components/TitleScreen';
@@ -43,6 +43,17 @@ function App() {
 
   const { locale, setLocale, t } = useTranslation();
 
+  // Error alert sound effect — fire once per new error string
+  const errorSoundGuard = useRef(false);
+  useEffect(() => {
+    if (error && !errorSoundGuard.current) {
+      errorSoundGuard.current = true;
+      playSE('discard');
+    } else if (!error) {
+      errorSoundGuard.current = false;
+    }
+  }, [error, playSE]);
+
   // Procedural BGM Theme Sync Controller
   useEffect(() => {
     if (screen === 'title' || screen === 'lobby') {
@@ -50,13 +61,14 @@ function App() {
     } else if (screen === 'game' && gameState) {
       if (gameState.phase === 'shop') {
         playBGM('shop');
+        playSE('shuffle');
       } else if (gameState.phase === 'battle') {
         playBGM('battle');
       } else {
-        playBGM('shop'); // Keep it chill for standings
+        playBGM('shop');
       }
     }
-  }, [screen, gameState?.phase, playBGM]);
+  }, [screen, gameState?.phase, playBGM, playSE]);
 
   // WebSocket Hook
   const {
@@ -260,6 +272,7 @@ function App() {
   const handleBuyCard = async (index: number) => {
     if (!gameState) return;
     playSE('purchase');
+    playSE('coin');
     setLoading(true);
     setError(null);
     try {
