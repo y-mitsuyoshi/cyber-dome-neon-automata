@@ -68,6 +68,7 @@ function App() {
         playBGM('shop');
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, gameState?.phase, playBGM, playSE]);
 
   // WebSocket Hook
@@ -95,6 +96,7 @@ function App() {
       setError(t('disconnectedMainframe'));
       resetKicked();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kicked]);
 
   // 1. Listen for WS start event
@@ -118,6 +120,7 @@ function App() {
       };
       initGame();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsGameId]);
 
   // 2. Listen for WS round/phase sync event
@@ -142,6 +145,7 @@ function App() {
       };
       syncState();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phaseTrigger]);
 
   // 2.5 Listen for WS battle events
@@ -180,6 +184,7 @@ function App() {
       };
       syncOnReconnect();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected]);
 
   // OFFLINE SOLO START

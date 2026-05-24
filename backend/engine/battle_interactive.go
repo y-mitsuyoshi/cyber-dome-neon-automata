@@ -422,12 +422,25 @@ func StepBattle(session *models.BattleSession) {
 		session.Player2Hand = append(session.Player2Hand, draw)
 	}
 
+	var p1CardPtr *models.Card
+	if c1Found {
+		p1CardPtr = &c1
+	}
+	var p2CardPtr *models.Card
+	if c2Found {
+		p2CardPtr = &c2
+	}
+
 	// 5. Append step log entry
 	logEntry := models.BattleLogEntry{
 		Step:            session.Step,
 		Action:          stepAction,
 		Player:          stepPlayer,
 		Card:            stepCard,
+		P1Card:          p1CardPtr,
+		P2Card:          p2CardPtr,
+		P1Action:        p1Action.ActionType,
+		P2Action:        p2Action.ActionType,
 		CurrentPower:    session.FlagPower,
 		EffectTriggered: stepEffect,
 		PlayerMemSlots:  memSlotNames(session.Player1Mem),

@@ -121,6 +121,7 @@ export const useWebSocket = (code: string | null, name: string | null) => {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, name]);
 
   const sendChatMessage = (text: string) => {
