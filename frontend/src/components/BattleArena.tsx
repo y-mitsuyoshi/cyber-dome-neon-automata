@@ -99,21 +99,17 @@ function BattleArena({
     setSelectedCards([]);
   }, [battleSession?.requiredAction, battleSession?.pendingActionPlayer]);
 
-  // Auto-Play timer effect
+  // Auto-Play timer effect (only triggers when user explicitly enables auto-play)
   useEffect(() => {
-    const shouldAutoStep = isAutoPlay || (isLiveMode && battleSession && battleSession.turnOwner === opponent && opponentIsNPC);
-
-    if (!shouldAutoStep) return;
+    if (!isAutoPlay) return;
 
     if (isLiveMode && battleSession) {
       if (battleSession.isFinished || battleSession.requiredAction !== 'DRAW') {
-        if (isAutoPlay) setIsAutoPlay(false);
+        setIsAutoPlay(false);
         return;
       }
       const timer = setTimeout(() => {
-        onStep().catch(() => {
-          if (isAutoPlay) setIsAutoPlay(false);
-        });
+        onStep().catch(() => setIsAutoPlay(false));
       }, playSpeed);
       return () => clearTimeout(timer);
     } else if (!isLiveMode) {
@@ -126,7 +122,7 @@ function BattleArena({
       }, playSpeed);
       return () => clearTimeout(timer);
     }
-  }, [isAutoPlay, isLiveMode, battleSession, currentLogIndex, battleLog, playSpeed, onStep, opponent, opponentIsNPC]);
+  }, [isAutoPlay, isLiveMode, battleSession, currentLogIndex, battleLog, playSpeed, onStep]);
 
   // Audio/Visual feedback cues
   const lastPlayedIndexRef = useRef<number>(-1);
@@ -687,11 +683,11 @@ function BattleArena({
                     : 'border-cyber-border text-cyber-text bg-cyber-surface/30 hover:bg-cyber-surface/50 font-medium disabled:opacity-40 disabled:cursor-not-allowed'
                 }`}
               >
-                <Play size={14} className={isMyDrawTurn ? 'animate-bounce' : ''} />
+                <Play size={14} className={isMyDrawTurn ? 'animate-bounce' : (isOpponentDrawTurn ? '' : '')} />
                 {isMyDrawTurn ? (
-                  <span>{t('drawNextCard') || 'DRAW CARD / デッキをめくる'}</span>
+                  <span>{t('drawNextCard') || 'DRAW CARD / カードをめくる'}</span>
                 ) : isOpponentDrawTurn ? (
-                  <span>{t('opponentDrawNext') || 'OPPONENT DRAW / 相手がめくる'}</span>
+                  <span>{t('opponentDrawNext') || 'DRAW OPPONENT / 相手のカードをめくる'}</span>
                 ) : (
                   <span>{t('nextStep') || 'NEXT STEP / 進む'}</span>
                 )}

@@ -175,11 +175,14 @@ function App() {
   }, [battleTrigger, gameState, resetBattleTrigger]);
 
   // 3. Auto-resync game state on WebSocket reconnection
+  const gameStateRef = useRef(gameState);
+  gameStateRef.current = gameState;
   useEffect(() => {
-    if (connected && screen === 'game' && gameState) {
+    if (connected && screen === 'game' && gameStateRef.current) {
+      const gs = gameStateRef.current;
       const syncOnReconnect = async () => {
         try {
-          const state = await getGameState(gameState.gameId, gameState.player.name);
+          const state = await getGameState(gs.gameId, gs.player.name);
           setGameState(state);
           if (state.phase === 'battle') {
             setWaitingForBattle(false);
@@ -197,7 +200,7 @@ function App() {
       syncOnReconnect();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, gameState]);
+  }, [connected]);
 
   // OFFLINE SOLO START
   const handleStartSolo = async (name: string) => {
