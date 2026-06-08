@@ -1,7 +1,7 @@
 export interface Card {
   id: string;
   name: string;
-  attribute: string; // Castle, City, Space, Movie, Shipwreck, Ghost, Fairground, None
+  attribute: string; // Mainframe, Sector, Orbit, HoloMedia, DeepWeb, Daemon, Matrix, None
   archetype?: string;
   power: number;
   rarity: string; // Common, Uncommon, Rare, Epic

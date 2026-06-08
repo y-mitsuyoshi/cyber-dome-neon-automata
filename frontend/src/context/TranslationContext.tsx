@@ -206,10 +206,16 @@ const uiDict: Record<Locale, Record<string, string>> = {
     // App Screen
     disconnectedMainframe: "DISCONNECTED: You have been kicked from the tournament mainframe.",
     acknowledgeBtn: "Acknowledge",
-    Virus: "Virus",
-    AI: "AI",
-    Hardware: "Hardware",
-    Netrunner: "Netrunner"
+    Mainframe: "Mainframe",
+    Sector: "Sector",
+    Orbit: "Orbit",
+    HoloMedia: "HoloMedia",
+    DeepWeb: "DeepWeb",
+    Daemon: "Daemon",
+    Matrix: "Matrix",
+    None: "None",
+    units: "Units",
+    initializingArenaLink: "INITIALIZING INTERACTIVE ARENA LINK..."
   },
   ja: {
     // Title Screen
@@ -394,122 +400,205 @@ const uiDict: Record<Locale, Record<string, string>> = {
     // App Screen
     disconnectedMainframe: "接続切断：アリーナのメインフレームからキックされました。",
     acknowledgeBtn: "確認",
-    Virus: "ウイルス",
-    AI: "AI",
-    Hardware: "ハードウェア",
-    Netrunner: "ネットランナー"
+    Mainframe: "メインフレーム",
+    Sector: "セクター",
+    Orbit: "オービット",
+    HoloMedia: "ホロメディア",
+    DeepWeb: "ディープウェブ",
+    Daemon: "デーモン",
+    Matrix: "マトリクス",
+    None: "なし",
+    units: "枚",
+    initializingArenaLink: "電脳アリーナ回線を初期化中..."
   }
 };
 
 // Card Translation Map (80 unique card IDs)
 const cardDictJa: Record<string, { name: string; effect: string }> = {
   // === Starter Cards ===
-  starter_virus_1: { name: "グリッチワーム・ジュニア", effect: "シンプルな攻撃コード（効果なし）" },
-  starter_virus_2: { name: "バッファオーバーフロー・ジュニア", effect: "シンプルな攻撃コード（効果なし）" },
-  starter_ai_1: { name: "線形回帰モデル", effect: "シンプルな学習モデル（効果なし）" },
-  starter_ai_2: { name: "ヒューリスティック・ヘルパー", effect: "シンプルな学習モデル（効果なし）" },
-  starter_hw_1: { name: "銅製バスバー", effect: "シンプルな熱伝導体（効果なし）" },
-  starter_hw_2: { name: "標準シールド", effect: "シンプルな物理シールド（効果なし）" },
-  starter_nr_1: { name: "グリッド・ルーキー", effect: "シンプルなネットワークトレース（効果なし）" },
-  starter_nr_2: { name: "プロキシ・ノード", effect: "シンプルなルーティングホップ（効果なし）" },
-  starter_net_1: { name: "データ・パイプライン", effect: "シンプルな情報転送ライン（効果なし）" },
-  starter_ai_3: { name: "ロジック・ノード", effect: "シンプルな決定木（効果なし）" },
+  starter_scout_1a: { name: "探索ノード", effect: "" },
+  starter_scout_1b: { name: "探索ノード", effect: "" },
+  starter_scout_1c: { name: "探索ノード", effect: "" },
+  starter_scout_2a: { name: "探索ノード", effect: "" },
+  starter_scout_2b: { name: "探索ノード", effect: "" },
+  starter_mascot: { name: "デーモンマスコット", effect: "" },
 
-  // === Virus (virus_001 to virus_020) ===
-  virus_001: { name: "グリッチワーム", effect: "公開時：敵の先頭カードパワーを -2" },
-  virus_002: { name: "データリーチ", effect: "勝利時：敵のデッキからトップカードを永久に削除" },
-  virus_003: { name: "トロジャンスパイク", effect: "公開時：敵の次のカード効果を無効化する" },
-  virus_004: { name: "ワームクラスター", effect: "公開時：敵の先頭カードパワーを -2" },
-  virus_005: { name: "バイトシュレッダー", effect: "勝利時：敵のデッキからトップカードを永久に削除" },
-  virus_006: { name: "プラグパケット", effect: "公開時：敵の次のカード効果を無効化する" },
-  virus_007: { name: "オーバークロックグリッチ", effect: "公開時：自身のデッキトップを削除しパワー +5" },
-  virus_008: { name: "メモリブリード", effect: "公開時：敵の先頭カードパワーを -3" },
-  virus_009: { name: "ランサムウェアプロ", effect: "公開時：敵の先頭カードパワーを -4" },
-  virus_010: { name: "バッファオーバーフロー", effect: "メモリ内の「ウイルス」属性1枚につきパワー +2" },
-  virus_011: { name: "フォーク爆弾", effect: "メモリ内の「ウイルス」属性1枚につきパワー +2" },
-  virus_012: { name: "ロジック爆弾", effect: "メモリ内の「ウイルス」属性1枚につきパワー +2" },
-  virus_013: { name: "ゼロデイ・スパイク", effect: "勝利時：敵のデッキからトップカードを2枚削除" },
-  virus_014: { name: "スパム急流", effect: "直前のカードが「ウイルス」属性だった場合パワー +3" },
-  virus_015: { name: "スパイウェア・ベクタ", effect: "直前のカードが「ウイルス」属性だった場合パワー +3" },
-  virus_016: { name: "ルートキットカーネル", effect: "公開時：自身のデッキトップを削除しパワー +5" },
-  virus_017: { name: "アドウェアポップ", effect: "メモリを占有しているカード1枚につきパワー +1" },
-  virus_018: { name: "フィッシングベイト", effect: "公開時：敵の次のカードをのぞき見る" },
-  virus_019: { name: "シェルコードインジェクタ", effect: "公開時：敵の次のカードをのぞき見る" },
-  virus_020: { name: "マルウェアエンジン", effect: "純粋な高パワー攻撃用プログラム（効果なし）" },
+  // === Deck A ===
+  a_jester: { name: "データジョーカー", effect: "ベンチにパワー1のカードがあれば、パワー+3" },
+  a_hermit: { name: "サンドボックス", effect: "ベンチにセクター（Sector）属性のカードがなければ、パワー+2" },
+  a_stable_boy: { name: "サブネットヘルパー", effect: "ベンチにあるパワー３のカード1枚につき、パワー+1" },
+  a_pig: { name: "データピッグ", effect: "" },
+  a_talent: { name: "ネットアイドル", effect: "" },
+  a_reporter: { name: "パケットスニッファ", effect: "山札から2枚見て、1枚を一番下、1枚を一番上に置く。" },
+  a_rescue_pod: { name: "バックアップポッド", effect: "このカードがフラッグを失う際、このカードを共有デッキに戻し、Bデッキのカード1枚を自分の除外エリアに置く。" },
+  a_ai: { name: "ニューロコア", effect: "このカードがベンチにある場合、自分のパワー2のキャラクターのパワー+1。" },
+  a_shapeshifter: { name: "モーフプログラム", effect: "このカードの選択時、自分のデッキのカード1枚を共有デッキに戻すことで、もう1枚追加で選んで良い。" },
+  a_cow: { name: "サイバーカウ", effect: "" },
+  a_makeup_artist: { name: "アバタースタイリスト", effect: "このカードがベンチにある場合、自分のパワー1のキャラクターの攻撃時、パワー+2" },
+  a_gangster: { name: "グリッドレイダー", effect: "攻撃時、パワー+2" },
+  a_moviestar: { name: "ネットセレブリティ", effect: "ベンチにパワー1か2のホロメディア（HoloMedia）カードがあれば、2枚まで山札の一番上に戻して良い。" },
+  a_cat: { name: "ネコAI", effect: "" },
+  a_merman: { name: "DeepWebエンティティ", effect: "ベンチにディープウェブ（DeepWeb）属性のカードがあれば、パワー+3" },
+  a_treasure: { name: "デクリプトコア", effect: "このカードがフラッグを手に入れたら、パワー+2" },
+  a_sailor: { name: "ネットナビゲーター", effect: "山札を見て、好きなカードを一番下に移動させて良い。" },
+  a_parrot: { name: "データパロット", effect: "" },
+  a_butler: { name: "メモリークリーナー", effect: "ベンチにあるカードを最大2枚まで除外エリアに置いて良い。" },
+  a_skeleton: { name: "スケルトンキー", effect: "このカードがフラッグを手に入れたら、パワー+1。" },
+  a_spider: { name: "ウェブクロウラー", effect: "" },
+  a_clown: { name: "データクラウン", effect: "このカードがフラッグを手に入れたら、★+2" },
+  a_juggler: { name: "タスクスケジューラー", effect: "自分の山札の上から3枚見て、好きな順で戻して良い。" },
+  a_vendor: { name: "ポートスキャナー", effect: "このカードがベンチにある場合、マトリクス（Matrix）属性のパワー+1" },
+  a_pony: { name: "サイバーポニー", effect: "" },
 
-  // === AI (ai_001 to ai_020) ===
-  ai_001: { name: "ニューラルスタック", effect: "メモリ内の「AI」属性1枚につきパワー +2" },
-  ai_002: { name: "ディープラーニング", effect: "メモリ内に同名カードがある場合パワーが2倍" },
-  ai_003: { name: "シナプス・クラスター", effect: "直前のカードが「AI」属性だった場合パワー +3" },
-  ai_004: { name: "帰納的マインド", effect: "メモリ内に同名カードがある場合パワーが2倍" },
-  ai_005: { name: "テンサーコア", effect: "メモリ内の「AI」属性1枚につきパワー +2" },
-  ai_006: { name: "ロジックゲート", effect: "直前のカードが「AI」属性だった場合パワー +3" },
-  ai_007: { name: "ヒューリスティック解法", effect: "メモリ内に同名カードがある場合パワーが2倍" },
-  ai_008: { name: "量子ニューラル", effect: "メモリ内に同名カードがある場合パワーが2倍" },
-  ai_009: { name: "シグモイドノード", effect: "直前のカードが「AI」属性だった場合パワー +3" },
-  ai_010: { name: "勾配降下法", effect: "直前のカードが「AI」属性だった場合パワー +3" },
-  ai_011: { name: "誤差逆伝播エージェント", effect: "メモリ内の「AI」属性1枚につきパワー +2" },
-  ai_012: { name: "GPTエージェント v1", effect: "メモリを占有しているカード1枚につきパワー +1" },
-  ai_013: { name: "GPTエージェント v2", effect: "メモリを占有しているカード1枚につきパワー +1" },
-  ai_014: { name: "AGIメインフレーム", effect: "メモリを占有しているカード1枚につきパワー +2" },
-  ai_015: { name: "パターン認識プログラム", effect: "敵の直前のカードが「AI」属性ならパワー +4" },
-  ai_016: { name: "ボットネット制御機構", effect: "敵の直前のカードが「ウイルス」属性ならパワー +4" },
-  ai_017: { name: "マシンビジョン", effect: "敵の直前のカードが「ネットランナー」属性ならパワー +4" },
-  ai_018: { name: "強化学習エージェント", effect: "自身のデッキ枚数が敵より少ない場合パワー +3" },
-  ai_019: { name: "監視ネットワーク", effect: "公開時：敵の次のカードをのぞき見る" },
-  ai_020: { name: "特異点コア", effect: "巨大なAIデータベースプログラム（効果なし）" },
+  // === Deck B ===
+  b_knight: { name: "コアガード", effect: "攻撃時：相手のトロフィーの数だけパワー+1" },
+  b_blacksmith: { name: "コードオプティマイザ", effect: "このカードがベンチにある場合、セクター（Sector）属性のパワー+1" },
+  b_magician: { name: "魔術師プログラム", effect: "ベンチにパワー3以下のカードがあれば、1枚を除外エリアに置いても良い。" },
+  b_horse: { name: "サイバーホース", effect: "" },
+  b_mascot: { name: "デーモンマスコット", effect: "ベンチにいる属性の種類の数だけパワー+1" },
+  b_dog: { name: "サイバードッグ", effect: "" },
+  b_ufo: { name: "ボイドキャリア", effect: "Aデッキの山札から2枚のカードを見ないで、自分の山札の一番下に追加する。" },
+  b_band: { name: "シナプスバンド", effect: "このカードがベンチにある場合、オービット（Orbit）属性のパワー+1" },
+  b_clone: { name: "レプリカエージェント", effect: "このカードの選択時、★1を得る。" },
+  b_alien: { name: "ゼノウイルス", effect: "" },
+  b_cowboy: { name: "データバガボンド", effect: "このカードがフラッグを手に入れたら、相手の山札の一番上のカードをベンチに送る。" },
+  b_comic: { name: "ホロヒーロー", effect: "このカードがフラッグを失う際、次のキャラクターの攻撃時、パワー+2" },
+  b_director: { name: "シスオペ", effect: "このカードがベンチにある場合、ホロメディア（HoloMedia）属性の攻撃時のパワー+1" },
+  b_lion: { name: "サイバーライオン", effect: "" },
+  b_cook: { name: "システムプロキシ", effect: "このカードがベンチにある場合、フラッグを持っている自分のキャラクターのパワー+1" },
+  b_navigator: { name: "グリッドマッパー", effect: "このカードがフラッグを失う際、山札から2枚見て、1枚を一番下、1枚を一番上に置く。" },
+  b_lifeguard: { name: "システムリカバリー", effect: "このカードが出たとき、山札の残り枚数が1枚以下なら、パワー+2" },
+  b_shark: { name: "サイバーシャーク", effect: "" },
+  b_ghost: { name: "ファントムスヌープ", effect: "相手の山札の一番上のカードを相手の除外エリアに置く。" },
+  b_teenager: { name: "スクリプトキディ", effect: "ベンチにあるデーモン（Daemon）属性のカード1枚につき、パワー+1" },
+  b_necromancer: { name: "リサイクルビン", effect: "ベンチにパワー2のカードがあれば、1枚を山札の一番上に戻して良い。" },
+  b_bat: { name: "サイバーバット", effect: "" },
+  b_mime: { name: "ミラープログラム", effect: "ベンチの空きの数だけ、パワー+1" },
+  b_pyrotechnist: { name: "バッファオーバーロード", effect: "このカードが出たとき、山札の残り枚数が1枚以下なら、★+2" },
+  b_fortune_teller: { name: "予測モデル", effect: "このカードがフラッグを失う際、山札を見て、好きなカードを一番上に移動させて良い。" },
+  b_duck: { name: "サイバーダック", effect: "" },
 
-  // === Hardware (hw_001 to hw_020) ===
-  hw_001: { name: "ファイアウォール・プライム", effect: "メモリに置かれた際、20%の確率でスロットを消費しない" },
-  hw_002: { name: "ICEバリア", effect: "防衛時：敵デッキの最高パワーカードを1ターンロック" },
-  hw_003: { name: "RAM最適化ツール", effect: "メモリに置かれた際、消費スロット数を1減少させる" },
-  hw_004: { name: "量子コア", effect: "メモリに置かれた際、20%の確率でスロットを消費しない" },
-  hw_005: { name: "シリコンシールド", effect: "メモリに置かれた際、消費スロット数を1減少させる" },
-  hw_006: { name: "フラックス・コンデンサ", effect: "防衛時：敵デッキの最高パワーカードを1ターンロック" },
-  hw_007: { name: "RAM拡張パーツ", effect: "メモリに置かれた際、50%の確率でスロットを消費しない" },
-  hw_008: { name: "ソリッドステート・ドライブ", effect: "メモリに置かれた際、50%の確率でスロットを消費しない" },
-  hw_009: { name: "仮想メモリ", effect: "メモリに置かれた際、100%スロットを消費しない" },
-  hw_010: { name: "液体冷却システム", effect: "メモリ内の「ハードウェア」1枚につきパワー +2" },
-  hw_011: { name: "銅製ヒートパイプ", effect: "メモリ内の「ハードウェア」1枚につきパワー +2" },
-  hw_012: { name: "グラフェンヒートシンク", effect: "メモリ内の「ハードウェア」1枚につきパワー +2" },
-  hw_013: { name: "グリッド安定化装置", effect: "直前のカードが「ハードウェア」属性だった場合パワー +3" },
-  hw_014: { name: "マザーボードノード", effect: "直前のカードが「ハードウェア」属性だった場合パワー +3" },
-  hw_015: { name: "ファラデーケージ", effect: "敵の直前のカードが「ハードウェア」属性ならパワー +4" },
-  hw_016: { name: "デコイサーバー", effect: "防衛時：敵デッキの最低パワーカードを1ターンロック" },
-  hw_017: { name: "ハニーポット", effect: "防衛時：敵デッキの最高パワーカードを2ターンロック" },
-  hw_018: { name: "非常用ジェネレータ", effect: "自身のデッキ枚数が敵より多い場合パワー +3" },
-  hw_019: { name: "静的ガード回路", effect: "メモリを占有しているカード1枚につきパワー +1" },
-  hw_020: { name: "メインフレーム筐体", effect: "物理防衛用の超頑丈なシャーシ（効果なし）" },
+  // === Deck C ===
+  c_bard: { name: "シグナルブースター", effect: "このカードがベンチにある場合、自分のキャラクターの攻撃時、パワー+1" },
+  c_prince: { name: "ダミーノード", effect: "このカードがフラッグを失う際、ベンチには置かれず、除外エリアに置かれる。" },
+  c_dragon: { name: "コーポドラゴン", effect: "" },
+  c_champion: { name: "エリートグラディエーター", effect: "" },
+  c_fanbus: { name: "データストリーマー", effect: "自分のトロフィーが3個以下なら★+2" },
+  c_hologram: { name: "ホログラムデコイ", effect: "このカードを出したら、Bデッキの山札から1枚のカードを見ないで、相手の山札の一番上に置く。" },
+  c_geek: { name: "軌道ハッカー", effect: "このカードの選択時、自分のデッキのオービット（Orbit）属性 2枚を共有デッキに戻すことで、もう1枚追加で選んで良い。" },
+  c_slime: { name: "電脳スライム", effect: "" },
+  c_hero: { name: "サイバーヒーロー", effect: "このカードがフラッグを手に入れたら、★+3" },
+  c_trex: { name: "Tウイルスレックス", effect: "" },
+  c_villain: { name: "ヴィランプログラム", effect: "このカードを出したら、Aデッキのカードを1枚見ないで、自分の山札の一番上に置く。" },
+  c_siren: { name: "フィッシングプログラム", effect: "相手のベンチのカード1枚を相手の除外エリアに置いても良い。" },
+  c_kraken: { name: "クラーケンICE", effect: "" },
+  c_submarine: { name: "サブネットダイバー", effect: "自分の山札の一番下のカードを自分の除外エリアに置く。" },
+  c_vampire: { name: "ヴァンパイアICE", effect: "自分のベンチにBデッキのカードがあれば、1枚を山札の一番上に戻して良い。" },
+  c_pumpkin: { name: "ジャックオーランタン", effect: "ベンチにあるカードを最大2枚まで、自分の除外エリアに置いて良い。" },
+  c_werewolf: { name: "電脳ワーウルフ", effect: "" },
+  c_illusionist: { name: "イリュージョニストICE", effect: "このカードがフラッグを手に入れたら、ベンチの空きの数だけ、パワー+1" },
+  c_bumper_car: { name: "トラフィックシェイパー", effect: "自分の山札の上から3枚見て、好きな順で戻して良い。" },
+  c_teddybear: { name: "電脳テディベア", effect: "" }
+};
 
-  // === Netrunner (nr_001 to nr_020) ===
-  nr_001: { name: "ゴーストランナー", effect: "公開時：敵の次のカードをのぞき見る" },
-  nr_002: { name: "暗号化エージェント", effect: "防衛時：30%の確率で攻撃をリダイレクト（フラグホルダーを戻す）" },
-  nr_003: { name: "プロキシシールド", effect: "メモリ内にある間、自身のすべてのカードのパワー +1" },
-  nr_004: { name: "ネオン・ファントム", effect: "公開時：敵の次のカードをのぞき見る" },
-  nr_005: { name: "シャドーブローカー", effect: "防衛時：30%の確率で攻撃をリダイレクト（フラグホルダーを戻す）" },
-  nr_006: { name: "データベール", effect: "メモリ内にある間、自身のすべてのカードのパワー +1" },
-  nr_007: { name: "リダイレクトゲートウェイ", effect: "防衛時：50%の確率で攻撃をリダイレクト（フラグホルダーを戻す）" },
-  nr_008: { name: "暗号化ノード", effect: "メモリ内の「ネットランナー」1枚につきパワー +2" },
-  nr_009: { name: "ダークウェブプロキシ", effect: "メモリ内の「ネットランナー」1枚につきパワー +2" },
-  nr_010: { name: "メインフレームジャック", effect: "メモリ内の「ネットランナー」1枚につきパワー +2" },
-  nr_011: { name: "グリッドウォーク", effect: "直前のカードが「ネットランナー」だった場合パワー +3" },
-  nr_012: { name: "サブネットハッカー", effect: "直前のカードが「ネットランナー」だった場合パワー +3" },
-  nr_013: { name: "シグナルブースター", effect: "メモリ内にある間、自身のすべてのカードのパワー +1" },
-  nr_014: { name: "データブローカー", effect: "メモリ内にある間、自身のすべてのカードのパワー +2" },
-  nr_015: { name: "デッキリサイクラー", effect: "メモリに置かれた際、自身の複製カードをデッキ底に追加" },
-  nr_016: { name: "メモリリーカー", effect: "メモリに置かれた際、自身の複製カードをデッキ底に追加" },
-  nr_017: { name: "デフラグメンタ", effect: "メモリに置かれた際、自身の複製カードをデッキ底に追加" },
-  nr_018: { name: "イントルーダーエージェント", effect: "敵の直前のカードが「ネットランナー」ならパワー +4" },
-  nr_019: { name: "トレースバスター", effect: "敵の直前のカードが「ハードウェア」ならパワー +4" },
-  nr_020: { name: "エリート・オペレータ", effect: "アリーナを支配する凄腕ネットランナー（効果なし）" }
+// Card English Map for locale === 'en'
+const cardDictEn: Record<string, { name: string; effect: string }> = {
+  // === Starter Cards ===
+  starter_scout_1a: { name: "Discovery Node", effect: "" },
+  starter_scout_1b: { name: "Discovery Node", effect: "" },
+  starter_scout_1c: { name: "Discovery Node", effect: "" },
+  starter_scout_2a: { name: "Discovery Node", effect: "" },
+  starter_scout_2b: { name: "Discovery Node", effect: "" },
+  starter_mascot: { name: "Daemon Mascot", effect: "" },
+
+  // === Deck A ===
+  a_jester: { name: "Data Joker", effect: "If there is a card with Power 1 on the bench, Power +3" },
+  a_hermit: { name: "Sandbox", effect: "If there is no Sector card on the bench, Power +2" },
+  a_stable_boy: { name: "Subnet Helper", effect: "For each card with Power 3 on the bench, Power +1" },
+  a_pig: { name: "Data Pig", effect: "" },
+  a_talent: { name: "Net Idol", effect: "" },
+  a_reporter: { name: "Packet Sniffer", effect: "Look at the top 2 cards of your deck, put 1 on the bottom and 1 on the top." },
+  a_rescue_pod: { name: "Backup Pod", effect: "When this card loses the flag, return it to the shared deck and put 1 Deck B card into your memory." },
+  a_ai: { name: "Neuro Core", effect: "If this card is on the bench, your Power 2 characters gain Power +1." },
+  a_shapeshifter: { name: "Morph Program", effect: "When choosing this card, you may return 1 card from your deck to the shared deck to choose 1 more." },
+  a_cow: { name: "Cyber Cow", effect: "" },
+  a_makeup_artist: { name: "Avatar Stylist", effect: "If this card is on the bench, your Power 1 characters gain Power +2 when attacking." },
+  a_gangster: { name: "Grid Raider", effect: "When attacking, Power +2" },
+  a_moviestar: { name: "Net Celebrity", effect: "If there is a Power 1 or 2 HoloMedia card on the bench, you may return up to 2 cards to the top of your deck." },
+  a_cat: { name: "Cat AI", effect: "" },
+  a_merman: { name: "DeepWeb Entity", effect: "If there is a DeepWeb card on the bench, Power +3" },
+  a_treasure: { name: "Decrypt Core", effect: "When this card claims the flag, Power +2" },
+  a_sailor: { name: "Net Navigator", effect: "Look through your deck and you may move any card to the bottom." },
+  a_parrot: { name: "Data Parrot", effect: "" },
+  a_butler: { name: "Memory Cleaner", effect: "You may place up to 2 cards from your bench into the memory (discard) area." },
+  a_skeleton: { name: "Skeleton Key", effect: "When this card claims the flag, Power +1." },
+  a_spider: { name: "Web Crawler", effect: "" },
+  a_clown: { name: "Data Clown", effect: "When this card claims the flag, Stars +2" },
+  a_juggler: { name: "Task Scheduler", effect: "Look at the top 3 cards of your deck and return them in any order." },
+  a_vendor: { name: "Port Scanner", effect: "If this card is on the bench, Matrix cards gain Power +1." },
+  a_pony: { name: "Cyber Pony", effect: "" },
+
+  // === Deck B ===
+  b_knight: { name: "Core Guard", effect: "When attacking, Power +1 for each opponent trophy." },
+  b_blacksmith: { name: "Code Optimizer", effect: "If this card is on the bench, Sector cards gain Power +1." },
+  b_magician: { name: "Magician Program", effect: "If there is a card with Power 3 or less on the bench, you may place 1 card into the memory area." },
+  b_horse: { name: "Cyber Horse", effect: "" },
+  b_mascot: { name: "Daemon Mascot", effect: "Power +1 for each unique attribute on the bench." },
+  b_dog: { name: "Cyber Dog", effect: "" },
+  b_ufo: { name: "Void Carrier", effect: "Look at the top 2 cards of Deck A without revealing, and add them to the bottom of your deck." },
+  b_band: { name: "Synapse Band", effect: "If this card is on the bench, Orbit cards gain Power +1." },
+  b_clone: { name: "Replica Agent", effect: "When choosing this card, gain 1 Star." },
+  b_alien: { name: "Xenovirus", effect: "" },
+  b_cowboy: { name: "Data Vagabond", effect: "When this card claims the flag, send the opponent's top deck card to the bench." },
+  b_comic: { name: "Holo Hero", effect: "When this card loses the flag, the next character gains Power +2 on attack." },
+  b_director: { name: "SysOp", effect: "If this card is on the bench, HoloMedia cards gain Power +1 on attack." },
+  b_lion: { name: "Cyber Lion", effect: "" },
+  b_cook: { name: "System Proxy", effect: "If this card is on the bench, your flag holder gains Power +1." },
+  b_navigator: { name: "Grid Mapper", effect: "When this card loses the flag, look at the top 2 cards of your deck, put 1 on the bottom and 1 on the top." },
+  b_lifeguard: { name: "System Recovery", effect: "When played, if your deck has 1 or fewer cards, Power +2." },
+  b_shark: { name: "Cyber Shark", effect: "" },
+  b_ghost: { name: "Phantom Snoop", effect: "Place the opponent's top deck card into their memory area." },
+  b_teenager: { name: "Script Kiddie", effect: "For each Daemon card on the bench, Power +1." },
+  b_necromancer: { name: "Recycle Bin", effect: "If there is a card with Power 2 on the bench, you may return 1 card to the top of your deck." },
+  b_bat: { name: "Cyber Bat", effect: "" },
+  b_mime: { name: "Mirror Program", effect: "Power +1 for each empty slot on the bench." },
+  b_pyrotechnist: { name: "Buffer Overload", effect: "When played, if your deck has 1 or fewer cards, Stars +2." },
+  b_fortune_teller: { name: "Predictive Model", effect: "When this card loses the flag, look through your deck and you may move any card to the top." },
+  b_duck: { name: "Cyber Duck", effect: "" },
+
+  // === Deck C ===
+  c_bard: { name: "Signal Booster", effect: "If this card is on the bench, your characters gain Power +1 when attacking." },
+  c_prince: { name: "Dummy Node", effect: "When this card loses the flag, it is sent to the memory area instead of the bench." },
+  c_dragon: { name: "Corpo Dragon", effect: "" },
+  c_champion: { name: "Elite Gladiator", effect: "" },
+  c_fanbus: { name: "Data Streamer", effect: "If you have 3 or fewer trophies, Stars +2." },
+  c_hologram: { name: "Hologram Decoy", effect: "When played, place 1 random card from Deck B onto the top of the opponent's deck." },
+  c_geek: { name: "Orbital Hacker", effect: "When choosing this card, you may return 2 Orbit cards from your deck to the shared deck to choose 1 more." },
+  c_slime: { name: "Cyber Slime", effect: "" },
+  c_hero: { name: "Cyber Hero", effect: "When this card claims the flag, Stars +3." },
+  c_trex: { name: "T-Virus Rex", effect: "" },
+  c_villain: { name: "Villain Program", effect: "When played, place 1 random card from Deck A onto the top of your deck." },
+  c_siren: { name: "Phishing Program", effect: "You may place 1 card from the opponent's bench into their memory area." },
+  c_kraken: { name: "Kraken ICE", effect: "" },
+  c_submarine: { name: "Subnet Diver", effect: "Place the bottom card of your deck into your memory area." },
+  c_vampire: { name: "Vampire ICE", effect: "If there is a Deck B card on your bench, you may return 1 card to the top of your deck." },
+  c_pumpkin: { name: "Jack-o'-Lantern", effect: "You may place up to 2 cards from your bench into your memory area." },
+  c_werewolf: { name: "Cyber Werewolf", effect: "" },
+  c_illusionist: { name: "Illusionist ICE", effect: "When this card claims the flag, Power +1 for each empty slot on the bench." },
+  c_bumper_car: { name: "Traffic Shaper", effect: "Look at the top 3 cards of your deck and return them in any order." },
+  c_teddybear: { name: "Cyber Teddybear", effect: "" }
 };
 
 // Attribute, Archetype, Rarity translations
 const attributeJa: Record<string, string> = {
-  Virus: "ウイルス",
-  AI: "AI",
-  Hardware: "ハードウェア",
-  Netrunner: "ネットランナー"
+  Mainframe: "メインフレーム",
+  Sector: "セクター",
+  Orbit: "オービット",
+  HoloMedia: "ホロメディア",
+  DeepWeb: "ディープウェブ",
+  Daemon: "デーモン",
+  Matrix: "マトリクス",
+  None: "なし"
 };
 
 const archetypeJa: Record<string, string> = {
@@ -524,110 +613,83 @@ const rarityJa: Record<string, string> = {
   Epic: "エピック"
 };
 
-// English Card Name to Japanese Card Name mapping (80 unique cards)
-const enCardNameToJa: Record<string, string> = {
-  // Starter Cards
-  "Glitch Worm Jr.": "グリッチワーム・ジュニア",
-  "Buffer Overflow Jr.": "バッファオーバーフロー・ジュニア",
-  "Linear Regressor": "線形回帰モデル",
-  "Heuristic Helper": "ヒューリスティック・ヘルパー",
-  "Copper Busbar": "銅製バスバー",
-  "Standard Shield": "標準シールド",
-  "Grid Rookie": "グリッド・ルーキー",
-  "Proxy Node": "プロキシ・ノード",
-  "Data Pipeline": "データ・パイプライン",
-  "Logic Node": "ロジック・ノード",
-
-  // Virus
-  "Glitch Worm": "グリッチワーム",
-  "Data Leech": "データリーチ",
-  "Trojan Spike": "トロジャンスパイク",
-  "Worm Cluster": "ワームクラスター",
-  "Byte Shredder": "バイトシュレッダー",
-  "Plague Packet": "プラグパケット",
-  "Overclock Glitch": "オーバークロックグリッチ",
-  "Memory Bleed": "メモリブリード",
-  "Ransomware Pro": "ランサムウェアプロ",
-  "Buffer Overflow": "バッファオーバーフロー",
-  "Fork Bomb": "フォーク爆弾",
-  "Logic Bomb": "ロジック爆弾",
-  "Zero Day Spike": "ゼロデイ・スパイク",
-  "Spam Torrent": "スパム急流",
-  "Spyware Vector": "スパイウェア・ベクタ",
-  "Rootkit Kernel": "ルートキットカーネル",
-  "Adware Pop": "アドウェアポップ",
-  "Phishing Bait": "フィッシングベイト",
-  "Shellcode Injector": "シェルコードインジェクタ",
-  "Malware Engine": "マルウェアエンジン",
-
-  // AI
-  "Neural Stack": "ニューラルスタック",
-  "Deep Learning": "ディープラーニング",
-  "Synapse Cluster": "シナプス・クラスター",
-  "Recursive Mind": "帰納的マインド",
-  "Tensor Core": "テンサーコア",
-  "Logic Gate": "ロジックゲート",
-  "Heuristic Solver": "ヒューリスティック解法",
-  "Quantum Neural": "量子ニューラル",
-  "Sigmoid Node": "シグモイドノード",
-  "Gradient Descent": "勾配降下法",
-  "Backprop Agent": "誤差逆伝播エージェント",
-  "GPT Agent v1": "GPTエージェント v1",
-  "GPT Agent v2": "GPTエージェント v2",
-  "AGI Mainframe": "AGIメインフレーム",
-  "Pattern Recognizer": "パターン認識プログラム",
-  "Botnet Controller": "ボットネット制御機構",
-  "Machine Vision": "マシンビジョン",
-  "Reinforcement Learner": "強化学習エージェント",
-  "Supervised Net": "監視ネットワーク",
-  "Singularity Core": "特異点コア",
-
-  // Hardware
-  "Firewall Prime": "ファイアウォール・プライム",
-  "ICE Barrier": "ICEバリア",
-  "RAM Optimizer": "RAM最適化ツール",
-  "Quantum Core": "量子コア",
-  "Silicon Shield": "シリコンシールド",
-  "Flux Capacitor": "フラックス・コンデンサ",
-  "RAM Expander": "RAM拡張パーツ",
-  "Solid State Drive": "ソリッドステート・ドライブ",
-  "Virtual Memory": "仮想メモリ",
-  "Liquid Cooler": "液体冷却システム",
-  "Copper Heatpipe": "銅製ヒートパイプ",
-  "Graphene Heatsink": "グラフェンヒートシンク",
-  "Grid Stabilizer": "グリッド安定化装置",
-  "Motherboard Node": "マザーボードノード",
-  "Faraday Cage": "ファラデーケージ",
-  "Decoy Server": "デコイサーバー",
-  "Honey Pot": "ハニーポット",
-  "Backup Generator": "非常用ジェネレータ",
-  "Static Guard": "静的ガード回路",
-  "Mainframe Chassis": "メインフレーム筐体",
-
-  // Netrunner
-  "Ghost Runner": "ゴーストランナー",
-  "Cipher Agent": "暗号化エージェント",
-  "Proxy Shield": "プロキシシールド",
-  "Neon Phantom": "ネオン・ファントム",
-  "Shadow Broker": "シャドーブローカー",
-  "Data Veil": "データベール",
-  "Redirect Gateway": "リダイレクトゲートウェイ",
-  "Encrypted Node": "暗号化ノード",
-  "Dark Web Proxy": "ダークウェブプロキシ",
-  "Mainframe Jack": "メインフレームジャック",
-  "Grid Walk": "グリッドウォーク",
-  "Subnet Hacker": "サブネットハッカー",
-  "Signal Booster": "シグナルブースター",
-  "Data Broker": "データブローカー",
-  "Deck Recycler": "デッキリサイクラー",
-  "Memory Leaker": "メモリリーカー",
-  "Defragmenter": "デフラグメンタ",
-  "Intruder Agent": "イントルーダーエージェント",
-  "Trace Buster": "トレースバスター",
-  "Elite Operative": "エリート・オペレータ"
+// Japanese Card Name to English mapping for logs and display names
+const jaCardNameToEn: Record<string, string> = {
+  "探索ノード": "Discovery Node",
+  "デーモンマスコット": "Daemon Mascot",
+  "データジョーカー": "Data Joker",
+  "サンドボックス": "Sandbox",
+  "サブネットヘルパー": "Subnet Helper",
+  "データピッグ": "Data Pig",
+  "ネットアイドル": "Net Idol",
+  "パケットスニッファ": "Packet Sniffer",
+  "バックアップポッド": "Backup Pod",
+  "ニューロコア": "Neuro Core",
+  "モーフプログラム": "Morph Program",
+  "サイバーカウ": "Cyber Cow",
+  "アバタースタイリスト": "Avatar Stylist",
+  "グリッドレイダー": "Grid Raider",
+  "ネットセレブリティ": "Net Celebrity",
+  "ネコAI": "Cat AI",
+  "DeepWebエンティティ": "DeepWeb Entity",
+  "デクリプトコア": "Decrypt Core",
+  "ネットナビゲーター": "Net Navigator",
+  "データパロット": "Data Parrot",
+  "メモリークリーナー": "Memory Cleaner",
+  "スケルトンキー": "Skeleton Key",
+  "ウェブクロウラー": "Web Crawler",
+  "データクラウン": "Data Clown",
+  "タスクスケジューラー": "Task Scheduler",
+  "ポートスキャナー": "Port Scanner",
+  "サイバーポニー": "Cyber Pony",
+  "コアガード": "Core Guard",
+  "コードオプティマイザ": "Code Optimizer",
+  "魔術師プログラム": "Magician Program",
+  "サイバーホース": "Cyber Horse",
+  "サイバードッグ": "Cyber Dog",
+  "ボイドキャリア": "Void Carrier",
+  "シナプスバンド": "Synapse Band",
+  "レプリカエージェント": "Replica Agent",
+  "ゼノウイルス": "Xenovirus",
+  "データバガボンド": "Data Vagabond",
+  "ホロヒーロー": "Holo Hero",
+  "シスオペ": "SysOp",
+  "サイバーライオン": "Cyber Lion",
+  "システムプロキシ": "System Proxy",
+  "グリッドマッパー": "Grid Mapper",
+  "システムリカバリー": "System Recovery",
+  "サイバーシャーク": "Cyber Shark",
+  "ファントムスヌープ": "Phantom Snoop",
+  "スクリプトキディ": "Script Kiddie",
+  "リサイクルビン": "Recycle Bin",
+  "サイバーバット": "Cyber Bat",
+  "ミラープログラム": "Mirror Program",
+  "バッファオーバーロード": "Buffer Overload",
+  "予測モデル": "Predictive Model",
+  "サイバーダック": "Cyber Duck",
+  "シグナルブースター": "Signal Booster",
+  "ダミーノード": "Dummy Node",
+  "コーポドラゴン": "Corpo Dragon",
+  "エリートグラディエーター": "Elite Gladiator",
+  "データストリーマー": "Data Streamer",
+  "ホログラムデコイ": "Hologram Decoy",
+  "軌道ハッカー": "Orbital Hacker",
+  "電脳スライム": "Cyber Slime",
+  "サイバーヒーロー": "Cyber Hero",
+  "Tウイルスレックス": "T-Virus Rex",
+  "ヴィランプログラム": "Villain Program",
+  "フィッシングプログラム": "Phishing Program",
+  "クラーケンICE": "Kraken ICE",
+  "サブネットダイバー": "Subnet Diver",
+  "ヴァンパイアICE": "Vampire ICE",
+  "ジャックオーランタン": "Jack-o'-Lantern",
+  "電脳ワーウルフ": "Cyber Werewolf",
+  "イリュージョニストICE": "Illusionist ICE",
+  "トラフィックシェイパー": "Traffic Shaper",
+  "電脳テディベア": "Cyber Teddybear"
 };
 
-export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const saved = localStorage.getItem('cyber_dome_locale');
     if (saved === 'ja' || saved === 'en') {
@@ -655,8 +717,11 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // Localizes a card on-the-fly without casting as any
   const translateCard = useCallback((card: Card): LocalizedCard => {
     if (locale === 'en') {
+      const enInfo = cardDictEn[card.id];
       return {
         ...card,
+        name: enInfo ? enInfo.name : card.name,
+        effect: enInfo ? enInfo.effect : card.effect,
         attribute: card.attribute,
         archetype: card.archetype || '',
         rarity: card.rarity
@@ -674,101 +739,65 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [locale]);
 
   const translateCardName = useCallback((name: string): string => {
-    if (locale === 'en' || !name) return name;
-    return enCardNameToJa[name] || name;
+    if (!name) return name;
+    if (locale === 'en') {
+      return jaCardNameToEn[name] || name;
+    }
+    return name;
   }, [locale]);
 
-  // Translates complex backend battle detail strings to Japanese
+  // Translates complex backend battle detail strings to English / Japanese
   const translateBattleDetail = useCallback((detail: string): string => {
-    if (locale === 'en' || !detail) return detail;
+    if (!detail) return detail;
     let translated = detail;
 
-    // Apply translations recursively based on phrases
-    const phrases = [
-      // Hand play interactive logs
-      { en: "Clash! (.*) \\((\\d+) POW\\) vs (.*) \\((\\d+) POW\\)", ja: "アリーナ激突：$1 ($2 POW) vs $3 ($4 POW)" },
-      { en: "(.*) played (.*) \\((\\d+) POW\\)\\. (.*) discarded\\.", ja: "$1 が $2 ($3 POW) をアリーナに展開。$4 は手札を廃棄。" },
-      { en: "Both players chose to discard\\. Grid matrix is stagnant\\.", ja: "双方とも手札を廃棄。電脳アリーナのエネルギーは膠着しています。" },
-      { en: "Memory Overflow! (.*) has exhausted unique memory capacity limit\\.", ja: "メモリオーバーフロー！$1 はユニークメモリの許容限界に達しました。" },
-      { en: "Tournament Grid Exhausted\\. (.*) claims absolute dominance!", ja: "電脳グリッド完全消費。$1 がアリーナの支配権を掌握しました！" },
+    if (locale === 'en') {
+      // 1. Replace all Japanese card names with English
+      Object.entries(jaCardNameToEn).forEach(([jaName, enName]) => {
+        translated = translated.replace(new RegExp(jaName, 'g'), enName);
+      });
 
-      { en: "claims the flag", ja: "がフラグを確保しました" },
-      { en: "Challenger cumulative power:", ja: "挑戦者の累積パワー：" },
-      { en: "vs flag:", ja: "対 フラグパワー：" },
-      { en: "cannot draw", ja: "がカードを引けません" },
-      { en: "No cards left", ja: "残りカードがありません" },
-      { en: "ran out of cards", ja: "のカードが尽きました" },
-      { en: "Card sent to memory", ja: "カードがメモリに送られました" },
-      { en: "benched to", ja: "がベンチメモリに送られました" },
-      { en: "memory overflow", ja: "メモリがオーバーフローしました" },
-      { en: "recycled: appended to owner's deck", ja: "が再利用され、オーナーのデッキに追加されました" },
-      { en: "On-win effect triggered", ja: "勝利時効果が発動" },
-      { en: "Defend effect from memory", ja: "メモリからの防衛効果が発動" },
-      { en: "Flag redirected!", ja: "フラグがリダイレクトされました！" },
-      { en: "Redirect successful", ja: "リダイレクト成功" },
-      { en: "Flag claimed by", ja: "フラグ確保：" },
-      { en: "now holds the flag with power", ja: "がパワーでフラグを保持しています：" },
-      { en: "wins — both decks exhausted", ja: "が勝利しました（両者のデッキ切れ）" },
-      { en: "Player wins — CPU has no cards to challenge", ja: "プレイヤーの勝利（CPUの挑戦カード不足）" },
-      { en: "CPU wins — Player has no cards to challenge", ja: "CPUの勝利（プレイヤーの挑戦カード不足）" },
-      { en: "Battle ended due to step limit", ja: "ステップ数上限に達したため戦闘を終了します" },
-      { en: "No opponent matched this round (Bye)", ja: "このラウンドは対戦相手がいません（不戦勝）" },
-      { en: "received a bye in this round.", ja: "はこのラウンド不戦勝（BYE）となりました。" },
-      { en: "received a bye.", ja: "は不戦勝となりました。" },
+      // 2. Apply translations for battle log patterns
+      const phrasesEn = [
+        { pattern: /ベンチのパワー3カード数 \((\d+)\) 分パワー\+(\d+)/, replacement: "Power +$2 for $1 Power 3 cards on bench" },
+        { pattern: /ベンチのデーモン属性数 \((\d+)\) 分パワー\+(\d+)/, replacement: "Power +$2 for $1 Daemon cards on bench" },
+        { pattern: /ベンチの空き数 \((\d+)\) 分パワー\+(\d+)/, replacement: "Power +$2 for $1 empty slots on bench" },
+        { pattern: /相手の山札から (.*) を除外エリアへ送りました/, replacement: "Sent opponent's top card $1 to the banish zone" },
+        { pattern: /Bデッキから1枚、相手の山札の上に置きました/, replacement: "Placed 1 card from Deck B onto opponent's deck" },
+        { pattern: /Aデッキから1枚、自分の山札の上に置きました/, replacement: "Placed 1 card from Deck A onto your deck" },
+        { pattern: /自分の山札の底から (.*) を除外エリアへ送りました/, replacement: "Sent $1 from the bottom of your deck to the banish zone" },
+        { pattern: /(.*) は (.*) を山札の上に、(.*) を山札の下に置きました/, replacement: "$1 placed $2 on top of the deck, and $3 on the bottom" },
+        { pattern: /(.*) は山札の上3枚を並び替えました/, replacement: "$1 reordered the top 3 cards of the deck" },
+        { pattern: /(.*) は (.*) を山札の一番下に移動しました/, replacement: "$1 moved $2 to the bottom of the deck" },
+        { pattern: /(.*) はベンチから (.*) を除外エリアへ送りました/, replacement: "$1 banished $2 from the bench" },
+        { pattern: /(.*) は魔術師の効果でベンチから (.*) を除外しました/, replacement: "$1 banished $2 from the bench via Magician's effect" },
+        { pattern: /(.*) はバンパイアの効果でベンチから (.*) を山札の上に戻しました/, replacement: "$1 returned $2 from the bench to the top of the deck via Vampire's effect" },
+        { pattern: /(.*) はムービースターの効果でベンチから映画カード (.*) を山札の上に戻しました/, replacement: "$1 returned HoloMedia card $2 from the bench to the top of the deck via MovieStar's effect" },
+        { pattern: /(.*) はサイレンの効果で相手のベンチから (.*) を除外しました/, replacement: "$1 banished $2 from the opponent's bench via Siren's effect" },
+        { pattern: /プリンスがフラッグを失ったため、ベンチではなく除外エリアに送られました/, replacement: "Since Dummy Node lost the flag, it was sent to the banish zone instead of the bench" },
+        { pattern: /レスキューポッドがフラッグを失い、除外されました/, replacement: "Backup Pod lost the flag and was banished" },
+        { pattern: /メモリ上限超過！ (.*) のベンチが満杯になり敗北しました/, replacement: "Memory capacity exceeded! $1's bench is full, resulting in defeat" },
+        { pattern: /カウボーイの効果でベンチへ送られたカードにより、(.*) のベンチが溢れて敗北しました/, replacement: "Opponent's bench overflowed and defeated due to Data Vagabond's effect" },
+        { pattern: /カウボーイの効果で相手の山札の上の (.*) をベンチに送りました/, replacement: "Sent opponent's top card $1 to the bench via Data Vagabond's effect" },
+        { pattern: / \(イリュージョニスト効果でパワー\+(\d+)\)/, replacement: " (Power +$1 via Illusionist effect)" },
+        { pattern: /(.*) がフラッグを奪いました！防衛パワー: (\d+)/, replacement: "$1 claimed the flag! Defense Power: $2" },
+        { pattern: /対戦相手 (.*) の山札がなくなりました。(.*) の勝利です！/, replacement: "Opponent $1 has no cards left. $2 wins!" },
+      ];
 
-      // Card reveal phrases
-      { en: "reduces flag holder power by 2 \\(now (\\d+)\\)", ja: "がフラグホルダーのパワーを2減少させました（現在：$1）" },
-      { en: "reduces flag holder power by 3 \\(now (\\d+)\\)", ja: "がフラグホルダーのパワーを3減少させました（現在：$1）" },
-      { en: "reduces flag holder power by 4 \\(now (\\d+)\\)", ja: "がフラグホルダーのパワーを4減少させました（現在：$1）" },
-      { en: "nullifies the next enemy card effect", ja: "が敵の次のカード効果を無効化しました" },
-      { en: "gains \\+(\\d+) power \\((\\d+) AI in memory\\)", ja: "がパワー +$1 を獲得しました（メモリ内のAIカード数：$2）" },
-      { en: "gains \\+(\\d+) power \\((\\d+) Virus in memory\\)", ja: "がパワー +$1 を獲得しました（メモリ内のウイルスカード数：$2）" },
-      { en: "gains \\+(\\d+) power \\((\\d+) Hardware in memory\\)", ja: "がパワー +$1 を獲得しました（メモリ内のハードウェアカード数：$2）" },
-      { en: "gains \\+(\\d+) power \\((\\d+) Netrunner in memory\\)", ja: "がパワー +$1 を獲得しました（メモリ内のネットランナーカード数：$2）" },
-      { en: "gains \\+(\\d+) power \\((\\d+) total cards benched\\)", ja: "がパワー +$1 を獲得しました（ベンチメモリの合計カード数：$2）" },
-      { en: "power doubled \\(same name in memory\\) -> (\\d+)", ja: "のパワーが2倍になりました（メモリに同名カードあり）：$1" },
-      { en: "No same-name card in memory", ja: "メモリに同名カードがありません" },
-      { en: "gains \\+3 power \\(previous card was AI\\)", ja: "がパワー +3 を獲得しました（前のカードがAI属性）" },
-      { en: "gains \\+3 power \\(previous card was Virus\\)", ja: "がパワー +3 を獲得しました（前のカードがウイルス属性）" },
-      { en: "gains \\+3 power \\(previous card was Hardware\\)", ja: "がパワー +3 を獲得しました（前のカードがハードウェア属性）" },
-      { en: "gains \\+3 power \\(previous card was Netrunner\\)", ja: "がパワー +3 を獲得しました（前のカードがネットランナー属性）" },
-      { en: "Previous card was not", ja: "前のカードが以下ではありませんでした：" },
-      { en: "gains \\+4 power vs AI flag holder", ja: "がパワー +4 を獲得しました（敵フラグホルダーがAI属性）" },
-      { en: "gains \\+4 power vs Virus flag holder", ja: "がパワー +4 を獲得しました（敵フラグホルダーがウイルス属性）" },
-      { en: "gains \\+4 power vs Hardware flag holder", ja: "がパワー +4 を獲得しました（敵フラグホルダーがハードウェア属性）" },
-      { en: "gains \\+4 power vs Netrunner flag holder", ja: "がパワー +4 を獲得しました（敵フラグホルダーがネットランナー属性）" },
-      { en: "Enemy flag holder is not", ja: "敵フラグホルダーが以下ではありませんでした：" },
-      { en: "gains \\+3 power \\(own deck (\\d+) vs enemy (\\d+)\\)", ja: "がパワー +3 を獲得しました（自身デッキ $1枚 vs 敵 $2枚）" },
-      { en: "is not smaller than enemy's", ja: "は敵デッキより少なくありません" },
-      { en: "is not larger than enemy's", ja: "は敵デッキより多くありません" },
-      { en: "deleted own card (\\S+) to gain \\+5 power \\(total (\\d+)\\)", ja: "が自身のカード $1 を削除してパワー +5 を獲得しました（合計パワー：$2）" },
-      { en: "found own deck empty, no card to delete", ja: "のデッキが空のため、削除するカードがありませんでした" },
-      { en: "peeks: enemy next card is (\\S+) \\(power (\\d+)\\)", ja: "が敵デッキトップをのぞき見しました：$1（パワー $2）" },
-      { en: "peeks: enemy deck is empty", ja: "が敵デッキトップをのぞき見しました：デッキは空です" },
-      { en: "Bench bonus applied: \\+(\\d+) power", ja: "ベンチボーナス適用：パワー +$1" },
-      { en: "No effect on reveal", ja: "公開時効果はありません" },
-      { en: "No effect", ja: "効果なし" },
+      phrasesEn.forEach(({ pattern, replacement }) => {
+        translated = translated.replace(pattern, replacement);
+      });
 
-      // Defend / Win Card details
-      { en: "locks enemy card (\\S+) \\(power (\\d+)\\) with double security", ja: "が敵のカード $1（パワー $2）を強力にロックしました" },
-      { en: "locks enemy card (\\S+) \\(power (\\d+)\\)", ja: "が敵のカード $1（パワー $2）をロックしました" },
-      { en: "No enemy card to lock", ja: "ロックする敵カードがありません" },
-      { en: "REDIRECTED! Flag holder swaps back", ja: "リダイレクト発動！フラグホルダーが攻撃元に引き戻されました" },
-      { en: "redirect failed", ja: "リダイレクト失敗" },
-      { en: "deleted enemy card: (\\S+)", ja: "が敵デッキからカード $1 を永久に削除しました" },
-      { en: "deleted enemy cards: \\[(.*)\\]", ja: "が敵デッキからカード $1 を永久に削除しました" }
-    ];
+    } else {
+      // locale === 'ja'
+      const phrasesJa = [
+        { pattern: /(.*) has no cards left in deck. (.*) wins!/, replacement: "$1 の山札がなくなりました。$2 の勝利です！" },
+        { pattern: /(.*) played (.*) \(Power: (\d+)\)/, replacement: "$1 が $2 (パワー: $3) をプレイしました" },
+      ];
 
-    // Localize card names dynamically inside logs too using enCardNameToJa mapping
-    Object.keys(enCardNameToJa).forEach(enName => {
-      const escaped = enName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const nameRegex = new RegExp(`\\b${escaped}\\b`, 'g');
-      translated = translated.replace(nameRegex, enCardNameToJa[enName]);
-    });
-
-    for (const phrase of phrases) {
-      const regex = new RegExp(phrase.en, 'g');
-      translated = translated.replace(regex, phrase.ja);
+      phrasesJa.forEach(({ pattern, replacement }) => {
+        translated = translated.replace(pattern, replacement);
+      });
     }
 
     return translated;

@@ -78,6 +78,13 @@ function BattleArena({
   const isLiveMode = battleSession !== null;
   const hasLog = isLiveMode ? (battleSession.log.length > 0) : (battleLog && battleLog.length > 0);
 
+  // Set log index to end when battle completes and transitions to replay mode
+  useEffect(() => {
+    if (!isLiveMode && battleLog && battleLog.length > 0) {
+      setCurrentLogIndex(battleLog.length - 1);
+    }
+  }, [isLiveMode, battleLog]);
+
   // Auto-scroll log
   useEffect(() => {
     if (latestLogEndRef.current && typeof latestLogEndRef.current.scrollIntoView === 'function') {
@@ -173,7 +180,12 @@ function BattleArena({
   };
 
   // Dual Board bindings (Dynamic depending on live vs historical mode)
-  const isPlayer1 = isLiveMode ? (battleSession.player1Name === playerName) : true;
+  const isPlayer1 = useMemo(() => {
+    if (!isLiveMode || !battleSession) return true;
+    const p1 = (battleSession.player1Name || '').trim().toLowerCase();
+    const cur = (playerName || '').trim().toLowerCase();
+    return p1 === cur;
+  }, [isLiveMode, battleSession, playerName]);
 
   const myMemSlots = useMemo(() => {
     if (isLiveMode) {
@@ -198,16 +210,22 @@ function BattleArena({
       return isPlayer1 ? battleSession.player1Deck.length : battleSession.player2Deck.length;
     }
     const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
-    return currentEntry ? currentEntry.playerDeckCount : 0;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
+    if (!currentEntry) return 0;
+    const p1Name = battleSession?.player1Name || (battleLog.length > 0 ? battleLog[0].player : '');
+    const isP1 = p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
+    return isP1 ? currentEntry.playerDeckCount : currentEntry.cpuDeckCount;
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, hasLog, playerName, isPlayer1]);
 
   const opponentDeckCount = useMemo(() => {
     if (isLiveMode) {
       return isPlayer1 ? battleSession.player2Deck.length : battleSession.player1Deck.length;
     }
     const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
-    return currentEntry ? currentEntry.cpuDeckCount : 0;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
+    if (!currentEntry) return 0;
+    const p1Name = battleSession?.player1Name || (battleLog.length > 0 ? battleLog[0].player : '');
+    const isP1 = p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
+    return isP1 ? currentEntry.cpuDeckCount : currentEntry.playerDeckCount;
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog, playerName]);
 
   // Card Visuals (Defender flag card & Challenger clash cards)
   const currentFlagCard = useMemo(() => {
@@ -437,7 +455,7 @@ function BattleArena({
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 flex justify-between items-center">
             <div>
               <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
-              <div className="text-sm font-bold text-neon-cyan">{myDeckCount} Units</div>
+              <div className="text-sm font-bold text-neon-cyan">{myDeckCount} {t('units') || 'Units'}</div>
             </div>
             <Layers size={18} className="text-neon-cyan/50" />
           </div>
@@ -633,7 +651,7 @@ function BattleArena({
             <p className="text-[10px] font-mono text-cyber-text leading-relaxed">
               {activeLog.length > 0
                 ? translateBattleDetail(activeLog[activeLog.length - 1].details)
-                : 'INITIALIZING INTERACTIVE ARENA LINK...'}
+                : t('initializingArenaLink') || 'INITIALIZING INTERACTIVE ARENA LINK...'}
               {activeLog.length > 0 && activeLog[activeLog.length - 1].effectTriggered && activeLog[activeLog.length - 1].effectTriggered !== 'None' && activeLog[activeLog.length - 1].effectTriggered !== '' && (
                 <span className="text-neon-green block font-bold mt-1 text-[9px] animate-pulse">
                   ⚡ {translateBattleDetail(activeLog[activeLog.length - 1].effectTriggered)}
@@ -691,7 +709,7 @@ function BattleArena({
             <Layers size={18} className="text-neon-magenta/50" />
             <div>
               <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
-              <div className="text-sm font-bold text-neon-magenta">{opponentDeckCount} Units</div>
+              <div className="text-sm font-bold text-neon-magenta">{opponentDeckCount} {t('units') || 'Units'}</div>
             </div>
           </div>
         </div>

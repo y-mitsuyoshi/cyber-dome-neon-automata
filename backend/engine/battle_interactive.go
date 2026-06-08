@@ -167,11 +167,11 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 			}
 		}
 	case "merman":
-		if hasAttributeCard(activeMem, "Shipwreck") {
+		if hasAttributeCard(activeMem, "DeepWeb") {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
 					session.ActiveCards[i].Power += 3
-					effectText = "ベンチに難破船属性があるため、パワー+3"
+					effectText = "ベンチにディープウェブ属性があるため、パワー+3"
 					break
 				}
 			}
@@ -187,12 +187,12 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 			}
 		}
 	case "teenager":
-		ghostCount := countAttributeInMemory(*activeMem, "Ghost")
-		if ghostCount > 0 {
+		daemonCount := countAttributeInMemory(*activeMem, "Daemon")
+		if daemonCount > 0 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += ghostCount
-					effectText = fmt.Sprintf("ベンチの幽霊属性数 (%d) 分パワー+%d", ghostCount, ghostCount)
+					session.ActiveCards[i].Power += daemonCount
+					effectText = fmt.Sprintf("ベンチのデーモン属性数 (%d) 分パワー+%d", daemonCount, daemonCount)
 					break
 				}
 			}
@@ -372,10 +372,10 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 			options = bCards
 		}
 	case "moviestar":
-		// Moviestar: Put up to 2 Movie cards of power 1 or 2 from bench on top of deck
+		// Moviestar: Put up to 2 HoloMedia cards of power 1 or 2 from bench on top of deck
 		var movieCards []models.Card
 		for _, slot := range *activeMem {
-			if len(slot.Cards) > 0 && slot.Cards[0].Attribute == "Movie" && (slot.Cards[0].Power == 1 || slot.Cards[0].Power == 2) {
+			if len(slot.Cards) > 0 && slot.Cards[0].Attribute == "HoloMedia" && (slot.Cards[0].Power == 1 || slot.Cards[0].Power == 2) {
 				movieCards = append(movieCards, slot.Cards[0])
 			}
 		}
@@ -1030,15 +1030,14 @@ func calculateIndividualCardPower(card models.Card, myMem, oppMem *[]models.Memo
 	power += benchPowerBonus(*myMem)
 
 	// 2. Specific attribute buffs from bench
-	// AI buff
-	if card.Power == 2 && hasAttributeCard(myMem, "AI") {
+	// NeuroCore (old AI) buff
+	if card.Power == 2 && hasEffectInMem(myMem, "ai") {
 		// AI: "自分のパワー2のキャラクターのパワー+1"
-		// Count how many AI cards in bench (actually it works per AI card on bench)
-		power += countAttributeInMemory(*myMem, "AI")
+		power += countEffectInMem(myMem, "ai")
 	}
 
 	// Makeup Artist buff
-	if card.Power == 1 && hasAttributeCard(myMem, "Movie") {
+	if card.Power == 1 && hasAttributeCard(myMem, "HoloMedia") {
 		// "自分のパワー1のキャラクターの攻撃時、パワー+2"
 		// If we are the challenger, we are attacking
 		if session.TurnOwner == playerName {
@@ -1047,22 +1046,22 @@ func calculateIndividualCardPower(card models.Card, myMem, oppMem *[]models.Memo
 	}
 
 	// Vendor buff
-	if card.Attribute == "Fairground" && hasVendor(myMem) {
+	if card.Attribute == "Matrix" && hasVendor(myMem) {
 		power += countVendors(myMem)
 	}
 
 	// Blacksmith buff
-	if card.Attribute == "City" && hasBlacksmith(myMem) {
+	if card.Attribute == "Sector" && hasBlacksmith(myMem) {
 		power += countBlacksmiths(myMem)
 	}
 
 	// Band buff
-	if card.Attribute == "Space" && hasBand(myMem) {
+	if card.Attribute == "Orbit" && hasBand(myMem) {
 		power += countBands(myMem)
 	}
 
 	// Director buff
-	if card.Attribute == "Movie" && hasDirector(myMem) && session.TurnOwner == playerName {
+	if card.Attribute == "HoloMedia" && hasDirector(myMem) && session.TurnOwner == playerName {
 		power += countDirectors(myMem)
 	}
 
@@ -1091,7 +1090,7 @@ func hasPower1Card(mem *[]models.MemorySlot) bool {
 
 func hasCityCard(mem *[]models.MemorySlot) bool {
 	for _, slot := range *mem {
-		if len(slot.Cards) > 0 && slot.Cards[0].Attribute == "City" {
+		if len(slot.Cards) > 0 && slot.Cards[0].Attribute == "Sector" {
 			return true
 		}
 	}

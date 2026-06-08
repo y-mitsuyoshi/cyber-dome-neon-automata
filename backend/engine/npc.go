@@ -58,17 +58,17 @@ func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 		remainingCards := make([]models.Card, 0, len(shop.Cards))
 		for _, card := range shop.Cards {
 			isPreferred := false
-			// Adapt to new attributes: Castle, City, Space, Movie, Shipwreck, Ghost, Fairground
-			// Aggro: Movie, Ghost
-			// Combo: Space, Fairground
-			// Control: Castle, City, Shipwreck
+			// Adapt to new attributes: Mainframe, Sector, Orbit, HoloMedia, DeepWeb, Daemon, Matrix
+			// Aggro: HoloMedia, Daemon
+			// Combo: Orbit, Matrix
+			// Control: Mainframe, Sector, DeepWeb
 			switch strategy {
 			case "Aggro":
-				isPreferred = (card.Attribute == "Movie" || card.Attribute == "Ghost")
+				isPreferred = (card.Attribute == "HoloMedia" || card.Attribute == "Daemon")
 			case "Combo":
-				isPreferred = (card.Attribute == "Space" || card.Attribute == "Fairground")
+				isPreferred = (card.Attribute == "Orbit" || card.Attribute == "Matrix")
 			case "Control":
-				isPreferred = (card.Attribute == "Castle" || card.Attribute == "City" || card.Attribute == "Shipwreck")
+				isPreferred = (card.Attribute == "Mainframe" || card.Attribute == "Sector" || card.Attribute == "DeepWeb")
 			}
 
 			cost := card.RarityCost()
@@ -103,11 +103,11 @@ func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 			isNonMatching := false
 			switch strategy {
 			case "Aggro":
-				isNonMatching = (card.Attribute != "Movie" && card.Attribute != "Ghost")
+				isNonMatching = (card.Attribute != "HoloMedia" && card.Attribute != "Daemon")
 			case "Combo":
-				isNonMatching = (card.Attribute != "Space" && card.Attribute != "Fairground")
+				isNonMatching = (card.Attribute != "Orbit" && card.Attribute != "Matrix")
 			case "Control":
-				isNonMatching = (card.Attribute != "Castle" && card.Attribute != "City" && card.Attribute != "Shipwreck")
+				isNonMatching = (card.Attribute != "Mainframe" && card.Attribute != "Sector" && card.Attribute != "DeepWeb")
 			}
 
 			if isNonMatching {

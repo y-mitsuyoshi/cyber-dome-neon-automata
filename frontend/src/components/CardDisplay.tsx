@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Cpu, Bug, HardDrive, User, Zap, Shield, Building, Rocket, Film, Anchor, Ghost, Ticket } from 'lucide-react';
+import { Cpu, Bug, HardDrive, User, Zap, Shield, Building, Rocket, Film, Anchor, Ghost, Ticket, Skull, Grid } from 'lucide-react';
 import type { Card } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
@@ -11,25 +11,22 @@ interface CardDisplayProps {
   disabled?: boolean;
   compact?: boolean;
   basePower?: number;
-}
-
-const attributeConfig = {
+}const attributeConfig = {
   Virus: { color: 'text-red-400', bg: 'bg-red-900/30', border: 'border-red-500/50', glow: '#ff0040', icon: Bug },
   AI: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Cpu },
   Hardware: { color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-500/50', glow: '#ffbf00', icon: HardDrive },
   Netrunner: { color: 'text-green-400', bg: 'bg-green-900/30', border: 'border-green-500/50', glow: '#00ff66', icon: User },
 
-  Castle: { color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-500/50', glow: '#ffbf00', icon: Shield },
-  City: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Building },
-  Space: { color: 'text-cyan-400', bg: 'bg-cyan-900/30', border: 'border-cyan-500/50', glow: '#00f0ff', icon: Rocket },
-  Movie: { color: 'text-pink-400', bg: 'bg-pink-900/30', border: 'border-pink-500/50', glow: '#ff00aa', icon: Film },
-  Shipwreck: { color: 'text-emerald-400', bg: 'bg-emerald-900/30', border: 'border-emerald-500/50', glow: '#00ff66', icon: Anchor },
-  Ghost: { color: 'text-purple-400', bg: 'bg-purple-900/30', border: 'border-purple-500/50', glow: '#aa00ff', icon: Ghost },
-  Fairground: { color: 'text-yellow-400', bg: 'bg-yellow-900/30', border: 'border-yellow-500/50', glow: '#ffff00', icon: Ticket },
+  Mainframe: { color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-500/50', glow: '#ffbf00', icon: Shield },
+  Sector: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Building },
+  Orbit: { color: 'text-cyan-400', bg: 'bg-cyan-900/30', border: 'border-cyan-500/50', glow: '#00f0ff', icon: Rocket },
+  HoloMedia: { color: 'text-pink-400', bg: 'bg-pink-900/30', border: 'border-pink-500/50', glow: '#ff00aa', icon: Film },
+  DeepWeb: { color: 'text-emerald-400', bg: 'bg-emerald-900/30', border: 'border-emerald-500/50', glow: '#00ff66', icon: Skull },
+  Daemon: { color: 'text-purple-400', bg: 'bg-purple-900/30', border: 'border-purple-500/50', glow: '#aa00ff', icon: Ghost },
+  Matrix: { color: 'text-yellow-400', bg: 'bg-yellow-900/30', border: 'border-yellow-500/50', glow: '#ffff00', icon: Grid },
   None: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User },
   Starter: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User }
 };
-
 function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower }: CardDisplayProps) {
   const { translateCard, t } = useTranslation();
   const { playSE } = useAudio();
