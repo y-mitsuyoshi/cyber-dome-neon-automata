@@ -29,7 +29,7 @@ const convertToFullCard = (logCard: BattleLogCard | Card | null | undefined): Ca
     archetype: 'Control',
     power: logCard.power,
     rarity: 'Common',
-    effect: (logCard as any).effect || '',
+    effect: 'effect' in logCard ? logCard.effect : '',
     effectType: logCard.effectType || '',
     cost: 0,
   };
@@ -162,7 +162,7 @@ function BattleArena({
   }, [currentLogIndex, activeLog, playerName, opponent, playSE, hasLog, isLiveMode, battleSession?.isFinished]);
 
   // Helper to parse live slots
-  const mapLiveMemSlots = (slots: any[]): string[][] => {
+  const mapLiveMemSlots = (slots: { count: number; cardName: string }[]): string[][] => {
     if (!slots) return [];
     return slots.map(slot => Array(slot.count).fill(slot.cardName));
   };

@@ -1,4 +1,4 @@
-import type { GameState, Card, BattleSession, Standing, BattleLogEntry } from '../types/game';
+import type { GameState, Card, BattleSession, Standing, BattleLogEntry, NPC, BattleResult } from '../types/game';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -64,9 +64,14 @@ function mapGameState(raw: RawGameState): GameState {
       credits: raw.shop.credits || 0,
     } : { cards: [], credits: 0 },
     standings: (raw.standings || []) as Standing[],
-    npcs: raw.npcs || [],
+    npcs: (raw.npcs || []) as NPC[],
     battleLog: (raw.battleLog || (raw.lastResult ? raw.lastResult.log : []) || []) as BattleLogEntry[],
-    lastResult: raw.lastResult || null,
+    lastResult: raw.lastResult
+      ? ({
+          ...raw.lastResult,
+          log: (raw.lastResult.log || []) as BattleLogEntry[],
+        } as BattleResult)
+      : null,
     opponent: raw.opponent || '',
     battleResult: raw.battleResult || '',
     battleSession: raw.battleSession || null,

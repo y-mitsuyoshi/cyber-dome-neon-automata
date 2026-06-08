@@ -91,6 +91,20 @@ export interface Standing {
   isPlayer: boolean;
 }
 
+export interface NPC {
+  name: string;
+  isNpc: boolean;
+  [key: string]: unknown;
+}
+
+export interface BattleResult {
+  winner: string;
+  loser: string;
+  reason: string;
+  log: BattleLogEntry[];
+  fansGained: number;
+}
+
 export interface GameState {
   gameId: string;
   currentRound: number;
@@ -107,9 +121,9 @@ export interface GameState {
   };
   shop: ShopState;
   standings: Standing[];
-  npcs: any[];
+  npcs: NPC[];
   battleLog: BattleLogEntry[];
-  lastResult: any;
+  lastResult: BattleResult | null;
   opponent: string;
   battleResult: string;
   battleSession: BattleSession | null;

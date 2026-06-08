@@ -89,7 +89,7 @@ class ProceduralAudioEngine {
         results: '/sounds/Final_Tally_In_Sector_Seven.mp3'
       };
 
-      if (typeof window !== 'undefined' && (window.Audio || (window as any).webkitAudioContext)) {
+      if (typeof window !== 'undefined' && (window.Audio || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)) {
         for (const [theme, filePath] of Object.entries(bgmFiles)) {
           if (typeof Audio !== 'undefined' && typeof this.ctx.createMediaElementSource === 'function') {
             try {
