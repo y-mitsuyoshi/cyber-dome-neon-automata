@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const getWsUrl = (code: string, name: string) => {
-  const base = API_URL.replace(/^http/, 'ws');
+  let base = API_URL;
+  if (!base) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    base = `${protocol}//${host}`;
+  } else {
+    base = base.replace(/^http/, 'ws');
+  }
   return `${base}/api/ws?code=${code}&name=${encodeURIComponent(name)}`;
 };
 
