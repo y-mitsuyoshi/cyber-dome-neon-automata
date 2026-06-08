@@ -50,7 +50,7 @@ func buildStandings(gs *models.GameState, activePlayer string) []models.Standing
 		entries = append(entries, models.StandingsEntry{
 			Name:     p.Name,
 			Wins:     p.Wins,
-			Fans:     p.Fans,
+			Fans:     p.GetTotalFans(),
 			IsPlayer: p.Name == activePlayer,
 		})
 	}
@@ -189,7 +189,7 @@ func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerNam
 			"hand":     player.Hand,
 			"deckSize": len(player.Deck),
 			"wins":     player.Wins,
-			"fans":     player.Fans,
+			"fans":     player.GetTotalFans(),
 		},
 		"shop":          shop,
 		"standings":     standings,
@@ -248,13 +248,9 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 		players[i] = engine.CreateNPC(name, strat)
 	}
 
-	shops := make(map[string]*models.ShopState)
-	for _, p := range players {
-		shop := engine.GenerateShop(10, 1)
-		shops[p.Name] = &shop
-	}
-
 	matchups := engine.GetMatchups(1, len(players))
+
+	deckA, deckB, deckC := engine.GenerateDeckPools()
 
 	gs := &models.GameState{
 		GameID:         gameID,
@@ -263,12 +259,26 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 		MaxRounds:      7,
 		Phase:          "shop",
 		Players:        players,
-		Shops:          shops,
+		Shops:          make(map[string]*models.ShopState),
 		ReadyPlayers:   make(map[string]bool),
 		Matchups:       matchups,
 		BattleLogs:     make(map[string][]models.BattleLogEntry),
 		LastResults:    make(map[string]*models.BattleResult),
 		BattleSessions: make(map[string]*models.BattleSession),
+		DeckAPool:      deckA,
+		DeckBPool:      deckB,
+		DeckCPool:      deckC,
+	}
+
+	// Generate initial shops and run NPC shops
+	for i := range gs.Players {
+		p := &gs.Players[i]
+		if p.IsNPC {
+			engine.NPCShopPhase(gs, p, 1)
+		} else {
+			shop := engine.GenerateShop(gs, 1)
+			gs.Shops[p.Name] = &shop
+		}
 	}
 
 	GameStore.Lock()
@@ -510,33 +520,71 @@ func resolveRound(gs *models.GameState) {
 		p1 := &gs.Players[p1Idx]
 		p2 := &gs.Players[p2Idx]
 
-		// Shuffle decks before running battle
-		p1.ShuffleDeck()
-		p2.ShuffleDeck()
+		if p1.IsNPC && p2.IsNPC {
+			// Symmetrical simulation of NPC vs NPC using interactive battle engine
+			session := engine.InitializeBattleSession(
+				fmt.Sprintf("%s_vs_%s_r%d", p1.Name, p2.Name, gs.CurrentRound),
+				p1.Name,
+				p2.Name,
+				p1.Deck,
+				p2.Deck,
+			)
 
-		// Run simulation
-		battleRes := engine.RunBattle(p1.CloneDeck(), p2.CloneDeck())
-
-		// Replace generic "player" and "cpu" names with actual player names in the result
-		adaptBattleResult(&battleRes, p1.Name, p2.Name)
-
-		// Apply standings increases
-		winnerName := battleRes.Winner
-		fansGained := battleRes.FansGained
-
-		for i := range gs.Players {
-			if gs.Players[i].Name == winnerName {
-				gs.Players[i].Wins++
-				gs.Players[i].Fans += fansGained
+			// Run StepBattle to completion (both are NPCs)
+			for !session.IsFinished {
+				engine.StepBattle(session, true, true)
 			}
+
+			// Finalize the result
+			fansGained := 2
+			if session.Step < 3 {
+				fansGained = 1
+			}
+
+			// Check for Hero effect bonus (+3 Fans) if hero was winning card
+			// We can scan the log details or simply check the winning card's effect
+			// Let's check if the winning card has c_hero effect
+			// Since we want to award Hero bonus:
+			var winningCard *models.Card
+			if len(session.ActiveCards) > 0 {
+				winningCard = &session.ActiveCards[0]
+			}
+			if winningCard != nil && winningCard.EffectType == "hero" {
+				fansGained += 3
+			}
+
+			winnerName := session.Winner
+			for i := range gs.Players {
+				if gs.Players[i].Name == winnerName {
+					gs.Players[i].Wins++
+					gs.Players[i].Fans += fansGained
+				}
+			}
+
+			battleRes := models.BattleResult{
+				Winner:     session.Winner,
+				Loser:      session.Loser,
+				Reason:     fmt.Sprintf("%s was defeated by %s.", session.Loser, session.Winner),
+				FansGained: fansGained,
+				Log:        session.Log,
+			}
+
+			gs.LastResults[p1.Name] = &battleRes
+			gs.BattleLogs[p1.Name] = session.Log
+			gs.LastResults[p2.Name] = &battleRes
+			gs.BattleLogs[p2.Name] = session.Log
+		} else {
+			// Human is involved! Create an interactive battle session
+			session := engine.InitializeBattleSession(
+				fmt.Sprintf("%s_vs_%s_r%d", p1.Name, p2.Name, gs.CurrentRound),
+				p1.Name,
+				p2.Name,
+				p1.Deck,
+				p2.Deck,
+			)
+			gs.BattleSessions[p1.Name] = session
+			gs.BattleSessions[p2.Name] = session
 		}
-
-		// Store results for both players
-		gs.LastResults[p1.Name] = &battleRes
-		gs.BattleLogs[p1.Name] = battleRes.Log
-
-		gs.LastResults[p2.Name] = &battleRes
-		gs.BattleLogs[p2.Name] = battleRes.Log
 	}
 
 	// Broadcast transition event to all connected clients
@@ -625,10 +673,10 @@ func advanceRound(gs *models.GameState) {
 
 			if p.IsNPC {
 				// Simulate symmetrical shop AI for NPCs!
-				engine.NPCShopPhase(p, gs.CurrentRound)
+				engine.NPCShopPhase(gs, p, gs.CurrentRound)
 			} else {
 				// Generate fresh shop for human players
-				shop := engine.GenerateShop(p.Credits, gs.CurrentRound)
+				shop := engine.GenerateShop(gs, gs.CurrentRound)
 				gs.Shops[p.Name] = &shop
 			}
 		}

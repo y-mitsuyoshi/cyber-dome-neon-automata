@@ -34,6 +34,7 @@ func main() {
 	// Tournament endpoints
 	mux.HandleFunc("/api/tournament/battle", handlers.HandleBattle)
 	mux.HandleFunc("/api/tournament/next-round", handlers.HandleNextRound)
+	mux.HandleFunc("/api/battle/step", handlers.HandleBattleStep)
 	mux.HandleFunc("/api/battle/action", handlers.HandleBattleAction)
 	mux.HandleFunc("/api/battle/complete", handlers.HandleBattleComplete)
 

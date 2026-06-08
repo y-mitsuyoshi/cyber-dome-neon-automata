@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Cpu, Bug, HardDrive, User, Zap } from 'lucide-react';
+import { Cpu, Bug, HardDrive, User, Zap, Shield, Building, Rocket, Film, Anchor, Ghost, Ticket } from 'lucide-react';
 import type { Card } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
@@ -18,6 +18,16 @@ const attributeConfig = {
   AI: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Cpu },
   Hardware: { color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-500/50', glow: '#ffbf00', icon: HardDrive },
   Netrunner: { color: 'text-green-400', bg: 'bg-green-900/30', border: 'border-green-500/50', glow: '#00ff66', icon: User },
+
+  Castle: { color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-500/50', glow: '#ffbf00', icon: Shield },
+  City: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Building },
+  Space: { color: 'text-cyan-400', bg: 'bg-cyan-900/30', border: 'border-cyan-500/50', glow: '#00f0ff', icon: Rocket },
+  Movie: { color: 'text-pink-400', bg: 'bg-pink-900/30', border: 'border-pink-500/50', glow: '#ff00aa', icon: Film },
+  Shipwreck: { color: 'text-emerald-400', bg: 'bg-emerald-900/30', border: 'border-emerald-500/50', glow: '#00ff66', icon: Anchor },
+  Ghost: { color: 'text-purple-400', bg: 'bg-purple-900/30', border: 'border-purple-500/50', glow: '#aa00ff', icon: Ghost },
+  Fairground: { color: 'text-yellow-400', bg: 'bg-yellow-900/30', border: 'border-yellow-500/50', glow: '#ffff00', icon: Ticket },
+  None: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User },
+  Starter: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User }
 };
 
 function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower }: CardDisplayProps) {
@@ -49,7 +59,7 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
   }, [card.id]);
 
   // Use original English values for style lookups
-  const attr = attributeConfig[card.attribute];
+  const attr = attributeConfig[card.attribute as keyof typeof attributeConfig] || attributeConfig.None;
   const AttrIcon = attr.icon;
 
   const rarityStyle = useMemo(() => {
@@ -68,6 +78,11 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         return {
           className: 'border-neon-amber/70 animate-epic-aura',
           shadow: '0 0 20px rgba(255,191,0,0.4)',
+        };
+      default:
+        return {
+          className: 'border-neon-cyan/40',
+          shadow: '0 0 8px rgba(0,240,255,0.2)',
         };
     }
   }, [card.rarity]);

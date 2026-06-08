@@ -183,75 +183,37 @@ func TestGetMatchupsOdd(t *testing.T) {
 }
 
 func TestInteractiveBattle(t *testing.T) {
-	p1Deck := StarterDeck()
-	p2Deck := StarterDeck()
+	p1Deck := []models.Card{
+		{ID: "starter_1", Name: "スカウト", Attribute: "None", Power: 1},
+		{ID: "starter_2", Name: "スカウト", Attribute: "None", Power: 2},
+	}
+	p2Deck := []models.Card{
+		{ID: "starter_3", Name: "スカウト", Attribute: "None", Power: 2},
+		{ID: "starter_4", Name: "スカウト", Attribute: "None", Power: 3},
+	}
 
 	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
 
-	// Override hands and decks to make the interactive test 100% deterministic
-	session.Player1Hand = []models.Card{
-		{ID: "starter_virus_1", Name: "Glitch Worm Jr.", Attribute: "Virus", Power: 3},
-	}
-	session.Player1Deck = []models.Card{
-		{ID: "starter_virus_2", Name: "Buffer Overflow Jr.", Attribute: "Virus", Power: 4},
-	}
-	session.Player2Hand = []models.Card{
-		{ID: "starter_ai_1", Name: "Linear Regressor", Attribute: "AI", Power: 3},
-	}
-	session.Player2Deck = []models.Card{
-		{ID: "starter_ai_2", Name: "Heuristic Helper", Attribute: "AI", Power: 4},
+	// Ensure RequiredAction is DRAW at start
+	if session.RequiredAction != "DRAW" {
+		t.Errorf("Expected RequiredAction to be DRAW, got %s", session.RequiredAction)
 	}
 
-	if len(session.Player1Hand) != 1 {
-		t.Errorf("Expected 1 starting card in P1 hand, got %d", len(session.Player1Hand))
-	}
-	if len(session.Player2Hand) != 1 {
-		t.Errorf("Expected 1 starting card in P2 hand, got %d", len(session.Player2Hand))
-	}
+	// Override turn owner to make it deterministic
+	session.TurnOwner = "P1"
+	session.PendingActionPlayer = "P1"
 
-	// 1. Commit actions: P1 plays Glitch Worm Jr. (starter_virus_1), P2 plays Linear Regressor (starter_ai_1)
-	session.PendingActions["P1"] = &models.BattleAction{
-		PlayerName: "P1",
-		ActionType: "PLAY",
-		CardID:     "starter_virus_1",
-	}
-	session.PendingActions["P2"] = &models.BattleAction{
-		PlayerName: "P2",
-		ActionType: "PLAY",
-		CardID:     "starter_ai_1",
-	}
+	// 1. Draw card for P1
+	StepBattle(session, false, false)
 
-	StepBattle(session)
-
-	// Since both are Power 3, Tie breaker applies and P1 wins flag (as default)
+	// Check P1 has flag
 	if session.FlagHolder != "P1" {
 		t.Errorf("Expected P1 to hold flag, got %s", session.FlagHolder)
 	}
-	// Played 1 card and drew 1 card: hand size should still be 1!
-	if len(session.Player1Hand) != 1 {
-		t.Errorf("Expected 1 card in P1 hand after draw, got %d", len(session.Player1Hand))
+	if len(session.ActiveCards) != 1 {
+		t.Errorf("Expected 1 active card, got %d", len(session.ActiveCards))
 	}
-	// Remaining deck should be empty
-	if len(session.Player1Deck) != 0 {
-		t.Errorf("Expected P1 deck to be empty, got %d", len(session.Player1Deck))
-	}
-	if len(session.Player1Mem) != 1 {
-		t.Errorf("Expected 1 slot in P1 memory, got %d", len(session.Player1Mem))
-	}
-	if session.Step != 1 {
-		t.Errorf("Expected Step to be 1, got %d", session.Step)
-	}
-}
-
-func TestNPCBestMove(t *testing.T) {
-	hand := []models.Card{
-		{ID: "starter_virus_1", Name: "Glitch Worm Jr.", Attribute: "Virus", Power: 3},
-		{ID: "starter_ai_3", Name: "Logic Node", Attribute: "AI", Power: 5},
-	}
-	
-	// Combo strategy NPC should prefer AI card (Logic Node, Power 5) over Virus
-	action := EvaluateBestMove(hand, "Combo", []models.MemorySlot{}, []models.MemorySlot{}, 0, false)
-	if action.ActionType != "PLAY" || action.CardID != "starter_ai_3" {
-		t.Errorf("Expected playing starter_ai_3, got %s:%s", action.ActionType, action.CardID)
+	if session.TurnOwner != "P2" {
+		t.Errorf("Expected TurnOwner to switch to P2, got %s", session.TurnOwner)
 	}
 }

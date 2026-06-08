@@ -189,7 +189,6 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 
 	// Create symmetric Player objects for the tournament
 	players := make([]models.Player, len(lob.Players))
-	shops := make(map[string]*models.ShopState)
 
 	for i, lp := range lob.Players {
 		var p models.Player
@@ -210,10 +209,6 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		players[i] = p
-		
-		// Generate initial shop for each player
-		shop := engine.GenerateShop(10, 1)
-		shops[lp.Name] = &shop
 	}
 
 	// Generate dynamic rounds size based on T players
@@ -225,19 +220,36 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 	// Generate initial pairings for Round 1
 	matchups := engine.GetMatchups(1, len(players))
 
+	deckA, deckB, deckC := engine.GenerateDeckPools()
+
 	gs := &models.GameState{
-		GameID:       gameID,
-		LobbyCode:    lob.Code,
-		HostName:     lob.Host,
-		CurrentRound: 1,
-		MaxRounds:    maxRounds,
-		Phase:        "shop",
-		Players:      players,
-		Shops:        shops,
-		ReadyPlayers: make(map[string]bool),
-		Matchups:     matchups,
-		BattleLogs:   make(map[string][]models.BattleLogEntry),
-		LastResults:  make(map[string]*models.BattleResult),
+		GameID:         gameID,
+		LobbyCode:      lob.Code,
+		HostName:       lob.Host,
+		CurrentRound:   1,
+		MaxRounds:      maxRounds,
+		Phase:          "shop",
+		Players:        players,
+		Shops:          make(map[string]*models.ShopState),
+		ReadyPlayers:   make(map[string]bool),
+		Matchups:       matchups,
+		BattleLogs:     make(map[string][]models.BattleLogEntry),
+		LastResults:    make(map[string]*models.BattleResult),
+		BattleSessions: make(map[string]*models.BattleSession),
+		DeckAPool:      deckA,
+		DeckBPool:      deckB,
+		DeckCPool:      deckC,
+	}
+
+	// Generate initial shops and run NPC shops
+	for i := range gs.Players {
+		p := &gs.Players[i]
+		if p.IsNPC {
+			engine.NPCShopPhase(gs, p, 1)
+		} else {
+			shop := engine.GenerateShop(gs, 1)
+			gs.Shops[p.Name] = &shop
+		}
 	}
 
 	// Save to global game store

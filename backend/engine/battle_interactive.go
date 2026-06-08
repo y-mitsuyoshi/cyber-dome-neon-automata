@@ -4,500 +4,1242 @@ import (
 	"backend/models"
 	"fmt"
 	"math/rand"
+	"strings"
 )
 
 // InitializeBattleSession creates a fresh interactive battle session between two players.
 func InitializeBattleSession(sessionID string, p1Name, p2Name string, p1Deck, p2Deck []models.Card) *models.BattleSession {
-	// Defensive copy to avoid mutating caller's slices
-	p1Deck = append([]models.Card(nil), p1Deck...)
-	p2Deck = append([]models.Card(nil), p2Deck...)
-
-	// Shuffle decks to randomize initial order
-	rand.Shuffle(len(p1Deck), func(i, j int) { p1Deck[i], p1Deck[j] = p1Deck[j], p1Deck[i] })
-	rand.Shuffle(len(p2Deck), func(i, j int) { p2Deck[i], p2Deck[j] = p2Deck[j], p2Deck[i] })
-
-	p1HandSize := 5
-	if len(p1Deck) < p1HandSize {
-		p1HandSize = len(p1Deck)
+	p1DeckCopy := make([]models.Card, len(p1Deck))
+	for i, c := range p1Deck {
+		p1DeckCopy[i] = c.Clone()
 	}
-	p1Hand := make([]models.Card, p1HandSize)
-	for i := 0; i < p1HandSize; i++ {
-		p1Hand[i] = p1Deck[i].Clone()
-	}
-	p1RemainingDeck := make([]models.Card, len(p1Deck)-p1HandSize)
-	for i := p1HandSize; i < len(p1Deck); i++ {
-		p1RemainingDeck[i-p1HandSize] = p1Deck[i].Clone()
+	p2DeckCopy := make([]models.Card, len(p2Deck))
+	for i, c := range p2Deck {
+		p2DeckCopy[i] = c.Clone()
 	}
 
-	p2HandSize := 5
-	if len(p2Deck) < p2HandSize {
-		p2HandSize = len(p2Deck)
-	}
-	p2Hand := make([]models.Card, p2HandSize)
-	for i := 0; i < p2HandSize; i++ {
-		p2Hand[i] = p2Deck[i].Clone()
-	}
-	p2RemainingDeck := make([]models.Card, len(p2Deck)-p2HandSize)
-	for i := p2HandSize; i < len(p2Deck); i++ {
-		p2RemainingDeck[i-p2HandSize] = p2Deck[i].Clone()
+	// Shuffle decks
+	rand.Shuffle(len(p1DeckCopy), func(i, j int) { p1DeckCopy[i], p1DeckCopy[j] = p1DeckCopy[j], p1DeckCopy[i] })
+	rand.Shuffle(len(p2DeckCopy), func(i, j int) { p2DeckCopy[i], p2DeckCopy[j] = p2DeckCopy[j], p2DeckCopy[i] })
+
+	// Cointoss for first turn owner
+	turnOwner := p1Name
+	if rand.Intn(2) == 0 {
+		turnOwner = p2Name
 	}
 
 	return &models.BattleSession{
-		SessionID:      sessionID,
-		Player1Name:    p1Name,
-		Player2Name:    p2Name,
-		Player1Hand:    p1Hand,
-		Player2Hand:    p2Hand,
-		Player1Deck:    p1RemainingDeck,
-		Player2Deck:    p2RemainingDeck,
-		Player1Mem:     []models.MemorySlot{},
-		Player2Mem:     []models.MemorySlot{},
-		Player1Discard: []models.Card{},
-		Player2Discard: []models.Card{},
-		FlagHolder:     "",
-		FlagPower:      0,
-		Step:           0,
-		PendingActions: make(map[string]*models.BattleAction),
-		IsFinished:     false,
+		SessionID:           sessionID,
+		Player1Name:         p1Name,
+		Player2Name:         p2Name,
+		Player1Deck:         p1DeckCopy,
+		Player2Deck:         p2DeckCopy,
+		Player1Mem:          []models.MemorySlot{},
+		Player2Mem:          []models.MemorySlot{},
+		Player1Discard:      []models.Card{},
+		Player2Discard:      []models.Card{},
+		FlagHolder:          "",
+		FlagPower:           0,
+		Step:                0,
+		IsFinished:          false,
+		Log:                 []models.BattleLogEntry{},
+		TurnOwner:           turnOwner,
+		RequiredAction:      "DRAW",
+		PendingActionPlayer: turnOwner,
+		ActionOptions:       []models.Card{},
+		ActiveCards:         []models.Card{},
+		ChallengerPower:     0,
 	}
 }
 
-// EvaluateBestMove decides the next action for an NPC based on their strategy and current hand/memory.
-func EvaluateBestMove(hand []models.Card, strategy string, myMem []models.MemorySlot, opponentMem []models.MemorySlot, opponentFlagPower int, isChallenger bool) models.BattleAction {
-	if len(hand) == 0 {
-		return models.BattleAction{ActionType: "DISCARD", CardID: ""}
-	}
-
-	bestPlayCardIdx := -1
-	bestPlayScore := -100
-
-	// 1. Evaluate best card to PLAY
-	for i, c := range hand {
-		score := c.Power
-
-		// Apply strategy synergy biases
-		if c.EffectType == "power_per_ai_in_memory" && strategy == "Combo" {
-			aiCount := countAttributeInMemory(myMem, "AI")
-			score += 2 * aiCount
-		} else if c.EffectType == "power_per_virus_in_memory" && strategy == "Aggro" {
-			count := countAttributeInMemory(myMem, "Virus")
-			score += 2 * count
-		} else if c.EffectType == "power_per_hardware_in_memory" && strategy == "Control" {
-			count := countAttributeInMemory(myMem, "Hardware")
-			score += 2 * count
-		}
-
-		// Rarity preference
-		if c.Rarity == "Epic" {
-			score += 2
-		} else if c.Rarity == "Rare" {
-			score += 1
-		}
-
-		// Strategy matching attribute bias
-		if (strategy == "Aggro" && c.Attribute == "Virus") ||
-			(strategy == "Combo" && c.Attribute == "AI") ||
-			(strategy == "Control" && (c.Attribute == "Hardware" || c.Attribute == "Netrunner")) {
-			score += 3
-		}
-
-		if score > bestPlayScore {
-			bestPlayScore = score
-			bestPlayCardIdx = i
-		}
-	}
-
-	// 2. Decide if we should DISCARD to save memory slots
-	// If unique slots occupied is high (>= 5) and we are the challenger, but even our best card cannot exceed opponent's flag power,
-	// it's wiser to DISCARD our worst card to save space instead of wasting a slot.
-	effectiveSlots := uniqueSlotCount(myMem)
-	if effectiveSlots >= 5 && isChallenger && bestPlayScore <= opponentFlagPower {
-		worstDiscardIdx := 0
-		worstDiscardScore := 9999
-
-		for i, c := range hand {
-			score := c.Power
-			// Try to preserve strategy cards
-			if (strategy == "Aggro" && c.Attribute == "Virus") ||
-				(strategy == "Combo" && c.Attribute == "AI") ||
-				(strategy == "Control" && (c.Attribute == "Hardware" || c.Attribute == "Netrunner")) {
-				score += 10
-			}
-
-			if score < worstDiscardScore {
-				worstDiscardScore = score
-				worstDiscardIdx = i
-			}
-		}
-
-		return models.BattleAction{
-			ActionType: "DISCARD",
-			CardID:     hand[worstDiscardIdx].ID,
-		}
-	}
-
-	// 3. Otherwise, play the best card
-	if bestPlayCardIdx != -1 {
-		return models.BattleAction{
-			ActionType: "PLAY",
-			CardID:     hand[bestPlayCardIdx].ID,
-		}
-	}
-
-	// Fallback to discard first card
-	return models.BattleAction{
-		ActionType: "DISCARD",
-		CardID:     hand[0].ID,
-	}
-}
-
-// StepBattle advances the interactive battle session by one step.
-func StepBattle(session *models.BattleSession) {
+// StepBattle processes one step of drawing from the current TurnOwner's deck.
+func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 	if session.IsFinished {
+		return
+	}
+
+	// 1. Check if we are waiting for a choice. If so, do nothing here.
+	if session.RequiredAction != "DRAW" {
 		return
 	}
 
 	session.Step++
 
-	// 1. Retrieve actions
-	p1Action := session.PendingActions[session.Player1Name]
-	p2Action := session.PendingActions[session.Player2Name]
+	// Determine active deck and opponent deck
+	var activeDeck *[]models.Card
+	var activeMem *[]models.MemorySlot
+	var activeDiscard *[]models.Card
+	var activePlayerName, oppPlayerName string
+	var isActiveNPC bool
 
-	// Fallbacks if action is missing
-	if p1Action == nil {
-		p1Action = &models.BattleAction{PlayerName: session.Player1Name, ActionType: "DISCARD"}
-	}
-	if p2Action == nil {
-		p2Action = &models.BattleAction{PlayerName: session.Player2Name, ActionType: "DISCARD"}
-	}
-
-	// 2. Extract and remove cards from hands (value copies to avoid slice reallocation pointer issues)
-	var c1 models.Card
-	var c1Found bool
-	for i, c := range session.Player1Hand {
-		if c.ID == p1Action.CardID {
-			c1 = c
-			c1Found = true
-			session.Player1Hand = append(session.Player1Hand[:i], session.Player1Hand[i+1:]...)
-			break
-		}
-	}
-	// Fallback first card if ID didn't match but PLAY requested
-	if !c1Found && p1Action.ActionType == "PLAY" && len(session.Player1Hand) > 0 {
-		c1 = session.Player1Hand[0]
-		c1Found = true
-		session.Player1Hand = session.Player1Hand[1:]
+	if session.TurnOwner == session.Player1Name {
+		activeDeck = &session.Player1Deck
+		activeMem = &session.Player1Mem
+		activeDiscard = &session.Player1Discard
+		activePlayerName = session.Player1Name
+		oppPlayerName = session.Player2Name
+		isActiveNPC = isP1NPC
+	} else {
+		activeDeck = &session.Player2Deck
+		activeMem = &session.Player2Mem
+		activeDiscard = &session.Player2Discard
+		activePlayerName = session.Player2Name
+		oppPlayerName = session.Player1Name
+		isActiveNPC = isP2NPC
 	}
 
-	var c2 models.Card
-	var c2Found bool
-	for i, c := range session.Player2Hand {
-		if c.ID == p2Action.CardID {
-			c2 = c
-			c2Found = true
-			session.Player2Hand = append(session.Player2Hand[:i], session.Player2Hand[i+1:]...)
-			break
-		}
-	}
-	// Fallback first card if ID didn't match but PLAY requested
-	if !c2Found && p2Action.ActionType == "PLAY" && len(session.Player2Hand) > 0 {
-		c2 = session.Player2Hand[0]
-		c2Found = true
-		session.Player2Hand = session.Player2Hand[1:]
-	}
-
-	// 3. Map to BattleState for high-fidelity effect calculations (symmetrical compatibility)
-	bs := &BattleState{
-		PlayerDeck:   session.Player1Deck,
-		CPUDeck:      session.Player2Deck,
-		PlayerMem:    session.Player1Mem,
-		CPUMem:       session.Player2Mem,
-		FlagHolder:   "", // Temp mapping
-		FlagPower:    session.FlagPower,
-		Step:         session.Step,
-		PrevCardAttr: map[string]string{"player": "", "cpu": ""},
-		NullifyNext:  map[string]bool{"player": false, "cpu": false},
-		LockedCards:  map[string]string{"player": "", "cpu": ""},
-	}
-	if session.FlagHolder == session.Player1Name {
-		bs.FlagHolder = "player"
-	} else if session.FlagHolder == session.Player2Name {
-		bs.FlagHolder = "cpu"
-	}
-
-	// Resolve the actions
-	p1Played := p1Action.ActionType == "PLAY" && c1Found
-	p2Played := p2Action.ActionType == "PLAY" && c2Found
-
-	p1Power := 0
-	p2Power := 0
-	p1Effect := ""
-	p2Effect := ""
-
-	// Process discards first
-	if !p1Played && c1Found {
-		session.Player1Discard = append(session.Player1Discard, c1)
-	}
-	if !p2Played && c2Found {
-		session.Player2Discard = append(session.Player2Discard, c2)
-	}
-
-	// Process PLAY reveals & OnReveal effects
-	if p1Played {
-		p1Power = c1.Power
-		p1Effect = bs.applyOnRevealEffects(&c1, "player", &p1Power)
-		bs.PrevCardAttr["player"] = c1.Attribute
-	}
-	if p2Played {
-		p2Power = c2.Power
-		p2Effect = bs.applyOnRevealEffects(&c2, "cpu", &p2Power)
-		bs.PrevCardAttr["cpu"] = c2.Attribute
-	}
-
-	// Determine step outcome
-	var stepCard *models.BattleLogCard
-	stepPlayer := ""
-	stepAction := "clash"
-	stepDetails := ""
-	stepEffect := ""
-
-	if p1Played && p2Played {
-		// --- CLASH CASE ---
-		stepCard = &models.BattleLogCard{Name: fmt.Sprintf("%s vs %s", c1.Name, c2.Name), Power: p1Power, Attribute: "Clash"}
-		stepDetails = fmt.Sprintf("Clash! %s (%d POW) vs %s (%d POW)", c1.Name, p1Power, c2.Name, p2Power)
-
-		var winnerCard models.Card
-		var winnerSide string
-		var winnerName string
-		var loserName string
-		var winnerPower int
-
-		if p1Power > p2Power {
-			winnerCard = c1
-			winnerSide = "player"
-			winnerName = session.Player1Name
-			loserName = session.Player2Name
-			winnerPower = p1Power
-		} else if p2Power > p1Power {
-			winnerCard = c2
-			winnerSide = "cpu"
-			winnerName = session.Player2Name
-			loserName = session.Player1Name
-			winnerPower = p2Power
-		} else {
-			// Tie breaker: Random coin toss or keep flag holder
-			if session.FlagHolder == session.Player2Name {
-				winnerCard = c2
-				winnerSide = "cpu"
-				winnerName = session.Player2Name
-				loserName = session.Player1Name
-				winnerPower = p2Power
-			} else {
-				winnerCard = c1
-				winnerSide = "player"
-				winnerName = session.Player1Name
-				loserName = session.Player2Name
-				winnerPower = p1Power
-			}
-			stepDetails += " (Tie breaker applied)"
-		}
-
-		// Apply OnWin effect
-		winEffect := bs.applyOnWinEffect(winnerCard, winnerSide)
-		if winEffect != "" {
-			stepEffect = fmt.Sprintf("Win Effect: %s", winEffect)
-		}
-
-		// Apply OnDefend effects from memory of the loser
-		var defenderMem *[]models.MemorySlot
-		defenderSide := "player"
-		if loserName == session.Player2Name {
-			defenderMem = &bs.PlayerMem // P1 defending
-		} else {
-			defenderMem = &bs.CPUMem    // P2 defending
-			defenderSide = "cpu"
-		}
+	// 2. Draw card
+	if len(*activeDeck) == 0 {
+		// Deck empty - opponent wins
+		session.IsFinished = true
+		session.Winner = oppPlayerName
+		session.Loser = activePlayerName
 		
-		for _, slot := range *defenderMem {
-			for _, mc := range slot.Cards {
-				isDefendEffect := mc.EffectType == "redirect_30pct" || mc.EffectType == "redirect_50pct" ||
-					mc.EffectType == "lock_enemy_highest" || mc.EffectType == "lock_enemy_highest_x2" ||
-					mc.EffectType == "lock_enemy_lowest"
-				if isDefendEffect {
-					dEffect := bs.applyOnDefendEffect(mc, defenderSide)
-					if dEffect != "" {
-						stepEffect += " | Defend Effect: " + dEffect
-						isRedirect := mc.EffectType == "redirect_30pct" || mc.EffectType == "redirect_50pct"
-						if isRedirect && len(dEffect) > 0 && len(dEffect) >= 4 && dEffect[len(dEffect)-4:] == "back" {
-							// Redirect succeeded: swap winner
-							winnerName = loserName
-							stepDetails += " (Flag redirected!)"
-						}
+		session.Log = append(session.Log, models.BattleLogEntry{
+			Step:            session.Step,
+			Action:          "deck_empty",
+			Player:          activePlayerName,
+			CurrentPower:    session.FlagPower,
+			PlayerMemSlots:  memSlotNames(session.Player1Mem),
+			CPUMemSlots:     memSlotNames(session.Player2Mem),
+			PlayerDeckCount: len(session.Player1Deck),
+			CPUDeckCount:    len(session.Player2Deck),
+			FlagHolder:      session.FlagHolder,
+			Details:         fmt.Sprintf("%s has no cards left in deck. %s wins!", activePlayerName, oppPlayerName),
+		})
+		return
+	}
+
+	card := (*activeDeck)[0]
+	*activeDeck = (*activeDeck)[1:]
+
+	session.ActiveCards = append(session.ActiveCards, card)
+
+	// Calculate base and temporary power (excluding active card-specific calculations yet)
+	// We'll calculate the cumulative challenger power including passive buffs
+	recalculateChallengerPower(session)
+
+	// Apply On Reveal effects
+	details := fmt.Sprintf("%s played %s (Power: %d)", activePlayerName, card.Name, card.Power)
+	effectText := ""
+
+	// Process card effects that trigger immediately
+	switch card.EffectType {
+	case "jester":
+		if hasPower1Card(activeMem) {
+			// Find jester in active cards and buff it
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += 3
+					effectText = "ベンチにパワー1のカードがあるため、パワー+3"
+					break
+				}
+			}
+		}
+	case "hermit":
+		if !hasCityCard(activeMem) {
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += 2
+					effectText = "ベンチにシティ属性がないため、パワー+2"
+					break
+				}
+			}
+		}
+	case "stable_boy":
+		count3 := countPower3Cards(activeMem)
+		if count3 > 0 {
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += count3
+					effectText = fmt.Sprintf("ベンチのパワー3カード数 (%d) 分パワー+%d", count3, count3)
+					break
+				}
+			}
+		}
+	case "gangster":
+		// Gangster gets +2 on attack (which is always true when revealed as challenger)
+		for i := range session.ActiveCards {
+			if session.ActiveCards[i].ID == card.ID {
+				session.ActiveCards[i].Power += 2
+				effectText = "攻撃時、パワー+2"
+				break
+			}
+		}
+	case "merman":
+		if hasAttributeCard(activeMem, "Shipwreck") {
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += 3
+					effectText = "ベンチに難破船属性があるため、パワー+3"
+					break
+				}
+			}
+		}
+	case "lifeguard":
+		if len(*activeDeck) <= 1 {
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += 2
+					effectText = "山札が1枚以下のため、パワー+2"
+					break
+				}
+			}
+		}
+	case "teenager":
+		ghostCount := countAttributeInMemory(*activeMem, "Ghost")
+		if ghostCount > 0 {
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += ghostCount
+					effectText = fmt.Sprintf("ベンチの幽霊属性数 (%d) 分パワー+%d", ghostCount, ghostCount)
+					break
+				}
+			}
+		}
+	case "mime":
+		emptySlots := 6 - uniqueSlotCount(*activeMem)
+		if emptySlots > 0 {
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += emptySlots
+					effectText = fmt.Sprintf("ベンチの空き数 (%d) 分パワー+%d", emptySlots, emptySlots)
+					break
+				}
+			}
+		}
+	case "ufo":
+		// UFO: Add 2 cards from Deck A pool to the bottom of the player's deck
+		// Handled immediately (non-interactive, just draws randomly from A-pool if available)
+		// We'll simulate this by adding two random A-deck cards to the bottom of their deck
+		all := AllCards()
+		var aCards []models.Card
+		for _, ac := range all {
+			if ac.Deck == "A" {
+				aCards = append(aCards, ac)
+			}
+		}
+		addedCount := 0
+		for addedCount < 2 && len(aCards) > 0 {
+			rc := aCards[rand.Intn(len(aCards))].Clone()
+			rc.ID = fmt.Sprintf("%s_ufo_%d_%d", rc.ID, session.Step, addedCount)
+			*activeDeck = append(*activeDeck, rc)
+			addedCount++
+		}
+		effectText = "Aデッキの山札から2枚カードを山札の下に追加しました"
+	case "ghost":
+		// Ghost: Send top card of opponent's deck to their banish pile (discard)
+		var oppDeck *[]models.Card
+		var oppDiscard *[]models.Card
+		if session.TurnOwner == session.Player1Name {
+			oppDeck = &session.Player2Deck
+			oppDiscard = &session.Player2Discard
+		} else {
+			oppDeck = &session.Player1Deck
+			oppDiscard = &session.Player1Discard
+		}
+		if len(*oppDeck) > 0 {
+			c := (*oppDeck)[0]
+			*oppDeck = (*oppDeck)[1:]
+			*oppDiscard = append(*oppDiscard, c)
+			effectText = fmt.Sprintf("相手の山札から %s を除外エリアへ送りました", c.Name)
+		} else {
+			effectText = "相手の山札が空のため、除外できませんでした"
+		}
+	case "hologram":
+		// Hologram: Put 1 random card from B-deck on top of opponent's deck
+		var oppDeck *[]models.Card
+		if session.TurnOwner == session.Player1Name {
+			oppDeck = &session.Player2Deck
+		} else {
+			oppDeck = &session.Player1Deck
+		}
+		all := AllCards()
+		var bCards []models.Card
+		for _, bc := range all {
+			if bc.Deck == "B" {
+				bCards = append(bCards, bc)
+			}
+		}
+		if len(bCards) > 0 {
+			rc := bCards[rand.Intn(len(bCards))].Clone()
+			rc.ID = fmt.Sprintf("%s_holo_%d", rc.ID, session.Step)
+			*oppDeck = append([]models.Card{rc}, *oppDeck...)
+			effectText = fmt.Sprintf("Bデッキから1枚、相手の山札の上に置きました")
+		}
+	case "villain":
+		// Villain: Put 1 random card from A-deck on top of own deck
+		all := AllCards()
+		var aCards []models.Card
+		for _, ac := range all {
+			if ac.Deck == "A" {
+				aCards = append(aCards, ac)
+			}
+		}
+		if len(aCards) > 0 {
+			rc := aCards[rand.Intn(len(aCards))].Clone()
+			rc.ID = fmt.Sprintf("%s_villain_%d", rc.ID, session.Step)
+			*activeDeck = append([]models.Card{rc}, *activeDeck...)
+			effectText = fmt.Sprintf("Aデッキから1枚、自分の山札の上に置きました")
+		}
+	case "submarine":
+		// Submarine: Put bottom card of own deck to own discard (banish)
+		if len(*activeDeck) > 0 {
+			lastIdx := len(*activeDeck) - 1
+			c := (*activeDeck)[lastIdx]
+			*activeDeck = (*activeDeck)[:lastIdx]
+			*activeDiscard = append(*activeDiscard, c)
+			effectText = fmt.Sprintf("自分の山札の底から %s を除外エリアへ送りました", c.Name)
+		} else {
+			effectText = "山札が空のため、除外できませんでした"
+		}
+	}
+
+	// Re-calculate power after immediate reveal effects
+	recalculateChallengerPower(session)
+
+	// Check for interactive choice effects
+	isChoice := false
+	var requiredAction string
+	var options []models.Card
+
+	switch card.EffectType {
+	case "reporter":
+		isChoice = true
+		requiredAction = "CHOOSE_REPORTER"
+		// Options: top 2 cards of active deck
+		limit := 2
+		if len(*activeDeck) < limit {
+			limit = len(*activeDeck)
+		}
+		options = make([]models.Card, limit)
+		for i := 0; i < limit; i++ {
+			options[i] = (*activeDeck)[i]
+		}
+	case "juggler", "bumper_car":
+		isChoice = true
+		requiredAction = "CHOOSE_JUGGLER"
+		// Options: top 3 cards of active deck
+		limit := 3
+		if len(*activeDeck) < limit {
+			limit = len(*activeDeck)
+		}
+		options = make([]models.Card, limit)
+		for i := 0; i < limit; i++ {
+			options[i] = (*activeDeck)[i]
+		}
+	case "sailor", "fortune_teller":
+		isChoice = true
+		requiredAction = "CHOOSE_SAILOR"
+		// Options: all cards in active deck
+		options = make([]models.Card, len(*activeDeck))
+		for i, c := range *activeDeck {
+			options[i] = c
+		}
+	case "butler", "pumpkin":
+		// Butler/Pumpkin: Banish up to 2 cards from bench
+		// Only trigger choice if bench has cards
+		uniqueCards := getUniqueCardsInMem(*activeMem)
+		if len(uniqueCards) > 0 {
+			isChoice = true
+			requiredAction = "CHOOSE_BUTLER"
+			options = uniqueCards
+		}
+	case "magician":
+		// Magician: Banish 1 card <= 3 power from bench
+		var validCards []models.Card
+		for _, slot := range *activeMem {
+			if len(slot.Cards) > 0 && slot.Cards[0].Power <= 3 {
+				validCards = append(validCards, slot.Cards[0])
+			}
+		}
+		if len(validCards) > 0 {
+			isChoice = true
+			requiredAction = "CHOOSE_MAGICIAN"
+			options = validCards
+		}
+	case "vampire":
+		// Vampire: Put 1 B-deck card from bench on top of deck
+		var bCards []models.Card
+		for _, slot := range *activeMem {
+			if len(slot.Cards) > 0 && slot.Cards[0].Deck == "B" {
+				bCards = append(bCards, slot.Cards[0])
+			}
+		}
+		if len(bCards) > 0 {
+			isChoice = true
+			requiredAction = "CHOOSE_VAMPIRE"
+			options = bCards
+		}
+	case "moviestar":
+		// Moviestar: Put up to 2 Movie cards of power 1 or 2 from bench on top of deck
+		var movieCards []models.Card
+		for _, slot := range *activeMem {
+			if len(slot.Cards) > 0 && slot.Cards[0].Attribute == "Movie" && (slot.Cards[0].Power == 1 || slot.Cards[0].Power == 2) {
+				movieCards = append(movieCards, slot.Cards[0])
+			}
+		}
+		if len(movieCards) > 0 {
+			isChoice = true
+			requiredAction = "CHOOSE_MOVIESTAR"
+			options = movieCards
+		}
+	}
+
+	// 4. Log the reveal event
+	logCard := &models.BattleLogCard{
+		ID:         card.ID,
+		Name:       card.Name,
+		Power:      card.Power,
+		BasePower:  card.Power, // original power
+		Attribute:  card.Attribute,
+		EffectType: card.EffectType,
+	}
+
+	session.Log = append(session.Log, models.BattleLogEntry{
+		Step:            session.Step,
+		Action:          "reveal",
+		Player:          activePlayerName,
+		Card:            logCard,
+		CurrentPower:    session.ChallengerPower,
+		EffectTriggered: effectText,
+		PlayerMemSlots:  memSlotNames(session.Player1Mem),
+		CPUMemSlots:     memSlotNames(session.Player2Mem),
+		PlayerDeckCount: len(session.Player1Deck),
+		CPUDeckCount:    len(session.Player2Deck),
+		FlagHolder:      session.FlagHolder,
+		Details:         details,
+	})
+
+	if isChoice {
+		if isActiveNPC {
+			// Resolve NPC choice automatically
+			resolveNPCChoice(session, activePlayerName, requiredAction, options)
+			// Proceed to power comparison immediately
+			resolvePowerComparison(session, isP1NPC, isP2NPC)
+		} else {
+			// Pause and ask the human player
+			session.RequiredAction = requiredAction
+			session.PendingActionPlayer = activePlayerName
+			session.ActionOptions = options
+		}
+	} else {
+		// Proceed to power comparison
+		resolvePowerComparison(session, isP1NPC, isP2NPC)
+	}
+}
+
+// SubmitChoice handles user input for interactive card choices.
+func SubmitChoice(session *models.BattleSession, action *models.BattleAction, isP1NPC, isP2NPC bool) {
+	if session.IsFinished || session.RequiredAction == "DRAW" {
+		return
+	}
+
+	// Verify the action is from the expected player
+	if action.PlayerName != session.PendingActionPlayer {
+		return
+	}
+
+	var activeDeck *[]models.Card
+	var activeMem *[]models.MemorySlot
+	var activeDiscard *[]models.Card
+	var oppMem *[]models.MemorySlot
+	var activePlayerName string
+
+	if session.TurnOwner == session.Player1Name {
+		activeDeck = &session.Player1Deck
+		activeMem = &session.Player1Mem
+		activeDiscard = &session.Player1Discard
+		oppMem = &session.Player2Mem
+		activePlayerName = session.Player1Name
+	} else {
+		activeDeck = &session.Player2Deck
+		activeMem = &session.Player2Mem
+		activeDiscard = &session.Player2Discard
+		oppMem = &session.Player1Mem
+		activePlayerName = session.Player2Name
+	}
+
+	details := ""
+
+	switch session.RequiredAction {
+	case "CHOOSE_REPORTER":
+		// Put selected card on top, remaining on bottom
+		if len(action.CardIDs) > 0 && len(*activeDeck) >= len(action.CardIDs) {
+			topCardID := action.CardIDs[0]
+			var topCard *models.Card
+			var bottomCard *models.Card
+
+			// Find which card is top, which is bottom
+			for i := 0; i < 2 && i < len(*activeDeck); i++ {
+				c := (*activeDeck)[i]
+				if c.ID == topCardID {
+					topCard = &c
+				} else {
+					bottomCard = &c
+				}
+			}
+
+			// Reconstruct deck: remove top 2, place topCard at index 0, bottomCard at bottom of deck
+			if topCard != nil && bottomCard != nil {
+				*activeDeck = (*activeDeck)[2:]
+				// Put topCard on top
+				*activeDeck = append([]models.Card{*topCard}, *activeDeck...)
+				// Put bottomCard at the bottom
+				*activeDeck = append(*activeDeck, *bottomCard)
+				details = fmt.Sprintf("%s は %s を山札の上に、%s を山札の下に置きました", activePlayerName, topCard.Name, bottomCard.Name)
+			}
+		}
+	case "CHOOSE_JUGGLER":
+		// Reorder top 3 cards based on CardIDs list
+		if len(action.CardIDs) > 0 {
+			var reordered []models.Card
+			
+			// Extract them
+			for _, id := range action.CardIDs {
+				for i, c := range *activeDeck {
+					if c.ID == id {
+						reordered = append(reordered, c)
+						*activeDeck = append((*activeDeck)[:i], (*activeDeck)[i+1:]...)
+						break
+					}
+				}
+			}
+			// Prepend reordered cards back to the deck
+			*activeDeck = append(reordered, *activeDeck...)
+			details = fmt.Sprintf("%s は山札の上3枚を並び替えました", activePlayerName)
+		}
+	case "CHOOSE_SAILOR":
+		// Banish one specific card in deck to the bottom
+		if len(action.CardIDs) > 0 {
+			targetID := action.CardIDs[0]
+			var foundCard *models.Card
+			foundIdx := -1
+			for i, c := range *activeDeck {
+				if c.ID == targetID {
+					foundIdx = i
+					foundCard = &c
+					break
+				}
+			}
+			if foundIdx != -1 && foundCard != nil {
+				// Remove from deck
+				*activeDeck = append((*activeDeck)[:foundIdx], (*activeDeck)[foundIdx+1:]...)
+				// Append to bottom
+				*activeDeck = append(*activeDeck, *foundCard)
+				details = fmt.Sprintf("%s は %s を山札の一番下に移動しました", activePlayerName, foundCard.Name)
+			}
+		}
+	case "CHOOSE_BUTLER":
+		// Banish up to 2 cards from bench
+		banishedNames := []string{}
+		for _, id := range action.CardIDs {
+			c, found := removeCardFromMemory(activeMem, id)
+			if found {
+				*activeDiscard = append(*activeDiscard, c)
+				banishedNames = append(banishedNames, c.Name)
+			}
+		}
+		if len(banishedNames) > 0 {
+			details = fmt.Sprintf("%s はベンチから %s を除外エリアへ送りました", activePlayerName, strings.Join(banishedNames, ", "))
+		}
+	case "CHOOSE_MAGICIAN":
+		// Banish 1 card <= 3 power from bench
+		if len(action.CardIDs) > 0 {
+			id := action.CardIDs[0]
+			c, found := removeCardFromMemory(activeMem, id)
+			if found {
+				*activeDiscard = append(*activeDiscard, c)
+				details = fmt.Sprintf("%s は魔術師の効果でベンチから %s を除外しました", activePlayerName, c.Name)
+			}
+		}
+	case "CHOOSE_VAMPIRE":
+		// Put 1 B-deck card from bench on top of deck
+		if len(action.CardIDs) > 0 {
+			id := action.CardIDs[0]
+			c, found := removeCardFromMemory(activeMem, id)
+			if found {
+				*activeDeck = append([]models.Card{c}, *activeDeck...)
+				details = fmt.Sprintf("%s はバンパイアの効果でベンチから %s を山札の上に戻しました", activePlayerName, c.Name)
+			}
+		}
+	case "CHOOSE_MOVIESTAR":
+		// Put up to 2 Movie cards of power 1 or 2 from bench on top of deck
+		restoredNames := []string{}
+		// Place them in order chosen
+		for _, id := range action.CardIDs {
+			c, found := removeCardFromMemory(activeMem, id)
+			if found {
+				*activeDeck = append([]models.Card{c}, *activeDeck...)
+				restoredNames = append(restoredNames, c.Name)
+			}
+		}
+		if len(restoredNames) > 0 {
+			details = fmt.Sprintf("%s はムービースターの効果でベンチから映画カード %s を山札の上に戻しました", activePlayerName, strings.Join(restoredNames, ", "))
+		}
+	case "CHOOSE_SIREN":
+		// Banish 1 card from opponent's bench
+		if len(action.CardIDs) > 0 {
+			id := action.CardIDs[0]
+			c, found := removeCardFromMemory(oppMem, id)
+			if found {
+				// Put in opponent's discard
+				var oppDiscard *[]models.Card
+				if session.TurnOwner == session.Player1Name {
+					oppDiscard = &session.Player2Discard
+				} else {
+					oppDiscard = &session.Player1Discard
+				}
+				*oppDiscard = append(*oppDiscard, c)
+				details = fmt.Sprintf("%s はサイレンの効果で相手のベンチから %s を除外しました", activePlayerName, c.Name)
+			}
+		}
+	}
+
+	// Log the choice
+	session.Log = append(session.Log, models.BattleLogEntry{
+		Step:            session.Step,
+		Action:          "effect_choice",
+		Player:          activePlayerName,
+		CurrentPower:    session.FlagPower,
+		EffectTriggered: session.RequiredAction,
+		PlayerMemSlots:  memSlotNames(session.Player1Mem),
+		CPUMemSlots:     memSlotNames(session.Player2Mem),
+		PlayerDeckCount: len(session.Player1Deck),
+		CPUDeckCount:    len(session.Player2Deck),
+		FlagHolder:      session.FlagHolder,
+		Details:         details,
+	})
+
+	// Reset choice requirements
+	session.RequiredAction = "DRAW"
+	session.PendingActionPlayer = session.TurnOwner
+	session.ActionOptions = []models.Card{}
+
+	// Recalculate power and perform check
+	recalculateChallengerPower(session)
+	resolvePowerComparison(session, isP1NPC, isP2NPC)
+}
+
+func resolveNPCChoice(session *models.BattleSession, npcName string, action string, options []models.Card) {
+	// Simple AI auto-choice
+	var activeDeck *[]models.Card
+	var activeMem *[]models.MemorySlot
+	var activeDiscard *[]models.Card
+	var oppMem *[]models.MemorySlot
+
+	if session.TurnOwner == session.Player1Name {
+		activeDeck = &session.Player1Deck
+		activeMem = &session.Player1Mem
+		activeDiscard = &session.Player1Discard
+		oppMem = &session.Player2Mem
+	} else {
+		activeDeck = &session.Player2Deck
+		activeMem = &session.Player2Mem
+		activeDiscard = &session.Player2Discard
+		oppMem = &session.Player1Mem
+	}
+
+	details := ""
+	switch action {
+	case "CHOOSE_REPORTER":
+		// Just keep the order as is
+		if len(*activeDeck) >= 2 {
+			details = fmt.Sprintf("%s (AI) はリポーターの効果を適用しました (順序維持)", npcName)
+		}
+	case "CHOOSE_JUGGLER":
+		// Sort by power descending to put highest on top
+		if len(options) > 0 {
+			// Remove top 3 from deck
+			limit := len(options)
+			*activeDeck = (*activeDeck)[limit:]
+			// Sort options descending by power
+			rand.Shuffle(len(options), func(i, j int) { options[i], options[j] = options[j], options[i] })
+			// Prepend back
+			*activeDeck = append(options, *activeDeck...)
+			details = fmt.Sprintf("%s (AI) はジャグラーの効果で山札の上を並び替えました", npcName)
+		}
+	case "CHOOSE_SAILOR":
+		// Move the first card in options to bottom
+		if len(options) > 0 {
+			c := (*activeDeck)[0]
+			*activeDeck = append((*activeDeck)[1:], c)
+			details = fmt.Sprintf("%s (AI) は船乗りの効果で %s を山札の底に移動しました", npcName, c.Name)
+		}
+	case "CHOOSE_BUTLER":
+		// Banish the lowest power card on bench
+		if len(options) > 0 {
+			lowest := options[0]
+			for _, c := range options {
+				if c.Power < lowest.Power {
+					lowest = c
+				}
+			}
+			c, found := removeCardFromMemory(activeMem, lowest.ID)
+			if found {
+				*activeDiscard = append(*activeDiscard, c)
+				details = fmt.Sprintf("%s (AI) はベンチから %s を除外しました", npcName, c.Name)
+			}
+		}
+	case "CHOOSE_MAGICIAN":
+		// Banish the first valid card
+		if len(options) > 0 {
+			target := options[0]
+			c, found := removeCardFromMemory(activeMem, target.ID)
+			if found {
+				*activeDiscard = append(*activeDiscard, c)
+				details = fmt.Sprintf("%s (AI) は魔術師の効果で %s を除外しました", npcName, c.Name)
+			}
+		}
+	case "CHOOSE_VAMPIRE":
+		// Put the first valid B card on top of deck
+		if len(options) > 0 {
+			target := options[0]
+			c, found := removeCardFromMemory(activeMem, target.ID)
+			if found {
+				*activeDeck = append([]models.Card{c}, *activeDeck...)
+				details = fmt.Sprintf("%s (AI) はバンパイアの効果で %s を山札の上に戻しました", npcName, c.Name)
+			}
+		}
+	case "CHOOSE_MOVIESTAR":
+		if len(options) > 0 {
+			target := options[0]
+			c, found := removeCardFromMemory(activeMem, target.ID)
+			if found {
+				*activeDeck = append([]models.Card{c}, *activeDeck...)
+				details = fmt.Sprintf("%s (AI) はムービースターの効果で %s を山札の上に戻しました", npcName, c.Name)
+			}
+		}
+	case "CHOOSE_SIREN":
+		// Banish the highest power card from opponent's bench
+		if len(options) > 0 {
+			highest := options[0]
+			for _, c := range options {
+				if c.Power > highest.Power {
+					highest = c
+				}
+			}
+			c, found := removeCardFromMemory(oppMem, highest.ID)
+			if found {
+				var oppDiscard *[]models.Card
+				if session.TurnOwner == session.Player1Name {
+					oppDiscard = &session.Player2Discard
+				} else {
+					oppDiscard = &session.Player1Discard
+				}
+				*oppDiscard = append(*oppDiscard, c)
+				details = fmt.Sprintf("%s (AI) はサイレンの効果で相手のベンチから %s を除外しました", npcName, c.Name)
+			}
+		}
+	}
+
+	session.Log = append(session.Log, models.BattleLogEntry{
+		Step:            session.Step,
+		Action:          "effect_choice",
+		Player:          npcName,
+		CurrentPower:    session.FlagPower,
+		EffectTriggered: action,
+		PlayerMemSlots:  memSlotNames(session.Player1Mem),
+		CPUMemSlots:     memSlotNames(session.Player2Mem),
+		PlayerDeckCount: len(session.Player1Deck),
+		CPUDeckCount:    len(session.Player2Deck),
+		FlagHolder:      session.FlagHolder,
+		Details:         details,
+	})
+}
+
+func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool) {
+	// Check if challenger power exceeds flag power
+	if session.ChallengerPower > session.FlagPower {
+		// FLAG SECURED!
+		oldFlagHolder := session.FlagHolder
+		
+		var activeMem *[]models.MemorySlot
+		var oppMem *[]models.MemorySlot
+		var oppDeck *[]models.Card
+		var oppDiscard *[]models.Card
+		var activePlayerName, oppPlayerName string
+		var isOpponentNPC bool
+
+		if session.TurnOwner == session.Player1Name {
+			activeMem = &session.Player1Mem
+			oppMem = &session.Player2Mem
+			oppDeck = &session.Player2Deck
+			oppDiscard = &session.Player2Discard
+			activePlayerName = session.Player1Name
+			oppPlayerName = session.Player2Name
+			isOpponentNPC = isP2NPC
+		} else {
+			activeMem = &session.Player2Mem
+			oppMem = &session.Player1Mem
+			oppDeck = &session.Player1Deck
+			oppDiscard = &session.Player1Discard
+			activePlayerName = session.Player2Name
+			oppPlayerName = session.Player1Name
+			isOpponentNPC = isP1NPC
+		}
+
+		// 1. Move old defender cards to defender's memory
+		if oldFlagHolder != "" {
+			// Find the previous defender card
+			// In our model, we keep track of the flag card by checking the last active cards of the defender
+			// But since we clear activeCards on turn change, the old defender's card is the one that was holding the flag
+			// To simplify, we track what the flag card was.
+			// Let's assume the first card of the opponent's previous activeCards is what we need to bench
+			// However, since we cleared activeCards, we can find the old flag card from the log.
+			var oldFlagCard *models.Card
+			for i := len(session.Log) - 1; i >= 0; i-- {
+				if session.Log[i].Action == "flag_change" && session.Log[i].Player == oldFlagHolder && session.Log[i].Card != nil {
+					// Found the card
+					c := convertLogCardToCard(session.Log[i].Card)
+					oldFlagCard = &c
+					break
+				}
+			}
+
+			if oldFlagCard != nil {
+				// Check Prince effect: Prince is banished instead of benched when losing the flag
+				if oldFlagCard.EffectType == "prince" {
+					*oppDiscard = append(*oppDiscard, *oldFlagCard)
+					session.Log = append(session.Log, models.BattleLogEntry{
+						Step:            session.Step,
+						Action:          "bench",
+						Player:          oldFlagHolder,
+						CurrentPower:    session.FlagPower,
+						EffectTriggered: "prince",
+						PlayerMemSlots:  memSlotNames(session.Player1Mem),
+						CPUMemSlots:     memSlotNames(session.Player2Mem),
+						PlayerDeckCount: len(session.Player1Deck),
+						CPUDeckCount:    len(session.Player2Deck),
+						FlagHolder:      session.FlagHolder,
+						Details:         fmt.Sprintf("プリンスがフラッグを失ったため、ベンチではなく除外エリアに送られました"),
+					})
+				} else if oldFlagCard.EffectType == "rescue_pod" {
+					// Rescue Pod: Return to shared pool, and banish 1 B-deck card (we just delete a B-deck card or random card from B pool)
+					// In this simplified version, we just put Rescue Pod to discard for now (or actually return it to shared pool A if we want to be precise)
+					*oppDiscard = append(*oppDiscard, *oldFlagCard)
+					session.Log = append(session.Log, models.BattleLogEntry{
+						Step:            session.Step,
+						Action:          "bench",
+						Player:          oldFlagHolder,
+						CurrentPower:    session.FlagPower,
+						EffectTriggered: "rescue_pod",
+						PlayerMemSlots:  memSlotNames(session.Player1Mem),
+						CPUMemSlots:     memSlotNames(session.Player2Mem),
+						PlayerDeckCount: len(session.Player1Deck),
+						CPUDeckCount:    len(session.Player2Deck),
+						FlagHolder:      session.FlagHolder,
+						Details:         fmt.Sprintf("レスキューポッドがフラッグを失い、除外されました"),
+					})
+				} else {
+					added := addToMemory(oppMem, *oldFlagCard)
+					if !added {
+						session.IsFinished = true
+						session.Winner = activePlayerName
+						session.Loser = oppPlayerName
+						session.Log = append(session.Log, models.BattleLogEntry{
+							Step:            session.Step,
+							Action:          "memory_overflow",
+							Player:          oppPlayerName,
+							CurrentPower:    session.FlagPower,
+							PlayerMemSlots:  memSlotNames(session.Player1Mem),
+							CPUMemSlots:     memSlotNames(session.Player2Mem),
+							PlayerDeckCount: len(session.Player1Deck),
+							CPUDeckCount:    len(session.Player2Deck),
+							FlagHolder:      session.FlagHolder,
+							Details:         fmt.Sprintf("メモリ上限超過！ %s のベンチが満杯になり敗北しました", oppPlayerName),
+						})
+						return
 					}
 				}
 			}
 		}
 
-		// Update flag
-		session.FlagHolder = winnerName
-		session.FlagPower = winnerPower
-
-		// Symmetrical: Send both played cards to memory
-		p1Added := addToMemory(&bs.PlayerMem, c1)
-		p2Added := addToMemory(&bs.CPUMem, c2)
-
-		if !p1Added || !p2Added {
-			session.IsFinished = true
-			session.Winner = session.Player2Name
-			session.Loser = session.Player1Name
-			if !p2Added {
-				session.Winner = session.Player1Name
-				session.Loser = session.Player2Name
+		// 2. Move challenger's non-winning active cards to memory
+		winningCard := session.ActiveCards[len(session.ActiveCards)-1]
+		for i := 0; i < len(session.ActiveCards)-1; i++ {
+			c := session.ActiveCards[i]
+			added := addToMemory(activeMem, c)
+			if !added {
+				session.IsFinished = true
+				session.Winner = oppPlayerName
+				session.Loser = activePlayerName
+				session.Log = append(session.Log, models.BattleLogEntry{
+					Step:            session.Step,
+					Action:          "memory_overflow",
+					Player:          activePlayerName,
+					CurrentPower:    session.FlagPower,
+					PlayerMemSlots:  memSlotNames(session.Player1Mem),
+					CPUMemSlots:     memSlotNames(session.Player2Mem),
+					PlayerDeckCount: len(session.Player1Deck),
+					CPUDeckCount:    len(session.Player2Deck),
+					FlagHolder:      session.FlagHolder,
+					Details:         fmt.Sprintf("メモリ上限超過！ %s のベンチが満杯になり敗北しました", activePlayerName),
+				})
+				return
 			}
-			stepAction = "memory_overflow"
-			stepDetails = fmt.Sprintf("Memory Overflow! %s has exhausted unique memory capacity limit.", session.Loser)
 		}
 
-	} else if p1Played {
-		// --- ONLY P1 PLAYED ---
-		stepCard = &models.BattleLogCard{ID: c1.ID, Name: c1.Name, Power: p1Power, Attribute: c1.Attribute}
-		stepAction = "reveal"
-		stepPlayer = session.Player1Name
-		stepDetails = fmt.Sprintf("%s played %s (%d POW). %s discarded.", session.Player1Name, c1.Name, p1Power, session.Player2Name)
-		stepEffect = p1Effect
-
-		session.FlagHolder = session.Player1Name
-		session.FlagPower = p1Power
-
-		// Send P1 card to memory
-		if !addToMemory(&bs.PlayerMem, c1) {
-			session.IsFinished = true
-			session.Winner = session.Player2Name
-			session.Loser = session.Player1Name
-			stepAction = "memory_overflow"
-			stepDetails = fmt.Sprintf("Memory Overflow! %s has exhausted unique memory capacity limit.", session.Player1Name)
-		}
-
-	} else if p2Played {
-		// --- ONLY P2 PLAYED ---
-		stepCard = &models.BattleLogCard{ID: c2.ID, Name: c2.Name, Power: p2Power, Attribute: c2.Attribute}
-		stepAction = "reveal"
-		stepPlayer = session.Player2Name
-		stepDetails = fmt.Sprintf("%s played %s (%d POW). %s discarded.", session.Player2Name, c2.Name, p2Power, session.Player1Name)
-		stepEffect = p2Effect
-
-		session.FlagHolder = session.Player2Name
-		session.FlagPower = p2Power
-
-		// Send P2 card to memory
-		if !addToMemory(&bs.CPUMem, c2) {
-			session.IsFinished = true
-			session.Winner = session.Player1Name
-			session.Loser = session.Player2Name
-			stepAction = "memory_overflow"
-			stepDetails = fmt.Sprintf("Memory Overflow! %s has exhausted unique memory capacity limit.", session.Player2Name)
-		}
-
-	} else {
-		// --- BOTH DISCARDED ---
-		stepAction = "discard"
-		stepDetails = "Both players chose to discard. Grid matrix is stagnant."
-	}
-
-	// 4. Map back Memory slots and Decks from BattleState
-	session.Player1Mem = bs.PlayerMem
-	session.Player2Mem = bs.CPUMem
-	session.Player1Deck = bs.PlayerDeck
-	session.Player2Deck = bs.CPUDeck
-
-	// Draw a card for each player at the end of the step if they have cards in deck
-	if len(session.Player1Deck) > 0 {
-		draw := session.Player1Deck[0]
-		session.Player1Deck = session.Player1Deck[1:]
-		session.Player1Hand = append(session.Player1Hand, draw)
-	}
-	if len(session.Player2Deck) > 0 {
-		draw := session.Player2Deck[0]
-		session.Player2Deck = session.Player2Deck[1:]
-		session.Player2Hand = append(session.Player2Hand, draw)
-	}
-
-	var p1CardPtr *models.BattleLogCard
-	if c1Found {
-		p1CardPtr = &models.BattleLogCard{
-			ID:        c1.ID,
-			Name:      c1.Name,
-			Power:     p1Power,
-			BasePower: c1.Power,
-			Attribute: c1.Attribute,
-		}
-	}
-	var p2CardPtr *models.BattleLogCard
-	if c2Found {
-		p2CardPtr = &models.BattleLogCard{
-			ID:        c2.ID,
-			Name:      c2.Name,
-			Power:     p2Power,
-			BasePower: c2.Power,
-			Attribute: c2.Attribute,
-		}
-	}
-
-	// 5. Append step log entry
-	logEntry := models.BattleLogEntry{
-		Step:            session.Step,
-		Action:          stepAction,
-		Player:          stepPlayer,
-		Card:            stepCard,
-		P1Card:          p1CardPtr,
-		P2Card:          p2CardPtr,
-		P1Action:        p1Action.ActionType,
-		P2Action:        p2Action.ActionType,
-		CurrentPower:    session.FlagPower,
-		EffectTriggered: stepEffect,
-		PlayerMemSlots:  memSlotNames(session.Player1Mem),
-		CPUMemSlots:     memSlotNames(session.Player2Mem),
-		PlayerDeckCount: len(session.Player1Deck),
-		CPUDeckCount:    len(session.Player2Deck),
-		PlayerHandCount: len(session.Player1Hand),
-		CPUHandCount:    len(session.Player2Hand),
-		FlagHolder:      session.FlagHolder,
-		Details:         stepDetails,
-	}
-	session.Log = append(session.Log, logEntry)
-
-	// 6. Check End conditions (when either hand empty)
-	if !session.IsFinished && (len(session.Player1Hand) == 0 || len(session.Player2Hand) == 0) {
-		session.IsFinished = true
-		if session.FlagHolder == session.Player1Name {
-			session.Winner = session.Player1Name
-			session.Loser = session.Player2Name
-		} else if session.FlagHolder == session.Player2Name {
-			session.Winner = session.Player2Name
-			session.Loser = session.Player1Name
-		} else {
-			// Symmetrical tie: Coin toss
-			if rand.Intn(2) == 0 {
-				session.Winner = session.Player1Name
-				session.Loser = session.Player2Name
-			} else {
-				session.Winner = session.Player2Name
-				session.Loser = session.Player1Name
+		// Apply OnWin effects (Hero, Cowboy, etc.)
+		effectText := ""
+		if winningCard.EffectType == "hero" {
+			// Hero: Fans +3
+			effectText = "ヒーローの効果でファン+3を獲得！"
+			// Handled on backend: we will increase the player's fans at the end of the battle
+			// But for now, we just log it
+		} else if winningCard.EffectType == "cowboy" {
+			// Cowboy: Send top card of opponent's deck to their bench
+			if len(*oppDeck) > 0 {
+				c := (*oppDeck)[0]
+				*oppDeck = (*oppDeck)[1:]
+				added := addToMemory(oppMem, c)
+				if !added {
+					session.IsFinished = true
+					session.Winner = activePlayerName
+					session.Loser = oppPlayerName
+					session.Log = append(session.Log, models.BattleLogEntry{
+						Step:            session.Step,
+						Action:          "memory_overflow",
+						Player:          oppPlayerName,
+						CurrentPower:    session.FlagPower,
+						PlayerMemSlots:  memSlotNames(session.Player1Mem),
+						CPUMemSlots:     memSlotNames(session.Player2Mem),
+						PlayerDeckCount: len(session.Player1Deck),
+						CPUDeckCount:    len(session.Player2Deck),
+						FlagHolder:      session.FlagHolder,
+						Details:         fmt.Sprintf("カウボーイの効果でベンチへ送られたカードにより、%s のベンチが溢れて敗北しました", oppPlayerName),
+					})
+					return
+				}
+				effectText = fmt.Sprintf("カウボーイの効果で相手の山札の上の %s をベンチに送りました", c.Name)
 			}
+		}
+
+		// Update flag details
+		session.FlagHolder = activePlayerName
+		
+		// Flag power becomes the winning card's power
+		// We calculate the individual power of the winning card with current board state
+		winCardPower := calculateIndividualCardPower(winningCard, activeMem, oppMem, activePlayerName, session)
+		session.FlagPower = winCardPower
+
+		// Apply Illusionist on-win power buff (if applicable)
+		if winningCard.EffectType == "illusionist" {
+			emptySlots := 6 - uniqueSlotCount(*activeMem)
+			if emptySlots > 0 {
+				session.FlagPower += emptySlots
+				effectText += fmt.Sprintf(" (イリュージョニスト効果でパワー+%d)", emptySlots)
+			}
+		}
+
+		// Swap turn
+		session.TurnOwner = oppPlayerName
+		session.PendingActionPlayer = oppPlayerName
+		session.RequiredAction = "DRAW"
+		
+		// Reset active cards: now contains only the new defending flag card
+		session.ActiveCards = []models.Card{winningCard}
+		session.ChallengerPower = 0
+
+		logCard := &models.BattleLogCard{
+			ID:         winningCard.ID,
+			Name:       winningCard.Name,
+			Power:      session.FlagPower,
+			BasePower:  winningCard.Power,
+			Attribute:  winningCard.Attribute,
+			EffectType: winningCard.EffectType,
 		}
 
 		session.Log = append(session.Log, models.BattleLogEntry{
-			Step:            session.Step + 1,
-			Action:          "game_end",
-			Player:          session.Winner,
+			Step:            session.Step,
+			Action:          "flag_change",
+			Player:          activePlayerName,
+			Card:            logCard,
 			CurrentPower:    session.FlagPower,
+			EffectTriggered: effectText,
 			PlayerMemSlots:  memSlotNames(session.Player1Mem),
 			CPUMemSlots:     memSlotNames(session.Player2Mem),
+			PlayerDeckCount: len(session.Player1Deck),
+			CPUDeckCount:    len(session.Player2Deck),
 			FlagHolder:      session.FlagHolder,
-			Details:         fmt.Sprintf("Tournament Grid Exhausted. %s claims absolute dominance!", session.Winner),
+			Details:         fmt.Sprintf("%s がフラッグを奪いました！防衛パワー: %d", activePlayerName, session.FlagPower),
 		})
+
+		// Check if opponent is dead (no cards left to challenge)
+		if len(*oppDeck) == 0 {
+			session.IsFinished = true
+			session.Winner = activePlayerName
+			session.Loser = oppPlayerName
+			session.Log = append(session.Log, models.BattleLogEntry{
+				Step:            session.Step + 1,
+				Action:          "game_end",
+				Player:          activePlayerName,
+				CurrentPower:    session.FlagPower,
+				PlayerMemSlots:  memSlotNames(session.Player1Mem),
+				CPUMemSlots:     memSlotNames(session.Player2Mem),
+				PlayerDeckCount: len(session.Player1Deck),
+				CPUDeckCount:    len(session.Player2Deck),
+				FlagHolder:      session.FlagHolder,
+				Details:         fmt.Sprintf("対戦相手 %s の山札がなくなりました。%s の勝利です！", oppPlayerName, activePlayerName),
+			})
+			return
+		}
+
+		// Check if opponent is NPC - if so, auto draw for them!
+		if isOpponentNPC {
+			// Trigger a recursive/delayed step or we let the frontend trigger it via next step
+			// In our design, the frontend triggers every step via /api/battle/step, even for NPC.
+			// This gives the user the ability to step through NPC turns.
+		}
+
+	} else {
+		// Challenger power is still <= flag power.
+		// Need to draw more cards.
+		session.RequiredAction = "DRAW"
+		session.PendingActionPlayer = session.TurnOwner
+	}
+}
+
+// Helper to recalculate the total challenger power
+func recalculateChallengerPower(session *models.BattleSession) {
+	var activeMem *[]models.MemorySlot
+	var oppMem *[]models.MemorySlot
+	var activePlayerName string
+	if session.TurnOwner == session.Player1Name {
+		activeMem = &session.Player1Mem
+		oppMem = &session.Player2Mem
+		activePlayerName = session.Player1Name
+	} else {
+		activeMem = &session.Player2Mem
+		oppMem = &session.Player1Mem
+		activePlayerName = session.Player2Name
 	}
 
-	// Reset pending actions for the next step
-	session.PendingActions = make(map[string]*models.BattleAction)
+	total := 0
+	for _, c := range session.ActiveCards {
+		total += calculateIndividualCardPower(c, activeMem, oppMem, activePlayerName, session)
+	}
+	session.ChallengerPower = total
+}
+
+func calculateIndividualCardPower(card models.Card, myMem, oppMem *[]models.MemorySlot, playerName string, session *models.BattleSession) int {
+	power := card.Power
+
+	// Apply global bench buffs
+	// 1. Bench power bonuses (bench_power_plus_1, bench_power_plus_2)
+	power += benchPowerBonus(*myMem)
+
+	// 2. Specific attribute buffs from bench
+	// AI buff
+	if card.Power == 2 && hasAttributeCard(myMem, "AI") {
+		// AI: "自分のパワー2のキャラクターのパワー+1"
+		// Count how many AI cards in bench (actually it works per AI card on bench)
+		power += countAttributeInMemory(*myMem, "AI")
+	}
+
+	// Makeup Artist buff
+	if card.Power == 1 && hasAttributeCard(myMem, "Movie") {
+		// "自分のパワー1のキャラクターの攻撃時、パワー+2"
+		// If we are the challenger, we are attacking
+		if session.TurnOwner == playerName {
+			power += countMakeupArtists(myMem) * 2
+		}
+	}
+
+	// Vendor buff
+	if card.Attribute == "Fairground" && hasVendor(myMem) {
+		power += countVendors(myMem)
+	}
+
+	// Blacksmith buff
+	if card.Attribute == "City" && hasBlacksmith(myMem) {
+		power += countBlacksmiths(myMem)
+	}
+
+	// Band buff
+	if card.Attribute == "Space" && hasBand(myMem) {
+		power += countBands(myMem)
+	}
+
+	// Director buff
+	if card.Attribute == "Movie" && hasDirector(myMem) && session.TurnOwner == playerName {
+		power += countDirectors(myMem)
+	}
+
+	// Cook buff
+	if hasCook(myMem) && session.FlagHolder == playerName && isFlagCard(session, card.ID) {
+		power += countCooks(myMem)
+	}
+
+	// Bard buff
+	if hasBard(myMem) && session.TurnOwner == playerName {
+		power += countBards(myMem)
+	}
+
+	return power
+}
+
+// Helpers for checking card presence & count in memory
+func hasPower1Card(mem *[]models.MemorySlot) bool {
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 && slot.Cards[0].Power == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCityCard(mem *[]models.MemorySlot) bool {
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 && slot.Cards[0].Attribute == "City" {
+			return true
+		}
+	}
+	return false
+}
+
+func countPower3Cards(mem *[]models.MemorySlot) int {
+	count := 0
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 && slot.Cards[0].Power == 3 {
+			count += slot.Count
+		}
+	}
+	return count
+}
+
+func hasAttributeCard(mem *[]models.MemorySlot, attr string) bool {
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 && slot.Cards[0].Attribute == attr {
+			return true
+		}
+	}
+	return false
+}
+
+func countMakeupArtists(mem *[]models.MemorySlot) int {
+	count := 0
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 && slot.Cards[0].EffectType == "makeup_artist" {
+			count += slot.Count
+		}
+	}
+	return count
+}
+
+func hasVendor(mem *[]models.MemorySlot) bool {
+	return hasEffectInMem(mem, "vendor")
+}
+
+func countVendors(mem *[]models.MemorySlot) int {
+	return countEffectInMem(mem, "vendor")
+}
+
+func hasBlacksmith(mem *[]models.MemorySlot) bool {
+	return hasEffectInMem(mem, "blacksmith")
+}
+
+func countBlacksmiths(mem *[]models.MemorySlot) int {
+	return countEffectInMem(mem, "blacksmith")
+}
+
+func hasBand(mem *[]models.MemorySlot) bool {
+	return hasEffectInMem(mem, "band")
+}
+
+func countBands(mem *[]models.MemorySlot) int {
+	return countEffectInMem(mem, "band")
+}
+
+func hasDirector(mem *[]models.MemorySlot) bool {
+	return hasEffectInMem(mem, "director")
+}
+
+func countDirectors(mem *[]models.MemorySlot) int {
+	return countEffectInMem(mem, "director")
+}
+
+func hasCook(mem *[]models.MemorySlot) bool {
+	return hasEffectInMem(mem, "cook")
+}
+
+func countCooks(mem *[]models.MemorySlot) int {
+	return countEffectInMem(mem, "cook")
+}
+
+func hasBard(mem *[]models.MemorySlot) bool {
+	return hasEffectInMem(mem, "bard")
+}
+
+func countBards(mem *[]models.MemorySlot) int {
+	return countEffectInMem(mem, "bard")
+}
+
+func hasEffectInMem(mem *[]models.MemorySlot, effectType string) bool {
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 && slot.Cards[0].EffectType == effectType {
+			return true
+		}
+	}
+	return false
+}
+
+func countEffectInMem(mem *[]models.MemorySlot, effectType string) int {
+	count := 0
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 && slot.Cards[0].EffectType == effectType {
+			count += slot.Count
+		}
+	}
+	return count
+}
+
+func isFlagCard(session *models.BattleSession, cardID string) bool {
+	// Usually the last card in activeCards of the flag holder is the flag card.
+	// But during the defender's state, activeCards has exactly the flag card.
+	if len(session.ActiveCards) > 0 {
+		return session.ActiveCards[0].ID == cardID
+	}
+	return false
+}
+
+func getUniqueCardsInMem(mem []models.MemorySlot) []models.Card {
+	var cards []models.Card
+	for _, slot := range mem {
+		if len(slot.Cards) > 0 {
+			cards = append(cards, slot.Cards[0].Clone())
+		}
+	}
+	return cards
+}
+
+func removeCardFromMemory(mem *[]models.MemorySlot, cardID string) (models.Card, bool) {
+	for i, slot := range *mem {
+		for j, c := range slot.Cards {
+			if c.ID == cardID {
+				// Remove card from slot
+				ret := c.Clone()
+				slot.Cards = append(slot.Cards[:j], slot.Cards[j+1:]...)
+				(*mem)[i].Cards = slot.Cards
+				(*mem)[i].Count--
+
+				// If slot is empty, remove slot from memory
+				if (*mem)[i].Count <= 0 {
+					*mem = append((*mem)[:i], (*mem)[i+1:]...)
+				}
+				return ret, true
+			}
+		}
+	}
+	return models.Card{}, false
+}
+
+func convertLogCardToCard(lc *models.BattleLogCard) models.Card {
+	return models.Card{
+		ID:         lc.ID,
+		Name:       lc.Name,
+		Power:      lc.Power,
+		Attribute:  lc.Attribute,
+		EffectType: lc.EffectType,
+	}
 }

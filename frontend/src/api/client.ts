@@ -39,6 +39,9 @@ interface RawGameState {
   opponent?: string;
   battleResult?: string;
   battleSession?: BattleSession;
+  deckAPool?: Card[];
+  deckBPool?: Card[];
+  deckCPool?: Card[];
 }
 
 function mapGameState(raw: RawGameState): GameState {
@@ -67,6 +70,9 @@ function mapGameState(raw: RawGameState): GameState {
     opponent: raw.opponent || '',
     battleResult: raw.battleResult || '',
     battleSession: raw.battleSession || null,
+    deckAPool: raw.deckAPool || [],
+    deckBPool: raw.deckBPool || [],
+    deckCPool: raw.deckCPool || [],
   };
 }
 
@@ -139,15 +145,23 @@ export async function startBattle(gameId: string, playerName: string): Promise<G
   return mapGameState(raw);
 }
 
+export async function stepBattle(gameId: string, playerName: string): Promise<GameState> {
+  const raw = await apiFetch<RawGameState>('/api/battle/step', {
+    method: 'POST',
+    body: JSON.stringify({ gameId, playerName }),
+  });
+  return mapGameState(raw);
+}
+
 export async function submitBattleAction(
   gameId: string,
   playerName: string,
-  actionType: 'PLAY' | 'DISCARD',
-  cardId: string
+  actionType: string,
+  cardIds: string[]
 ): Promise<GameState> {
   const raw = await apiFetch<RawGameState>('/api/battle/action', {
     method: 'POST',
-    body: JSON.stringify({ gameId, playerName, actionType, cardId }),
+    body: JSON.stringify({ gameId, playerName, actionType, cardIds }),
   });
   return mapGameState(raw);
 }

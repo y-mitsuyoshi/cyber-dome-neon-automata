@@ -658,7 +658,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return {
         ...card,
         attribute: card.attribute,
-        archetype: card.archetype,
+        archetype: card.archetype || '',
         rarity: card.rarity
       };
     }
@@ -668,7 +668,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       name: jaInfo ? jaInfo.name : card.name,
       effect: jaInfo ? jaInfo.effect : card.effect,
       attribute: attributeJa[card.attribute] || card.attribute,
-      archetype: archetypeJa[card.archetype] || card.archetype,
+      archetype: card.archetype ? (archetypeJa[card.archetype] || card.archetype) : '',
       rarity: rarityJa[card.rarity] || card.rarity
     };
   }, [locale]);

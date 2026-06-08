@@ -1,13 +1,15 @@
 export interface Card {
   id: string;
   name: string;
-  attribute: 'Virus' | 'AI' | 'Hardware' | 'Netrunner';
-  archetype: 'Aggro' | 'Combo' | 'Control';
+  attribute: string; // Castle, City, Space, Movie, Shipwreck, Ghost, Fairground, None
+  archetype?: string;
   power: number;
-  rarity: 'Common' | 'Rare' | 'Epic';
+  rarity: string; // Common, Uncommon, Rare, Epic
   effect: string;
   effectType: string;
   cost: number;
+  deck?: string; // A, B, C, Starter
+  quantity?: number;
 }
 
 export interface BattleLogCard {
@@ -15,7 +17,8 @@ export interface BattleLogCard {
   name: string;
   power: number;
   basePower?: number;
-  attribute: 'Virus' | 'AI' | 'Hardware' | 'Netrunner' | string;
+  attribute: string;
+  effectType?: string;
 }
 
 export interface BattleLogEntry {
@@ -46,8 +49,8 @@ export interface ShopState {
 
 export interface BattleAction {
   playerName: string;
-  actionType: 'PLAY' | 'DISCARD';
-  cardId: string;
+  actionType: string; // e.g. "CHOOSE_CARD", "REORDER", "BANISH"
+  cardIds?: string[];
 }
 
 export interface MemorySlot {
@@ -60,8 +63,8 @@ export interface BattleSession {
   sessionId: string;
   player1Name: string;
   player2Name: string;
-  player1Hand: Card[];
-  player2Hand: Card[];
+  player1Deck: Card[];
+  player2Deck: Card[];
   player1Mem: MemorySlot[];
   player2Mem: MemorySlot[];
   player1Discard: Card[];
@@ -69,11 +72,16 @@ export interface BattleSession {
   flagHolder: string;
   flagPower: number;
   step: number;
-  pendingActions: Record<string, BattleAction>;
   isFinished: boolean;
   winner: string;
   loser: string;
   log: BattleLogEntry[];
+  turnOwner: string;
+  requiredAction: string; // "DRAW", "CHOOSE_REPORTER", "CHOOSE_BUTLER", etc.
+  pendingActionPlayer: string; // Player name we are waiting for
+  actionOptions: Card[];
+  activeCards: Card[];
+  challengerPower: number;
 }
 
 export interface Standing {
@@ -99,10 +107,13 @@ export interface GameState {
   };
   shop: ShopState;
   standings: Standing[];
-  npcs: unknown[];
+  npcs: any[];
   battleLog: BattleLogEntry[];
-  lastResult: unknown;
+  lastResult: any;
   opponent: string;
   battleResult: string;
   battleSession: BattleSession | null;
+  deckAPool: Card[];
+  deckBPool: Card[];
+  deckCPool: Card[];
 }

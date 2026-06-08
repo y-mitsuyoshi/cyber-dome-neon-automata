@@ -2,7 +2,6 @@ package engine
 
 import (
 	"backend/models"
-	"math/rand"
 )
 
 // NPCNames is a list of NPC names for the tournament.
@@ -45,86 +44,31 @@ func CreateNPC(name string, strategy string) models.Player {
 	}
 }
 
-// buildBiasedDeck creates a starting deck biased toward the given strategy.
-func buildBiasedDeck(pool []models.Card, strategy string, size int) []models.Card {
-	var preferred []models.Card
-	var others []models.Card
-
-	for _, c := range pool {
-		switch strategy {
-		case "Aggro":
-			if c.Attribute == "Virus" {
-				preferred = append(preferred, c)
-			} else {
-				others = append(others, c)
-			}
-		case "Combo":
-			if c.Attribute == "AI" {
-				preferred = append(preferred, c)
-			} else {
-				others = append(others, c)
-			}
-		case "Control":
-			if c.Attribute == "Hardware" || c.Attribute == "Netrunner" {
-				preferred = append(preferred, c)
-			} else {
-				others = append(others, c)
-			}
-		}
-	}
-
-	deck := make([]models.Card, 0, size)
-
-	// 70% preferred, 30% others for starting deck flavor
-	preferredCount := (size * 70) / 100
-	if preferredCount < 1 {
-		preferredCount = 1
-	}
-
-	for i := 0; i < preferredCount && len(preferred) > 0; i++ {
-		idx := rand.Intn(len(preferred))
-		deck = append(deck, preferred[idx].Clone())
-	}
-
-	for len(deck) < size {
-		if len(others) > 0 {
-			idx := rand.Intn(len(others))
-			deck = append(deck, others[idx].Clone())
-		} else if len(preferred) > 0 {
-			idx := rand.Intn(len(preferred))
-			deck = append(deck, preferred[idx].Clone())
-		}
-	}
-
-	// Shuffle deck
-	rand.Shuffle(len(deck), func(i, j int) {
-		deck[i], deck[j] = deck[j], deck[i]
-	})
-
-	return deck
-}
-
 // NPCShopPhase simulates a symmetrical shop phase for an NPC player.
-func NPCShopPhase(npc *models.Player, round int) {
+func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 	strategy := npc.AIStrategy
 	
 	// Max 3 purchase/reroll iterations to prevent infinite loops and simulate human speed
 	for iter := 0; iter < 3; iter++ {
-		// Generate standard shop of 3 cards
-		shop := GenerateShop(npc.Credits, round)
+		// Generate standard shop of 5 cards using the shared pool
+		shop := GenerateShop(gs, round)
 		boughtAny := false
 
 		// 1. Evaluate and buy matching cards
 		remainingCards := make([]models.Card, 0, len(shop.Cards))
 		for _, card := range shop.Cards {
 			isPreferred := false
+			// Adapt to new attributes: Castle, City, Space, Movie, Shipwreck, Ghost, Fairground
+			// Aggro: Movie, Ghost
+			// Combo: Space, Fairground
+			// Control: Castle, City, Shipwreck
 			switch strategy {
 			case "Aggro":
-				isPreferred = (card.Attribute == "Virus")
+				isPreferred = (card.Attribute == "Movie" || card.Attribute == "Ghost")
 			case "Combo":
-				isPreferred = (card.Attribute == "AI")
+				isPreferred = (card.Attribute == "Space" || card.Attribute == "Fairground")
 			case "Control":
-				isPreferred = (card.Attribute == "Hardware" || card.Attribute == "Netrunner")
+				isPreferred = (card.Attribute == "Castle" || card.Attribute == "City" || card.Attribute == "Shipwreck")
 			}
 
 			cost := card.RarityCost()
@@ -137,7 +81,9 @@ func NPCShopPhase(npc *models.Player, round int) {
 				remainingCards = append(remainingCards, card)
 			}
 		}
-		shop.Cards = remainingCards
+		
+		// Return unbought cards to the pool
+		ReturnCardsToPool(gs, remainingCards)
 
 		// 2. Reroll decision: If didn't buy anything, has >= 3 credits, and has iteration left, spend 1 credit to reroll
 		if !boughtAny && npc.Credits >= 3 && iter < 2 {
@@ -149,19 +95,19 @@ func NPCShopPhase(npc *models.Player, round int) {
 		}
 	}
 
-	// 3. Compact deck: If deck is getting bloated (> 10 cards) and they have >= 2 credits,
-	// delete a card that does NOT match their strategy archetype.
-	if len(npc.Deck) > 10 && npc.Credits >= 2 {
+	// 3. Compact deck: If deck is getting bloated (> 10 cards)
+	// delete a card that does NOT match their strategy archetype. Deletion is free.
+	if len(npc.Deck) > 10 {
 		deleteIdx := -1
 		for i, card := range npc.Deck {
 			isNonMatching := false
 			switch strategy {
 			case "Aggro":
-				isNonMatching = (card.Attribute != "Virus")
+				isNonMatching = (card.Attribute != "Movie" && card.Attribute != "Ghost")
 			case "Combo":
-				isNonMatching = (card.Attribute != "AI")
+				isNonMatching = (card.Attribute != "Space" && card.Attribute != "Fairground")
 			case "Control":
-				isNonMatching = (card.Attribute != "Hardware" && card.Attribute != "Netrunner")
+				isNonMatching = (card.Attribute != "Castle" && card.Attribute != "City" && card.Attribute != "Shipwreck")
 			}
 
 			if isNonMatching {
@@ -171,8 +117,7 @@ func NPCShopPhase(npc *models.Player, round int) {
 		}
 
 		if deleteIdx != -1 {
-			// Delete card and pay 2 credits
-			npc.Credits -= 2
+			// Delete card for free
 			npc.Deck = append(npc.Deck[:deleteIdx], npc.Deck[deleteIdx+1:]...)
 		}
 	}

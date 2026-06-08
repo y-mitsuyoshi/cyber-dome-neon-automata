@@ -17,6 +17,7 @@ import {
   rerollShop,
   deleteCard,
   startBattle,
+  stepBattle,
   submitBattleAction,
   nextRound,
   createLobby,
@@ -362,12 +363,27 @@ function App() {
     }
   };
 
-  const handleSubmitBattleAction = async (actionType: 'PLAY' | 'DISCARD', cardId: string) => {
+  const handleStepBattle = async () => {
     if (!gameState) return;
     setLoading(true);
     setError(null);
     try {
-      const state = await submitBattleAction(gameState.gameId, playerName, actionType, cardId);
+      const state = await stepBattle(gameState.gameId, playerName);
+      setGameState(state);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Step advanced failed.';
+      setError(`STEP_FAILED: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitBattleAction = async (actionType: string, cardIds: string[]) => {
+    if (!gameState) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await submitBattleAction(gameState.gameId, playerName, actionType, cardIds);
       setGameState(state);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Neural network overflow.';
@@ -538,6 +554,7 @@ function App() {
               opponent={gameState.opponent}
               onComplete={handleBattleComplete}
               deck={gameState.player.deck}
+              onStep={handleStepBattle}
               onSubmitAction={handleSubmitBattleAction}
               loading={loading}
             />

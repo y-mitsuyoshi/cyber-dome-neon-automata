@@ -5,68 +5,69 @@ import (
 	"math/rand"
 )
 
-// GenerateShop creates a shop with 3 random cards from the pool based on the current round's rarity progression.
-func GenerateShop(credits int, round int) models.ShopState {
-	pool := AllCards()
-
-	// Separate cards by rarity
-	var commons []models.Card
-	var rares []models.Card
-	var epics []models.Card
-
-	for _, c := range pool {
-		switch c.Rarity {
-		case "Common":
-			commons = append(commons, c)
-		case "Rare":
-			rares = append(rares, c)
-		case "Epic":
-			epics = append(epics, c)
-		}
-	}
-
-	// Default probabilities (fallback)
-	pCommon := 100
-	pRare := 0
-	pEpic := 0
-
-	// Progression probabilities
+// GenerateShop creates a shop with 5 cards from the shared pool based on the current round.
+func GenerateShop(gs *models.GameState, round int) models.ShopState {
+	var pool *[]models.Card
 	if round <= 2 {
-		pCommon = 90
-		pRare = 10
-		pEpic = 0
+		pool = &gs.DeckAPool
 	} else if round <= 4 {
-		pCommon = 50
-		pRare = 40
-		pEpic = 10
+		pool = &gs.DeckBPool
 	} else {
-		pCommon = 25
-		pRare = 50
-		pEpic = 25
+		pool = &gs.DeckCPool
 	}
 
 	cards := make([]models.Card, 5)
 	for i := 0; i < 5; i++ {
-		roll := rand.Intn(100)
-		var selectedCard models.Card
-
-		if roll < pEpic && len(epics) > 0 {
-			selectedCard = epics[rand.Intn(len(epics))]
-		} else if roll < (pEpic + pRare) && len(rares) > 0 {
-			selectedCard = rares[rand.Intn(len(rares))]
-		} else if roll < (pEpic + pRare + pCommon) && len(commons) > 0 {
-			selectedCard = commons[rand.Intn(len(commons))]
-		} else {
-			// Fallback to absolute random if something is empty
-			selectedCard = pool[rand.Intn(len(pool))]
-		}
-
-		cards[i] = selectedCard.Clone()
+		cards[i] = popCardFromPool(pool, round)
 	}
 
 	return models.ShopState{
 		Cards:   cards,
-		Credits: credits,
+		Credits: 0,
+	}
+}
+
+func popCardFromPool(pool *[]models.Card, round int) models.Card {
+	if len(*pool) == 0 {
+		// Fallback: generate a random card belonging to the correct deck category
+		all := AllCards()
+		var targetDeck string
+		if round <= 2 {
+			targetDeck = "A"
+		} else if round <= 4 {
+			targetDeck = "B"
+		} else {
+			targetDeck = "C"
+		}
+		
+		var matchingCards []models.Card
+		for _, c := range all {
+			if c.Deck == targetDeck {
+				matchingCards = append(matchingCards, c)
+			}
+		}
+		if len(matchingCards) > 0 {
+			return matchingCards[rand.Intn(len(matchingCards))].Clone()
+		}
+		return all[rand.Intn(len(all))].Clone()
+	}
+	
+	idx := rand.Intn(len(*pool))
+	card := (*pool)[idx]
+	*pool = append((*pool)[:idx], (*pool)[idx+1:]...)
+	return card
+}
+
+// ReturnCardsToPool returns cards back to their respective shared deck pools.
+func ReturnCardsToPool(gs *models.GameState, cards []models.Card) {
+	for _, c := range cards {
+		if c.Deck == "A" {
+			gs.DeckAPool = append(gs.DeckAPool, c)
+		} else if c.Deck == "B" {
+			gs.DeckBPool = append(gs.DeckBPool, c)
+		} else if c.Deck == "C" {
+			gs.DeckCPool = append(gs.DeckCPool, c)
+		}
 	}
 }
 
@@ -94,16 +95,6 @@ func BuyCard(shop *models.ShopState, deck *[]models.Card, credits int, cardIndex
 	return credits, &card, ""
 }
 
-// RerollShop regenerates the shop for 1 credit.
-func RerollShop(shop *models.ShopState, credits int, round int) (int, string) {
-	if credits < 1 {
-		return credits, "Not enough credits to reroll"
-	}
-	credits--
-	*shop = GenerateShop(credits, round)
-	return credits, ""
-}
-
 // DeleteCard removes a card from the player's deck at the given index. Costs 0 credits (Free).
 func DeleteCard(deck *[]models.Card, credits int, cardIndex int) (int, *models.Card, string) {
 	if cardIndex < 0 || cardIndex >= len(*deck) {
@@ -114,4 +105,22 @@ func DeleteCard(deck *[]models.Card, credits int, cardIndex int) (int, *models.C
 	*deck = append((*deck)[:cardIndex], (*deck)[cardIndex+1:]...)
 
 	return credits, &deleted, ""
+}
+
+// RerollShop spends 1 credit, returns old shop cards to the pool, and draws 5 new cards.
+func RerollShop(gs *models.GameState, shop *models.ShopState, credits int, round int) (int, string) {
+	if credits < 1 {
+		return credits, "Not enough credits to reroll"
+	}
+	credits -= 1
+
+	// Return current shop cards to the shared pool
+	ReturnCardsToPool(gs, shop.Cards)
+
+	// Generate a new shop
+	newShop := GenerateShop(gs, round)
+	shop.Cards = newShop.Cards
+	shop.Credits = credits
+
+	return credits, ""
 }

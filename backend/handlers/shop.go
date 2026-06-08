@@ -124,10 +124,14 @@ func HandleBuyCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credits, _, errMsg := engine.BuyCard(shop, &p.Deck, p.Credits, req.CardIndex)
+	credits, purchasedCard, errMsg := engine.BuyCard(shop, &p.Deck, p.Credits, req.CardIndex)
 	if errMsg != "" {
 		writeError(w, http.StatusBadRequest, errMsg)
 		return
+	}
+
+	if purchasedCard != nil && purchasedCard.EffectType == "clone" {
+		p.Fans += 1
 	}
 
 	p.Credits = credits
@@ -191,7 +195,7 @@ func HandleRerollShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credits, errMsg := engine.RerollShop(shop, p.Credits, gs.CurrentRound)
+	credits, errMsg := engine.RerollShop(gs, shop, p.Credits, gs.CurrentRound)
 	if errMsg != "" {
 		writeError(w, http.StatusBadRequest, errMsg)
 		return

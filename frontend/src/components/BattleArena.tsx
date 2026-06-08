@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Flag, Zap, User, Cpu, Play, Pause, FastForward, RotateCcw, Layers, Shield, Flame, Activity } from 'lucide-react';
+import { Flag, User, Cpu, Play, Pause, RotateCcw, Layers, Shield, Activity } from 'lucide-react';
 import type { BattleLogEntry, BattleSession, Card, BattleLogCard } from '../types/game';
 import MemorySlots from './MemorySlots';
 import CardDisplay from './CardDisplay';
@@ -7,12 +7,12 @@ import { useTranslation } from '../context/TranslationContext';
 import DeckViewerModal from './DeckViewerModal';
 import { useAudio } from '../context/AudioContext';
 
-const convertToFullCard = (logCard: BattleLogCard | null | undefined): Card => {
+const convertToFullCard = (logCard: BattleLogCard | Card | null | undefined): Card => {
   if (!logCard) {
     return {
       id: 'default',
       name: 'UNKNOWN',
-      attribute: 'Virus',
+      attribute: 'None',
       archetype: 'Control',
       power: 0,
       rarity: 'Common',
@@ -22,19 +22,15 @@ const convertToFullCard = (logCard: BattleLogCard | null | undefined): Card => {
     };
   }
 
-  const attribute = (['Virus', 'AI', 'Hardware', 'Netrunner'].includes(logCard.attribute)
-    ? logCard.attribute
-    : 'Virus') as 'Virus' | 'AI' | 'Hardware' | 'Netrunner';
-
   return {
     id: logCard.id || 'default',
     name: logCard.name,
-    attribute,
+    attribute: logCard.attribute || 'None',
     archetype: 'Control',
     power: logCard.power,
     rarity: 'Common',
-    effect: '',
-    effectType: '',
+    effect: (logCard as any).effect || '',
+    effectType: logCard.effectType || '',
     cost: 0,
   };
 };
@@ -42,208 +38,358 @@ const convertToFullCard = (logCard: BattleLogCard | null | undefined): Card => {
 interface BattleArenaProps {
   gameId: string;
   playerName: string;
-  battleSession: BattleSession | null; // Ignored as simulation is backend-only now
+  battleSession: BattleSession | null;
   battleLog: BattleLogEntry[];
   opponent: string;
   onComplete: () => void;
   deck: Card[];
-  onSubmitAction: (actionType: 'PLAY' | 'DISCARD', cardId: string) => Promise<void>; // Retained for type compatibility
+  onStep: () => Promise<void>;
+  onSubmitAction: (actionType: string, cardIds: string[]) => Promise<void>;
   loading: boolean;
 }
 
 function BattleArena({
   gameId: _gameId,
   playerName,
+  battleSession,
   battleLog = [],
   opponent,
   onComplete,
   deck,
-  onSubmitAction: _onSubmitAction,
+  onStep,
+  onSubmitAction,
   loading: _loading,
 }: BattleArenaProps) {
   const { playSE } = useAudio();
-  const { t, translateBattleDetail, translateCardName } = useTranslation();
+  const { t, translateBattleDetail } = useTranslation();
   const [showDeckModal, setShowDeckModal] = useState(false);
 
-  // Replay playback states
+  // Replay playback states (for non-live historical log viewer fallback)
   const [currentLogIndex, setCurrentLogIndex] = useState<number>(0);
-  const [isAutoPlay, setIsAutoPlay] = useState<boolean>(true);
+  const [isAutoPlay, setIsAutoPlay] = useState<boolean>(false);
   const [playSpeed, setPlaySpeed] = useState<number>(1000); // ms per step
   const [flashState, setFlashState] = useState<'cyan' | 'magenta' | null>(null);
 
+  // Interactive selection state
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
+
   const latestLogEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Initialize and check if log is empty
-  const hasLog = !!(battleLog && battleLog.length > 0);
+  const isLiveMode = battleSession !== null;
+  const hasLog = isLiveMode ? (battleSession.log.length > 0) : (battleLog && battleLog.length > 0);
 
-  // Auto-scroll the visual action log to the latest event
+  // Auto-scroll log
   useEffect(() => {
     if (latestLogEndRef.current && typeof latestLogEndRef.current.scrollIntoView === 'function') {
       latestLogEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [currentLogIndex]);
+  }, [currentLogIndex, battleSession?.log.length]);
 
-  // Handle automatic step increments
+  // Reset selected cards when required action changes
   useEffect(() => {
-    if (!isAutoPlay || !hasLog) return;
-    if (currentLogIndex >= battleLog.length - 1) {
-      setIsAutoPlay(false);
-      return;
+    setSelectedCards([]);
+  }, [battleSession?.requiredAction, battleSession?.pendingActionPlayer]);
+
+  // Auto-Play timer effect
+  useEffect(() => {
+    if (!isAutoPlay) return;
+
+    if (isLiveMode) {
+      if (battleSession.isFinished || battleSession.requiredAction !== 'DRAW') {
+        setIsAutoPlay(false);
+        return;
+      }
+      const timer = setTimeout(() => {
+        onStep().catch(() => setIsAutoPlay(false));
+      }, playSpeed);
+      return () => clearTimeout(timer);
+    } else {
+      if (currentLogIndex >= battleLog.length - 1) {
+        setIsAutoPlay(false);
+        return;
+      }
+      const timer = setTimeout(() => {
+        setCurrentLogIndex((prev) => prev + 1);
+      }, playSpeed);
+      return () => clearTimeout(timer);
     }
+  }, [isAutoPlay, isLiveMode, battleSession, currentLogIndex, battleLog, playSpeed, onStep]);
 
-    const timer = setTimeout(() => {
-      setCurrentLogIndex((prev) => prev + 1);
-    }, playSpeed);
-
-    return () => clearTimeout(timer);
-  }, [isAutoPlay, currentLogIndex, battleLog, playSpeed, hasLog]);
-
-  // Audio and visual flash cues triggered on step transitions
+  // Audio/Visual feedback cues
   const lastPlayedIndexRef = useRef<number>(-1);
+  const activeLog = isLiveMode ? battleSession.log : battleLog;
+
   useEffect(() => {
-    if (!hasLog || currentLogIndex < 0 || currentLogIndex === lastPlayedIndexRef.current) return;
-    lastPlayedIndexRef.current = currentLogIndex;
-    const entry = battleLog[currentLogIndex];
+    if (!hasLog || activeLog.length === 0) return;
+    const targetIdx = isLiveMode ? activeLog.length - 1 : currentLogIndex;
+    if (targetIdx === lastPlayedIndexRef.current) return;
+    lastPlayedIndexRef.current = targetIdx;
+
+    const entry = activeLog[targetIdx];
     if (!entry) return;
 
     if (entry.action === 'reveal') {
       playSE('clash');
     } else if (entry.action === 'flag_change') {
       playSE('roll');
-      // Trigger dramatic flash overlays
       if (entry.flagHolder === playerName) {
         setFlashState('cyan');
       } else if (entry.flagHolder === opponent) {
         setFlashState('magenta');
       }
       setTimeout(() => setFlashState(null), 400);
-    } else if (entry.action === 'redirect') {
-      playSE('roll');
-      setFlashState(entry.flagHolder === playerName ? 'cyan' : 'magenta');
-      setTimeout(() => setFlashState(null), 400);
     } else if (entry.action === 'memory_overflow' || entry.action === 'deck_empty') {
       playSE('discard');
     }
 
-    // Battle concluded
-    if (currentLogIndex === battleLog.length - 1) {
-      const winner = battleLog[battleLog.length - 1].flagHolder;
+    if (targetIdx === activeLog.length - 1 && (isLiveMode ? battleSession.isFinished : currentLogIndex === battleLog.length - 1)) {
+      const winner = entry.flagHolder;
       if (winner === playerName) {
         playSE('victory');
       } else if (winner === opponent) {
         playSE('defeat');
       }
     }
-  }, [currentLogIndex, battleLog, playerName, opponent, playSE, hasLog]);
+  }, [currentLogIndex, activeLog, playerName, opponent, playSE, hasLog, isLiveMode, battleSession?.isFinished]);
 
-  // Helper to parse "CardName(xCount)" strings into raw nested slot arrays for MemorySlots
-  const parseMemSlots = (slots: string[] | undefined | null): string[][] => {
+  // Helper to parse live slots
+  const mapLiveMemSlots = (slots: any[]): string[][] => {
     if (!slots) return [];
-    return slots
-      .filter((slotStr) => typeof slotStr === 'string')
-      .map((slotStr) => {
-        const match = slotStr.match(/^(.+)\(x(\d+)\)$/);
-        if (match) {
-          const name = match[1];
-          const count = parseInt(match[2], 10);
-          return Array(count).fill(name);
-        }
-        return [slotStr];
-      });
+    return slots.map(slot => Array(slot.count).fill(slot.cardName));
   };
 
-  // Determine which side of the simulation this player is logged under
-  const isPlayerSide = useMemo(() => {
-    if (!hasLog) return true;
-    return battleLog.some((e) => e && e.player === playerName);
-  }, [battleLog, playerName, hasLog]);
+  // Helper to parse historical string slots
+  const parseMemSlots = (slots: string[] | undefined | null): string[][] => {
+    if (!slots) return [];
+    return slots.map((slotStr) => {
+      const match = slotStr.match(/^(.+)\(x(\d+)\)$/);
+      if (match) {
+        const name = match[1];
+        const count = parseInt(match[2], 10);
+        return Array(count).fill(name);
+      }
+      return [slotStr];
+    });
+  };
 
-  // Current entry snapshot based on replay head index
-  const currentEntry = useMemo(() => {
-    if (!hasLog || currentLogIndex < 0) return null;
-    return battleLog[Math.min(currentLogIndex, battleLog.length - 1)] || null;
-  }, [battleLog, currentLogIndex, hasLog]);
+  // Dual Board bindings (Dynamic depending on live vs historical mode)
+  const isPlayer1 = isLiveMode ? (battleSession.player1Name === playerName) : true;
 
-  // Memory Slots for the current step
   const myMemSlots = useMemo(() => {
+    if (isLiveMode) {
+      return mapLiveMemSlots(isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem);
+    }
+    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
-    const rawSlots = isPlayerSide ? currentEntry.playerMemSlots : currentEntry.cpuMemSlots;
-    return parseMemSlots(rawSlots);
-  }, [currentEntry, isPlayerSide]);
+    return parseMemSlots(currentEntry.playerMemSlots);
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
 
   const opponentMemSlots = useMemo(() => {
+    if (isLiveMode) {
+      return mapLiveMemSlots(isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem);
+    }
+    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
-    const rawSlots = isPlayerSide ? currentEntry.cpuMemSlots : currentEntry.playerMemSlots;
-    return parseMemSlots(rawSlots);
-  }, [currentEntry, isPlayerSide]);
+    return parseMemSlots(currentEntry.cpuMemSlots);
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
 
-  // Deck counts for the current step
   const myDeckCount = useMemo(() => {
-    if (!currentEntry) return 0;
-    return isPlayerSide ? currentEntry.playerDeckCount : currentEntry.cpuDeckCount;
-  }, [currentEntry, isPlayerSide]);
+    if (isLiveMode) {
+      return isPlayer1 ? battleSession.player1Deck.length : battleSession.player2Deck.length;
+    }
+    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    return currentEntry ? currentEntry.playerDeckCount : 0;
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
 
   const opponentDeckCount = useMemo(() => {
-    if (!currentEntry) return 0;
-    return isPlayerSide ? currentEntry.cpuDeckCount : currentEntry.playerDeckCount;
-  }, [currentEntry, isPlayerSide]);
-
-  // Calculate the active challenger cards played in this segment (before next flag claim)
-  const currentClashCards = useMemo(() => {
-    if (!hasLog || currentLogIndex < 0) return [];
-    const cards: BattleLogCard[] = [];
-    for (let i = currentLogIndex; i >= 0; i--) {
-      const entry = battleLog[i];
-      if (!entry) continue;
-      if (entry.action === 'flag_change') {
-        break;
-      }
-      if (entry.action === 'reveal' && entry.player !== entry.flagHolder && entry.card) {
-        cards.unshift(entry.card);
-      }
+    if (isLiveMode) {
+      return isPlayer1 ? battleSession.player2Deck.length : battleSession.player1Deck.length;
     }
-    return cards;
-  }, [battleLog, currentLogIndex, hasLog]);
+    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    return currentEntry ? currentEntry.cpuDeckCount : 0;
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
 
-  // Calculate the active defender card currently holding the flag
+  // Card Visuals (Defender flag card & Challenger clash cards)
   const currentFlagCard = useMemo(() => {
+    if (isLiveMode) {
+      return battleSession.flagHolder ? convertToFullCard(battleSession.activeCards[0]) : null;
+    }
+    // Playback logic
     if (!hasLog || currentLogIndex < 0) return null;
     for (let i = currentLogIndex; i >= 0; i--) {
       const entry = battleLog[i];
-      if (!entry) continue;
-      if (entry.action === 'flag_change' && entry.card) {
-        return entry.card;
-      }
-      if (i === 0 && entry.action === 'reveal' && entry.card) {
-        return entry.card;
+      if (entry && entry.action === 'flag_change' && entry.card) {
+        return convertToFullCard(entry.card);
       }
     }
     return null;
-  }, [battleLog, currentLogIndex, hasLog]);
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, hasLog]);
 
-  // Determine whose turn it is to draw/reveal cards
+  const currentClashCards = useMemo(() => {
+    if (isLiveMode) {
+      const list = battleSession.flagHolder ? battleSession.activeCards.slice(1) : battleSession.activeCards;
+      return list.map(c => convertToFullCard(c));
+    }
+    // Playback logic
+    if (!hasLog || currentLogIndex < 0) return [];
+    const cards: Card[] = [];
+    for (let i = currentLogIndex; i >= 0; i--) {
+      const entry = battleLog[i];
+      if (!entry) continue;
+      if (entry.action === 'flag_change') break;
+      if (entry.action === 'reveal' && entry.player !== entry.flagHolder && entry.card) {
+        cards.unshift(convertToFullCard(entry.card));
+      }
+    }
+    return cards;
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, hasLog]);
+
+  // Draw turns status
   const isMyDrawTurn = useMemo(() => {
-    if (!currentEntry) return false;
-    return currentEntry.player === playerName && currentEntry.action === 'reveal';
-  }, [currentEntry, playerName]);
+    if (isLiveMode) {
+      return battleSession.turnOwner === playerName && battleSession.requiredAction === 'DRAW' && !battleSession.isFinished;
+    }
+    const currentEntry = hasLog ? battleLog[currentLogIndex] : null;
+    return currentEntry ? currentEntry.player === playerName && currentEntry.action === 'reveal' : false;
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, playerName, hasLog]);
 
   const isOpponentDrawTurn = useMemo(() => {
-    if (!currentEntry) return false;
-    return currentEntry.player === opponent && currentEntry.action === 'reveal';
-  }, [currentEntry, opponent]);
+    if (isLiveMode) {
+      return battleSession.turnOwner !== playerName && battleSession.requiredAction === 'DRAW' && !battleSession.isFinished;
+    }
+    const currentEntry = hasLog ? battleLog[currentLogIndex] : null;
+    return currentEntry ? currentEntry.player === opponent && currentEntry.action === 'reveal' : false;
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, opponent, hasLog]);
 
-  if (!hasLog) {
+  const isReplayFinished = isLiveMode ? battleSession.isFinished : (currentLogIndex >= battleLog.length - 1);
+  const flagHolderName = isLiveMode ? battleSession.flagHolder : (hasLog ? activeLog[currentLogIndex].flagHolder : 'None');
+  const flagPowerValue = isLiveMode ? battleSession.flagPower : (hasLog ? activeLog[currentLogIndex].currentPower : 0);
+  const challengerPower = isLiveMode ? battleSession.challengerPower : 0;
+
+  // Active Choice Config
+  const showChoiceUI = isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer === playerName && !battleSession.isFinished;
+
+  const choiceConfig = useMemo(() => {
+    if (!showChoiceUI) return null;
+    const action = battleSession.requiredAction;
+    switch (action) {
+      case 'CHOOSE_REPORTER':
+        return {
+          title: 'REPORTER DETECTED / リポーター効果発動',
+          instructions: '山札の上のカードを1枚選択してください。選択したカードが山札の一番上になり、もう1枚は山札の一番下に置かれます。',
+          maxSelect: 1,
+          minSelect: 1,
+          isOptional: false,
+        };
+      case 'CHOOSE_JUGGLER':
+      case 'CHOOSE_BUMPER_CAR':
+        return {
+          title: 'JUGGLER / バンパーカー効果発動',
+          instructions: '山札の上のカードを並び替えたい順に選択してください。最初に選択したカードが山札の一番上になります。',
+          maxSelect: battleSession.actionOptions.length,
+          minSelect: battleSession.actionOptions.length,
+          isOptional: false,
+        };
+      case 'CHOOSE_SAILOR':
+      case 'CHOOSE_PROPHET':
+        return {
+          title: 'SAILOR / 船乗り・予知能力者効果発動',
+          instructions: '山札からカードを1枚選択し、山札の底（予知能力者の場合は山札のトップ）に移動します。',
+          maxSelect: 1,
+          minSelect: 1,
+          isOptional: false,
+        };
+      case 'CHOOSE_BUTLER':
+      case 'CHOOSE_PUMPKIN':
+        return {
+          title: 'BUTLER / 執事・パンプキン効果発動',
+          instructions: 'ベンチから除外するカードを最大2枚選択してください。（選択しなくても構いません）',
+          maxSelect: 2,
+          minSelect: 0,
+          isOptional: true,
+        };
+      case 'CHOOSE_MAGICIAN':
+        return {
+          title: 'MAGICIAN / 魔術師効果発動',
+          instructions: 'ベンチからパワー3以下のカードを1枚選択して除外してください。',
+          maxSelect: 1,
+          minSelect: 0,
+          isOptional: true,
+        };
+      case 'CHOOSE_VAMPIRE':
+        return {
+          title: 'VAMPIRE / バンパイア効果発動',
+          instructions: 'ベンチからBデッキのカードを1枚選択し、山札の一番上に戻します。',
+          maxSelect: 1,
+          minSelect: 0,
+          isOptional: true,
+        };
+      case 'CHOOSE_MOVIESTAR':
+        return {
+          title: 'MOVIESTAR / ムービースター効果発動',
+          instructions: 'ベンチからパワー1または2の映画カードを最大2枚選択し、山札の上に戻します。',
+          maxSelect: 2,
+          minSelect: 0,
+          isOptional: true,
+        };
+      case 'CHOOSE_SIREN':
+        return {
+          title: 'SIREN / サイレン効果発動',
+          instructions: '相手のベンチからカードを1枚選択し、除外エリアに送ります。',
+          maxSelect: 1,
+          minSelect: 0,
+          isOptional: true,
+        };
+      default:
+        return {
+          title: 'CARD EFFECT TRIGGERED / カード効果選択',
+          instructions: 'カードを選択してください。',
+          maxSelect: 1,
+          minSelect: 0,
+          isOptional: true,
+        };
+    }
+  }, [showChoiceUI, battleSession]);
+
+  const handleSelectCard = (id: string) => {
+    if (!choiceConfig) return;
+    playSE('hover');
+    if (choiceConfig.maxSelect === 1) {
+      if (selectedCards.includes(id)) {
+        setSelectedCards([]);
+      } else {
+        setSelectedCards([id]);
+      }
+    } else {
+      if (selectedCards.includes(id)) {
+        setSelectedCards(selectedCards.filter((x) => x !== id));
+      } else {
+        if (selectedCards.length < choiceConfig.maxSelect) {
+          setSelectedCards([...selectedCards, id]);
+        }
+      }
+    }
+  };
+
+  const handleConfirmChoice = () => {
+    if (!isLiveMode || !choiceConfig) return;
+    playSE('click');
+    onSubmitAction(battleSession.requiredAction, selectedCards);
+  };
+
+  const handleSkipChoice = () => {
+    if (!isLiveMode) return;
+    playSE('click');
+    onSubmitAction(battleSession.requiredAction, []);
+  };
+
+  const isSelectionValid = useMemo(() => {
+    if (!choiceConfig) return false;
     return (
-      <div className="min-h-screen bg-cyber-dark flex flex-col items-center justify-center font-mono">
-        <Activity className="text-neon-cyan animate-pulse mb-4" size={32} />
-        <p className="text-xs text-cyber-text-dim uppercase tracking-widest">{t('awaitingCombatData')}</p>
-      </div>
+      selectedCards.length >= choiceConfig.minSelect &&
+      selectedCards.length <= choiceConfig.maxSelect
     );
-  }
-
-  const isReplayFinished = currentLogIndex >= battleLog.length - 1;
-  const flagHolderName = currentEntry ? currentEntry.flagHolder : 'None';
-  const flagPowerValue = currentEntry ? currentEntry.currentPower : 0;
+  }, [selectedCards, choiceConfig]);
 
   const speedOptions = [
     { label: '0.5x', value: 1600 },
@@ -253,7 +399,7 @@ function BattleArena({
   ];
 
   return (
-    <div className="min-h-screen bg-cyber-dark relative overflow-hidden flex flex-col justify-between p-4">
+    <div className="min-h-screen bg-cyber-dark relative overflow-hidden flex flex-col justify-between p-4 select-none">
       {/* Background gradients */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -284,6 +430,7 @@ function BattleArena({
 
       {/* 2. Main Dual Board Area */}
       <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[220px_1fr_220px] gap-6 items-center my-4 flex-1">
+        
         {/* Left Col: Local Player State */}
         <div className="font-mono flex flex-col gap-3 self-start order-2 lg:order-1">
           <MemorySlots slots={myMemSlots} label={t('yourMemory')} side="left" />
@@ -315,9 +462,65 @@ function BattleArena({
             <div className="absolute inset-0 bg-neon-magenta/20 border border-neon-magenta shadow-[inset_0_0_40px_rgba(255,0,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
           )}
 
+          {/* Interactive Choice Overlay Panel */}
+          {showChoiceUI && choiceConfig && (
+            <div className="absolute inset-0 z-40 bg-cyber-darker/95 backdrop-blur-md flex flex-col items-center justify-center p-6 border-2 border-neon-magenta/40 rounded-xl animate-fade-in">
+              <div className="text-neon-magenta text-glow-magenta font-black tracking-widest text-xs uppercase mb-1 animate-pulse">
+                ⚡ {choiceConfig.title} ⚡
+              </div>
+              <p className="text-[10px] text-cyber-text-dim uppercase tracking-wider mb-4 text-center max-w-sm">
+                {choiceConfig.instructions}
+              </p>
+
+              {/* Action Options Grid */}
+              <div className="flex gap-4 flex-wrap justify-center my-3 overflow-y-auto max-h-[220px] p-2">
+                {battleSession.actionOptions.map((optCard) => {
+                  const fullCard = convertToFullCard(optCard);
+                  const isSelected = selectedCards.includes(optCard.id);
+                  const selectIdx = selectedCards.indexOf(optCard.id);
+                  return (
+                    <div
+                      key={optCard.id}
+                      onClick={() => handleSelectCard(optCard.id)}
+                      className={`relative cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 ${
+                        isSelected ? 'ring-2 ring-neon-magenta scale-102 opacity-100 z-10' : 'opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <CardDisplay card={fullCard} disabled={false} />
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 bg-neon-magenta text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-white/20">
+                          {selectIdx + 1}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Controls */}
+              <div className="flex gap-4 mt-2">
+                <button
+                  onClick={handleConfirmChoice}
+                  disabled={!isSelectionValid}
+                  className="px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-bold uppercase tracking-widest rounded bg-purple-950/20 hover:bg-purple-950/40 text-[10px] shadow-[0_0_10px_rgba(255,0,255,0.2)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {t('confirmChoice') || 'CONFIRM / 確定'}
+                </button>
+                {choiceConfig.isOptional && (
+                  <button
+                    onClick={handleSkipChoice}
+                    className="px-6 py-2 border border-cyber-border text-cyber-text-dim hover:text-white hover:border-white uppercase tracking-wider rounded bg-cyber-surface/10 hover:bg-cyber-surface/30 text-[10px] cursor-pointer"
+                  >
+                    {t('skipChoice') || 'SKIP / スキップ'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Top Step Counter */}
           <div className="text-[10px] text-cyber-text-dim uppercase tracking-widest font-mono z-10">
-            {t('battleStep')} / 進捗: {currentLogIndex + 1} / {battleLog.length}
+            {t('battleStep')} / 進捗: {isLiveMode ? activeLog.length : currentLogIndex + 1} {isLiveMode ? '' : `/ ${battleLog.length}`}
           </div>
 
           {/* Active Turn Indicator Banner */}
@@ -326,13 +529,21 @@ function BattleArena({
               <div className="text-neon-green text-glow-green text-xs font-bold font-mono tracking-widest uppercase border border-neon-green/30 bg-green-950/15 py-1.5 rounded animate-pulse">
                 SYS_STATUS: CLASH RESOLVED / バトル決着
               </div>
-            ) : isMyDrawnTurn ? (
-              <div className="text-neon-cyan text-glow-cyan text-xs font-bold font-mono tracking-widest uppercase border border-neon-cyan/30 bg-cyan-950/15 py-1.5 rounded animate-flicker">
+            ) : isMyDrawTurn ? (
+              <div className="text-neon-cyan text-glow-cyan text-xs font-bold font-mono tracking-widest uppercase border border-neon-cyan/30 bg-cyan-950/15 py-1.5 rounded animate-pulse">
                 &gt;&gt; PLAYER DRAW TURN / あなたのめくり番 &lt;&lt;
               </div>
             ) : isOpponentDrawTurn ? (
-              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/30 bg-purple-950/15 py-1.5 rounded animate-flicker">
+              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/30 bg-purple-950/15 py-1.5 rounded animate-pulse">
                 &gt;&gt; OPPONENT DRAW TURN / 相手のめくり番 &lt;&lt;
+              </div>
+            ) : showChoiceUI ? (
+              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/40 bg-purple-950/30 py-1.5 rounded animate-pulse">
+                ⚡ AWAITING YOUR CARD CHOICE / 効果選択待機中 ⚡
+              </div>
+            ) : isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer !== playerName ? (
+              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/20 bg-purple-950/10 py-1.5 rounded animate-pulse">
+                AWAITING OPPONENT DECISION / 相手の効果選択中...
               </div>
             ) : (
               <div className="text-cyber-text-dim text-xs font-bold font-mono tracking-widest uppercase border border-cyber-border/20 bg-cyber-surface/10 py-1.5 rounded">
@@ -368,8 +579,8 @@ function BattleArena({
               {/* Defender Card Visual */}
               <div className="mt-3 flex items-center justify-center min-h-[140px]">
                 {currentFlagCard ? (
-                  <div key={currentFlagCard.name} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
-                    <CardDisplay card={convertToFullCard(currentFlagCard)} basePower={currentFlagCard.basePower} disabled />
+                  <div key={currentFlagCard.id + '_' + currentFlagCard.power} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
+                    <CardDisplay card={currentFlagCard} disabled />
                   </div>
                 ) : (
                   <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
@@ -381,8 +592,13 @@ function BattleArena({
 
             {/* CHALLENGER / ATTACKER ZONE */}
             <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
-              <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2">
-                ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード
+              <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <span>ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード</span>
+                {challengerPower > 0 && (
+                  <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
+                    計 {challengerPower} POW
+                  </span>
+                )}
               </div>
 
               {/* Stacked drawn challenger cards */}
@@ -392,14 +608,14 @@ function BattleArena({
                     const isLatest = idx === currentClashCards.length - 1;
                     return (
                       <div
-                        key={idx}
+                        key={cCard.id + '_' + idx}
                         className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
                           isLatest
                             ? 'animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80'
                             : 'opacity-70 scale-75'
                         }`}
                       >
-                        <CardDisplay card={convertToFullCard(cCard)} basePower={cCard.basePower} disabled />
+                        <CardDisplay card={cCard} disabled />
                       </div>
                     );
                   })
@@ -415,13 +631,55 @@ function BattleArena({
           {/* Action Resolution status details */}
           <div className="w-full text-center mt-2 px-4 py-2 border border-cyber-border/10 rounded bg-cyber-dark/40 min-h-[50px] flex items-center justify-center z-10">
             <p className="text-[10px] font-mono text-cyber-text leading-relaxed">
-              {currentEntry ? translateBattleDetail(currentEntry.details) : 'INITIALIZING REPLAY ENGINE...'}
-              {currentEntry?.effectTriggered && currentEntry.effectTriggered !== 'None' && currentEntry.effectTriggered !== '' && (
+              {activeLog.length > 0
+                ? translateBattleDetail(activeLog[activeLog.length - 1].details)
+                : 'INITIALIZING INTERACTIVE ARENA LINK...'}
+              {activeLog.length > 0 && activeLog[activeLog.length - 1].effectTriggered && activeLog[activeLog.length - 1].effectTriggered !== 'None' && activeLog[activeLog.length - 1].effectTriggered !== '' && (
                 <span className="text-neon-green block font-bold mt-1 text-[9px] animate-pulse">
-                  ⚡ {translateBattleDetail(currentEntry.effectTriggered)}
+                  ⚡ {translateBattleDetail(activeLog[activeLog.length - 1].effectTriggered)}
                 </span>
               )}
             </p>
+          </div>
+
+          {/* Main Interactive Draw Button */}
+          <div className="w-full mt-4 z-10 flex flex-col items-center gap-2">
+            {!isReplayFinished ? (
+              <button
+                disabled={isLiveMode && (battleSession.requiredAction !== 'DRAW' || (battleSession.turnOwner === opponent && !isLiveMode))}
+                onClick={() => {
+                  playSE('click');
+                  if (isLiveMode) {
+                    onStep();
+                  } else {
+                    setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
+                  }
+                }}
+                className={`w-full max-w-xs py-2.5 px-5 rounded border-2 font-mono font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-md flex items-center justify-center gap-2 ${
+                  isMyDrawTurn
+                    ? 'border-neon-cyan text-neon-cyan bg-cyan-950/20 hover:bg-cyan-950/40 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)] animate-pulse'
+                    : isOpponentDrawTurn
+                    ? 'border-neon-magenta text-neon-magenta bg-purple-950/20 hover:bg-purple-950/40 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.2)]'
+                    : 'border-cyber-border text-cyber-text bg-cyber-surface/30 hover:bg-cyber-surface/50 font-medium disabled:opacity-40 disabled:cursor-not-allowed'
+                }`}
+              >
+                <Play size={14} className={isMyDrawTurn ? 'animate-bounce' : ''} />
+                {isMyDrawTurn ? (
+                  <span>{t('drawNextCard') || 'DRAW CARD / デッキをめくる'}</span>
+                ) : isOpponentDrawTurn ? (
+                  <span>{t('opponentDrawNext') || 'OPPONENT DRAW / 相手がめくる'}</span>
+                ) : (
+                  <span>{t('nextStep') || 'NEXT STEP / 進む'}</span>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={onComplete}
+                className="w-full max-w-xs py-2.5 px-5 rounded border-2 border-neon-green text-neon-green bg-green-950/20 hover:bg-green-950/40 text-glow-green font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-[0_0_15px_rgba(0,255,102,0.25)] animate-pulse animate-neon-pulse"
+              >
+                <span>{t('continueToStandings') || 'VIEW STANDINGS / リザルト確認 →'}</span>
+              </button>
+            )}
           </div>
 
         </div>
@@ -439,18 +697,19 @@ function BattleArena({
         </div>
       </div>
 
-      {/* 3. Replay Controllers */}
+      {/* 3. Replay / Speed / Auto Controllers */}
       <div className="relative z-10 max-w-3xl mx-auto w-full border border-cyber-border/30 rounded-lg p-3 bg-cyber-darker/90 backdrop-blur-md mb-3 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
+        
         {/* Play/Pause controls */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsAutoPlay(!isAutoPlay)}
-            disabled={isReplayFinished}
+            disabled={isReplayFinished || (isLiveMode && battleSession.requiredAction !== 'DRAW')}
             className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer border transition-all ${
-              isReplayFinished
+              isReplayFinished || (isLiveMode && battleSession.requiredAction !== 'DRAW')
                 ? 'border-cyber-border/35 text-cyber-text-dim cursor-not-allowed opacity-50'
                 : isAutoPlay
-                ? 'border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10 shadow-[0_0_8px_rgba(255,0,255,0.1)]'
+                ? 'border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10 shadow-[0_0_8px_rgba(255,0,255,0.1)] animate-pulse'
                 : 'border-neon-green text-neon-green hover:bg-neon-green/10 shadow-[0_0_8px_rgba(0,255,0,0.1)]'
             }`}
           >
@@ -458,36 +717,35 @@ function BattleArena({
             {isAutoPlay ? 'PAUSE / 一時停止' : 'AUTO / オート'}
           </button>
 
-          <button
-            onClick={() => {
-              playSE('click');
-              setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
-              setIsAutoPlay(false);
-            }}
-            disabled={isReplayFinished}
-            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer border transition-all ${
-              isReplayFinished
-                ? 'border-cyber-border/35 text-cyber-text-dim cursor-not-allowed opacity-50'
-                : 'border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10 shadow-[0_0_8px_rgba(0,240,255,0.1)]'
-            }`}
-          >
-            <FastForward size={12} />
-            {t('nextStepBtnTitle') || 'DRAW / めくる'}
-          </button>
+          {!isLiveMode && (
+            <>
+              <button
+                onClick={() => {
+                  playSE('click');
+                  setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
+                  setIsAutoPlay(false);
+                }}
+                disabled={isReplayFinished}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer border border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10 transition-all"
+              >
+                <Play size={12} />
+                {t('nextStepBtnTitle') || 'DRAW / めくる'}
+              </button>
 
-          <button
-            onClick={() => {
-              playSE('shuffle');
-              setCurrentLogIndex(0);
-              setIsAutoPlay(false);
-              lastPlayedIndexRef.current = -1;
-            }}
-            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded text-[10px] border border-cyber-border/50 text-cyber-text-dim hover:text-white hover:border-cyber-border transition-all cursor-pointer"
-            title="Reset Replay"
-          >
-            <RotateCcw size={12} />
-            {t('resetBtnTitle') || 'RESTART / 最初から'}
-          </button>
+              <button
+                onClick={() => {
+                  playSE('shuffle');
+                  setCurrentLogIndex(0);
+                  setIsAutoPlay(false);
+                  lastPlayedIndexRef.current = -1;
+                }}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded text-[10px] border border-cyber-border/50 text-cyber-text-dim hover:text-white hover:border-cyber-border transition-all cursor-pointer"
+              >
+                <RotateCcw size={12} />
+                {t('resetBtnTitle') || 'RESTART / 最初から'}
+              </button>
+            </>
+          )}
         </div>
 
         {/* Playback Speed selector */}
@@ -520,7 +778,7 @@ function BattleArena({
             >
               {t('continueBtn') || 'STANDINGS / リザルト確認 →'}
             </button>
-          ) : (
+          ) : !isLiveMode ? (
             <button
               onClick={() => {
                 playSE('click');
@@ -531,7 +789,7 @@ function BattleArena({
             >
               {t('skipSim') || 'SKIP / 結末へスキップ'}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -543,12 +801,12 @@ function BattleArena({
             {t('combatLogHeader')} / 実況ログ
           </span>
           <span className="text-[9px] text-cyber-text-dim ml-auto">
-            {currentLogIndex + 1} / {battleLog.length} events
+            {activeLog.length} events
           </span>
         </div>
         
         <div className="flex flex-col gap-1">
-          {battleLog.slice(0, currentLogIndex + 1).map((log, i) => {
+          {activeLog.map((log, i) => {
             const displayLogAction = translateBattleDetail(log.details || log.action);
             const displayLogEffect = log.effectTriggered ? translateBattleDetail(log.effectTriggered) : '';
             const isPlayer = log.player === playerName;
@@ -558,7 +816,7 @@ function BattleArena({
               <div
                 key={i}
                 className={`flex items-start gap-2 py-1 px-1.5 rounded transition-all duration-300 ${
-                  i === currentLogIndex ? 'bg-cyber-surface/40 border border-cyber-border/10 animate-slide-in' : ''
+                  i === activeLog.length - 1 ? 'bg-cyber-surface/40 border border-cyber-border/10 animate-slide-in' : ''
                 }`}
               >
                 <div className={`mt-0.5 min-w-[14px] ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
@@ -568,11 +826,11 @@ function BattleArena({
                   <span className={`font-bold ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
                     {isSystem ? '[SYS]' : `[${log.player}]`}
                   </span>{' '}
-                  <span className={i === currentLogIndex ? 'text-cyber-text font-semibold' : 'text-cyber-text-dim/70'}>
+                  <span className={i === activeLog.length - 1 ? 'text-cyber-text font-semibold' : 'text-cyber-text-dim/70'}>
                     {displayLogAction}
                   </span>
                   {log.effectTriggered && log.effectTriggered !== 'None' && log.effectTriggered !== '' && (
-                    <span className="text-neon-green ml-1.5 inline-flex items-center gap-1 font-bold">
+                    <span className="text-neon-green ml-1.5 inline-flex items-center gap-1 font-bold animate-pulse">
                       ⚡ {displayLogEffect}
                     </span>
                   )}

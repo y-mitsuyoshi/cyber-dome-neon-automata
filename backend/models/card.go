@@ -9,13 +9,15 @@ import (
 type Card struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
-	Attribute  string `json:"attribute"`  // Virus, AI, Hardware, Netrunner
+	Attribute  string `json:"attribute"`  // Castle, City, Space, Movie, Shipwreck, Ghost, Fairground
 	Archetype  string `json:"archetype"`  // Aggro, Combo, Control
 	Power      int    `json:"power"`
-	Rarity     string `json:"rarity"`     // Common, Rare, Epic
+	Rarity     string `json:"rarity"`     // Common, Uncommon, Rare, Epic
 	Effect     string `json:"effect"`
 	EffectType string `json:"effectType"`
 	Cost       int    `json:"cost"`
+	Deck       string `json:"deck"`       // A, B, C
+	Quantity   int    `json:"quantity"`   // Number of copies of this card in the pool
 }
 
 // RarityCost returns the credit cost based on rarity.
@@ -47,6 +49,8 @@ func (c Card) Clone() Card {
 		Effect:     c.Effect,
 		EffectType: c.EffectType,
 		Cost:       c.Cost,
+		Deck:       c.Deck,
+		Quantity:   c.Quantity,
 	}
 }
 
@@ -62,7 +66,7 @@ type Player struct {
 	Name        string       `json:"name"`
 	Credits     int          `json:"credits"`
 	Deck        []Card       `json:"deck"`
-	Hand        []Card       `json:"hand"` // In-hand cards for interactive battle
+	Hand        []Card       `json:"hand"` // In-hand cards (historical/unused now)
 	Wins        int          `json:"wins"`
 	Fans        int          `json:"fans"`
 	IsNPC       bool         `json:"isNpc"`
@@ -86,6 +90,21 @@ func (p *Player) ShuffleDeck() {
 	})
 }
 
+// GetTotalFans returns player's trophy fans plus passive stars from their deck.
+func (p *Player) GetTotalFans() int {
+	total := p.Fans
+	for _, c := range p.Deck {
+		if c.EffectType == "clone" {
+			total += 1
+		} else if c.EffectType == "fanbus" {
+			if p.Wins <= 3 {
+				total += 2
+			}
+		}
+	}
+	return total
+}
+
 // ShopState represents the current shop offerings.
 type ShopState struct {
 	Cards   []Card `json:"cards"`
@@ -94,11 +113,12 @@ type ShopState struct {
 
 // BattleLogCard is a minimal card representation for the battle log.
 type BattleLogCard struct {
-	ID        string `json:"id,omitempty"`
-	Name      string `json:"name"`
-	Power     int    `json:"power"`
-	BasePower int    `json:"basePower,omitempty"`
-	Attribute string `json:"attribute"`
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name"`
+	Power      int    `json:"power"`
+	BasePower  int    `json:"basePower,omitempty"`
+	Attribute  string `json:"attribute"`
+	EffectType string `json:"effectType,omitempty"`
 }
 
 // BattleLogEntry represents a single step in the battle log.
@@ -117,49 +137,52 @@ type BattleLogEntry struct {
 	CPUMemSlots      []string        `json:"cpuMemSlots"`
 	PlayerDeckCount  int             `json:"playerDeckCount"`
 	CPUDeckCount     int             `json:"cpuDeckCount"`
-	PlayerHandCount  int             `json:"playerHandCount"` // Remaining hand size
-	CPUHandCount     int             `json:"cpuHandCount"`    // Remaining hand size
+	PlayerHandCount  int             `json:"playerHandCount"`
+	CPUHandCount     int             `json:"cpuHandCount"`
 	FlagHolder       string          `json:"flagHolder"`
 	Details          string          `json:"details,omitempty"`
 }
 
-// BattleAction represents a player's decision for a step.
+// BattleAction represents a player's decision for a step (used in choices).
 type BattleAction struct {
 	PlayerName string `json:"playerName"`
-	ActionType string `json:"actionType"` // "PLAY" or "DISCARD"
-	CardID     string `json:"cardId"`
+	ActionType string `json:"actionType"` // e.g. "CHOOSE_CARD", "REORDER", "BANISH"
+	CardIDs    []string `json:"cardIds"`  // Selected card IDs
 }
 
 // BattleSession represents an active interactive match between two combatants.
 type BattleSession struct {
-	SessionID      string                   `json:"sessionId"`
-	Player1Name    string                   `json:"player1Name"`
-	Player2Name    string                   `json:"player2Name"`
-	Player1Hand    []Card                   `json:"player1Hand"`
-	Player2Hand    []Card                   `json:"player2Hand"`
-	Player1Deck    []Card                   `json:"player1Deck"`
-	Player2Deck    []Card                   `json:"player2Deck"`
-	Player1Mem     []MemorySlot             `json:"player1Mem"`
-	Player2Mem     []MemorySlot             `json:"player2Mem"`
-	Player1Discard []Card                   `json:"player1Discard"`
-	Player2Discard []Card                   `json:"player2Discard"`
-	FlagHolder     string                   `json:"flagHolder"`
-	FlagPower      int                      `json:"flagPower"`
-	Step           int                      `json:"step"`
-	PendingActions map[string]*BattleAction `json:"pendingActions"` // player -> action
-	IsFinished     bool                     `json:"isFinished"`
-	Winner         string                   `json:"winner"`
-	Loser          string                   `json:"loser"`
-	Log            []BattleLogEntry         `json:"log"`
+	SessionID           string                   `json:"sessionId"`
+	Player1Name         string                   `json:"player1Name"`
+	Player2Name         string                   `json:"player2Name"`
+	Player1Deck         []Card                   `json:"player1Deck"`
+	Player2Deck         []Card                   `json:"player2Deck"`
+	Player1Mem          []MemorySlot             `json:"player1Mem"`
+	Player2Mem          []MemorySlot             `json:"player2Mem"`
+	Player1Discard      []Card                   `json:"player1Discard"` // Banish pile for player1
+	Player2Discard      []Card                   `json:"player2Discard"` // Banish pile for player2
+	FlagHolder          string                   `json:"flagHolder"`
+	FlagPower           int                      `json:"flagPower"`
+	Step                int                      `json:"step"`
+	IsFinished          bool                     `json:"isFinished"`
+	Winner              string                   `json:"winner"`
+	Loser               string                   `json:"loser"`
+	Log                 []BattleLogEntry         `json:"log"`
+	TurnOwner           string                   `json:"turnOwner"`           // "player" or "cpu" / actual name
+	RequiredAction      string                   `json:"requiredAction"`      // "DRAW", "CHOOSE_REPORTER", "CHOOSE_BUTLER", "CHOOSE_JUGGLER", "CHOOSE_SAILOR", "CHOOSE_MAGICIAN", "CHOOSE_NAVIGATOR", "CHOOSE_PROPHET", "CHOOSE_SIREN", "CHOOSE_VAMPIRE", "CHOOSE_PUMPKIN", "CHOOSE_BUMPER_CAR"
+	PendingActionPlayer string                   `json:"pendingActionPlayer"` // Player name we are waiting for
+	ActionOptions       []Card                   `json:"actionOptions"`       // Card options presented for choice
+	ActiveCards         []Card                   `json:"activeCards"`         // Cards revealed this turn before taking flag
+	ChallengerPower     int                      `json:"challengerPower"`     // Cumulative power of active cards
 }
 
 // BattleResult stores the outcome of a battle.
 type BattleResult struct {
-	Winner    string           `json:"winner"`
-	Loser     string           `json:"loser"`
-	Reason    string           `json:"reason"`
-	Log       []BattleLogEntry `json:"log"`
-	FansGained int             `json:"fansGained"`
+	Winner     string           `json:"winner"`
+	Loser      string           `json:"loser"`
+	Reason     string           `json:"reason"`
+	Log        []BattleLogEntry `json:"log"`
+	FansGained int              `json:"fansGained"`
 }
 
 // StandingsEntry represents a row in the standings table.
@@ -186,5 +209,8 @@ type GameState struct {
 	BattleLogs     map[string][]BattleLogEntry `json:"battleLogs"` // Keyed by player name
 	LastResults    map[string]*BattleResult    `json:"lastResults"` // Keyed by player name
 	Standings      []StandingsEntry            `json:"standings"`
-	BattleSessions map[string]*BattleSession   `json:"battleSessions"` // Keyed by player name (participant)
+	BattleSessions map[string]*BattleSession   `json:"battleSessions"` // Keyed by player name (map key is player who initiated, or both)
+	DeckAPool      []Card                      `json:"deckAPool"`
+	DeckBPool      []Card                      `json:"deckBPool"`
+	DeckCPool      []Card                      `json:"deckCPool"`
 }
