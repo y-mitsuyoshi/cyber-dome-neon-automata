@@ -7,7 +7,21 @@ import { useTranslation } from '../context/TranslationContext';
 import DeckViewerModal from './DeckViewerModal';
 import { useAudio } from '../context/AudioContext';
 
-const convertToFullCard = (logCard: BattleLogCard): Card => {
+const convertToFullCard = (logCard: BattleLogCard | null | undefined): Card => {
+  if (!logCard) {
+    return {
+      id: 'default',
+      name: 'UNKNOWN',
+      attribute: 'Virus',
+      archetype: 'Control',
+      power: 0,
+      rarity: 'Common',
+      effect: '',
+      effectType: '',
+      cost: 0,
+    };
+  }
+
   const attribute = (['Virus', 'AI', 'Hardware', 'Netrunner'].includes(logCard.attribute)
     ? logCard.attribute
     : 'Virus') as 'Virus' | 'AI' | 'Hardware' | 'Netrunner';
@@ -55,15 +69,16 @@ function BattleArena({
   const [currentLogIndex, setCurrentLogIndex] = useState<number>(0);
   const [isAutoPlay, setIsAutoPlay] = useState<boolean>(true);
   const [playSpeed, setPlaySpeed] = useState<number>(1000); // ms per step
+  const [flashState, setFlashState] = useState<'cyan' | 'magenta' | null>(null);
 
   const latestLogEndRef = useRef<HTMLDivElement | null>(null);
 
   // Initialize and check if log is empty
-  const hasLog = battleLog && battleLog.length > 0;
+  const hasLog = !!(battleLog && battleLog.length > 0);
 
   // Auto-scroll the visual action log to the latest event
   useEffect(() => {
-    if (latestLogEndRef.current) {
+    if (latestLogEndRef.current && typeof latestLogEndRef.current.scrollIntoView === 'function') {
       latestLogEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [currentLogIndex]);
@@ -83,17 +98,29 @@ function BattleArena({
     return () => clearTimeout(timer);
   }, [isAutoPlay, currentLogIndex, battleLog, playSpeed, hasLog]);
 
-  // Audio cues triggered on step transitions
+  // Audio and visual flash cues triggered on step transitions
   const lastPlayedIndexRef = useRef<number>(-1);
   useEffect(() => {
     if (!hasLog || currentLogIndex < 0 || currentLogIndex === lastPlayedIndexRef.current) return;
     lastPlayedIndexRef.current = currentLogIndex;
     const entry = battleLog[currentLogIndex];
+    if (!entry) return;
 
     if (entry.action === 'reveal') {
       playSE('clash');
-    } else if (entry.action === 'flag_change' || entry.action === 'redirect') {
-      playSE('roll'); // Flag captures/redirects
+    } else if (entry.action === 'flag_change') {
+      playSE('roll');
+      // Trigger dramatic flash overlays
+      if (entry.flagHolder === playerName) {
+        setFlashState('cyan');
+      } else if (entry.flagHolder === opponent) {
+        setFlashState('magenta');
+      }
+      setTimeout(() => setFlashState(null), 400);
+    } else if (entry.action === 'redirect') {
+      playSE('roll');
+      setFlashState(entry.flagHolder === playerName ? 'cyan' : 'magenta');
+      setTimeout(() => setFlashState(null), 400);
     } else if (entry.action === 'memory_overflow' || entry.action === 'deck_empty') {
       playSE('discard');
     }
@@ -112,27 +139,29 @@ function BattleArena({
   // Helper to parse "CardName(xCount)" strings into raw nested slot arrays for MemorySlots
   const parseMemSlots = (slots: string[] | undefined | null): string[][] => {
     if (!slots) return [];
-    return slots.map((slotStr) => {
-      const match = slotStr.match(/^(.+)\(x(\d+)\)$/);
-      if (match) {
-        const name = match[1];
-        const count = parseInt(match[2], 10);
-        return Array(count).fill(name);
-      }
-      return [slotStr];
-    });
+    return slots
+      .filter((slotStr) => typeof slotStr === 'string')
+      .map((slotStr) => {
+        const match = slotStr.match(/^(.+)\(x(\d+)\)$/);
+        if (match) {
+          const name = match[1];
+          const count = parseInt(match[2], 10);
+          return Array(count).fill(name);
+        }
+        return [slotStr];
+      });
   };
 
   // Determine which side of the simulation this player is logged under
   const isPlayerSide = useMemo(() => {
     if (!hasLog) return true;
-    return battleLog.some((e) => e.player === playerName);
+    return battleLog.some((e) => e && e.player === playerName);
   }, [battleLog, playerName, hasLog]);
 
   // Current entry snapshot based on replay head index
   const currentEntry = useMemo(() => {
     if (!hasLog || currentLogIndex < 0) return null;
-    return battleLog[Math.min(currentLogIndex, battleLog.length - 1)];
+    return battleLog[Math.min(currentLogIndex, battleLog.length - 1)] || null;
   }, [battleLog, currentLogIndex, hasLog]);
 
   // Memory Slots for the current step
@@ -165,6 +194,7 @@ function BattleArena({
     const cards: BattleLogCard[] = [];
     for (let i = currentLogIndex; i >= 0; i--) {
       const entry = battleLog[i];
+      if (!entry) continue;
       if (entry.action === 'flag_change') {
         break;
       }
@@ -180,6 +210,7 @@ function BattleArena({
     if (!hasLog || currentLogIndex < 0) return null;
     for (let i = currentLogIndex; i >= 0; i--) {
       const entry = battleLog[i];
+      if (!entry) continue;
       if (entry.action === 'flag_change' && entry.card) {
         return entry.card;
       }
@@ -213,6 +244,13 @@ function BattleArena({
   const isReplayFinished = currentLogIndex >= battleLog.length - 1;
   const flagHolderName = currentEntry ? currentEntry.flagHolder : 'None';
   const flagPowerValue = currentEntry ? currentEntry.currentPower : 0;
+
+  const speedOptions = [
+    { label: '0.5x', value: 1600 },
+    { label: '1.0x', value: 1000 },
+    { label: '2.0x', value: 500 },
+    { label: '4.0x', value: 200 },
+  ];
 
   return (
     <div className="min-h-screen bg-cyber-dark relative overflow-hidden flex flex-col justify-between p-4">
@@ -267,15 +305,23 @@ function BattleArena({
         </div>
 
         {/* Center: Duel Arena */}
-        <div className="flex flex-col items-center justify-between min-h-[460px] border border-cyber-border/20 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-6 relative order-1 lg:order-2">
+        <div className="flex flex-col items-center justify-between min-h-[460px] border border-cyber-border/20 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-6 relative order-1 lg:order-2 overflow-hidden">
           
+          {/* Symmetrical Flash Overlays */}
+          {flashState === 'cyan' && (
+            <div className="absolute inset-0 bg-neon-cyan/20 border border-neon-cyan shadow-[inset_0_0_40px_rgba(0,240,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
+          )}
+          {flashState === 'magenta' && (
+            <div className="absolute inset-0 bg-neon-magenta/20 border border-neon-magenta shadow-[inset_0_0_40px_rgba(255,0,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
+          )}
+
           {/* Top Step Counter */}
-          <div className="text-[10px] text-cyber-text-dim uppercase tracking-widest font-mono">
+          <div className="text-[10px] text-cyber-text-dim uppercase tracking-widest font-mono z-10">
             {t('battleStep')} / 進捗: {currentLogIndex + 1} / {battleLog.length}
           </div>
 
           {/* Active Turn Indicator Banner */}
-          <div className="my-3 w-full max-w-md text-center">
+          <div className="my-3 w-full max-w-md text-center z-10">
             {isReplayFinished ? (
               <div className="text-neon-green text-glow-green text-xs font-bold font-mono tracking-widest uppercase border border-neon-green/30 bg-green-950/15 py-1.5 rounded animate-pulse">
                 SYS_STATUS: CLASH RESOLVED / バトル決着
@@ -295,8 +341,8 @@ function BattleArena({
             )}
           </div>
 
-          {/* Core Arena Display (Defender vs Challenger cards) */}
-          <div className="flex-1 w-full flex flex-col justify-center gap-4 my-2">
+          {/* Core Arena Display */}
+          <div className="flex-1 w-full flex flex-col justify-center gap-4 my-2 z-10">
             {/* DEFENDER ZONE */}
             <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
               <div
@@ -308,7 +354,7 @@ function BattleArena({
                     : 'border-cyber-border text-cyber-text-dim bg-cyber-dark/50'
                 }`}
               >
-                <Flag size={12} className={flagHolderName === playerName ? 'animate-pulse text-neon-cyan' : flagHolderName === opponent ? 'text-neon-magenta animate-pulse' : ''} />
+                <Flag size={12} className={flagHolderName === playerName ? 'animate-pulse text-neon-cyan animate-neon-pulse' : flagHolderName === opponent ? 'text-neon-magenta animate-pulse' : ''} />
                 <span className="uppercase">
                   {flagHolderName === playerName
                     ? 'DEFENDING / あなたが支配中'
@@ -322,7 +368,7 @@ function BattleArena({
               {/* Defender Card Visual */}
               <div className="mt-3 flex items-center justify-center min-h-[140px]">
                 {currentFlagCard ? (
-                  <div className="transform scale-90 transition-transform">
+                  <div key={currentFlagCard.name} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
                     <CardDisplay card={convertToFullCard(currentFlagCard)} basePower={currentFlagCard.basePower} disabled />
                   </div>
                 ) : (
@@ -339,14 +385,24 @@ function BattleArena({
                 ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード
               </div>
 
-              {/* Horizontally stack or arrange revealed cards */}
+              {/* Stacked drawn challenger cards */}
               <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
                 {currentClashCards.length > 0 ? (
-                  currentClashCards.map((cCard, idx) => (
-                    <div key={idx} className="transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-transform duration-300">
-                      <CardDisplay card={convertToFullCard(cCard)} basePower={cCard.basePower} disabled />
-                    </div>
-                  ))
+                  currentClashCards.map((cCard, idx) => {
+                    const isLatest = idx === currentClashCards.length - 1;
+                    return (
+                      <div
+                        key={idx}
+                        className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
+                          isLatest
+                            ? 'animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80'
+                            : 'opacity-70 scale-75'
+                        }`}
+                      >
+                        <CardDisplay card={convertToFullCard(cCard)} basePower={cCard.basePower} disabled />
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
                     AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
@@ -357,11 +413,11 @@ function BattleArena({
           </div>
 
           {/* Action Resolution status details */}
-          <div className="w-full text-center mt-2 px-4 py-2 border border-cyber-border/10 rounded bg-cyber-dark/40 min-h-[50px] flex items-center justify-center">
+          <div className="w-full text-center mt-2 px-4 py-2 border border-cyber-border/10 rounded bg-cyber-dark/40 min-h-[50px] flex items-center justify-center z-10">
             <p className="text-[10px] font-mono text-cyber-text leading-relaxed">
               {currentEntry ? translateBattleDetail(currentEntry.details) : 'INITIALIZING REPLAY ENGINE...'}
               {currentEntry?.effectTriggered && currentEntry.effectTriggered !== 'None' && currentEntry.effectTriggered !== '' && (
-                <span className="text-neon-green block font-bold mt-1 text-[9px]">
+                <span className="text-neon-green block font-bold mt-1 text-[9px] animate-pulse">
                   ⚡ {translateBattleDetail(currentEntry.effectTriggered)}
                 </span>
               )}
@@ -437,12 +493,7 @@ function BattleArena({
         {/* Playback Speed selector */}
         <div className="flex items-center gap-1.5 text-[10px]">
           <span className="text-cyber-text-dim">SPEED / 速度:</span>
-          {([
-            { label: '0.5x', value: 1600 },
-            { label: '1.0x', value: 1000 },
-            { label: '2.0x', value: 500 },
-            { label: '4.0x', value: 200 },
-          ]).map((speedOpt) => (
+          {speedOptions.map((speedOpt) => (
             <button
               key={speedOpt.label}
               onClick={() => {
@@ -506,8 +557,8 @@ function BattleArena({
             return (
               <div
                 key={i}
-                className={`flex items-start gap-2 py-1 px-1.5 rounded ${
-                  i === currentLogIndex ? 'bg-cyber-surface/40 border border-cyber-border/10' : ''
+                className={`flex items-start gap-2 py-1 px-1.5 rounded transition-all duration-300 ${
+                  i === currentLogIndex ? 'bg-cyber-surface/40 border border-cyber-border/10 animate-slide-in' : ''
                 }`}
               >
                 <div className={`mt-0.5 min-w-[14px] ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
