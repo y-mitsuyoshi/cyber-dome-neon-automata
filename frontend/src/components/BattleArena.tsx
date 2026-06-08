@@ -46,6 +46,7 @@ interface BattleArenaProps {
   onStep: () => Promise<void>;
   onSubmitAction: (actionType: string, cardIds: string[]) => Promise<void>;
   loading: boolean;
+  opponentIsNPC: boolean;
 }
 
 function BattleArena({
@@ -59,6 +60,7 @@ function BattleArena({
   onStep,
   onSubmitAction,
   loading: _loading,
+  opponentIsNPC,
 }: BattleArenaProps) {
   const { playSE } = useAudio();
   const { t, translateBattleDetail } = useTranslation();
@@ -99,18 +101,22 @@ function BattleArena({
 
   // Auto-Play timer effect
   useEffect(() => {
-    if (!isAutoPlay) return;
+    const shouldAutoStep = isAutoPlay || (isLiveMode && battleSession && battleSession.turnOwner === opponent && opponentIsNPC);
 
-    if (isLiveMode) {
+    if (!shouldAutoStep) return;
+
+    if (isLiveMode && battleSession) {
       if (battleSession.isFinished || battleSession.requiredAction !== 'DRAW') {
-        setIsAutoPlay(false);
+        if (isAutoPlay) setIsAutoPlay(false);
         return;
       }
       const timer = setTimeout(() => {
-        onStep().catch(() => setIsAutoPlay(false));
+        onStep().catch(() => {
+          if (isAutoPlay) setIsAutoPlay(false);
+        });
       }, playSpeed);
       return () => clearTimeout(timer);
-    } else {
+    } else if (!isLiveMode) {
       if (currentLogIndex >= battleLog.length - 1) {
         setIsAutoPlay(false);
         return;
@@ -120,7 +126,7 @@ function BattleArena({
       }, playSpeed);
       return () => clearTimeout(timer);
     }
-  }, [isAutoPlay, isLiveMode, battleSession, currentLogIndex, battleLog, playSpeed, onStep]);
+  }, [isAutoPlay, isLiveMode, battleSession, currentLogIndex, battleLog, playSpeed, onStep, opponent, opponentIsNPC]);
 
   // Audio/Visual feedback cues
   const lastPlayedIndexRef = useRef<number>(-1);
@@ -211,7 +217,7 @@ function BattleArena({
     }
     const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return 0;
-    const p1Name = battleSession?.player1Name || (battleLog.length > 0 ? battleLog[0].player : '');
+    const p1Name = battleLog.length > 0 ? battleLog[0].player : '';
     const isP1 = p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
     return isP1 ? currentEntry.playerDeckCount : currentEntry.cpuDeckCount;
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, hasLog, playerName, isPlayer1]);
@@ -222,7 +228,7 @@ function BattleArena({
     }
     const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return 0;
-    const p1Name = battleSession?.player1Name || (battleLog.length > 0 ? battleLog[0].player : '');
+    const p1Name = battleLog.length > 0 ? battleLog[0].player : '';
     const isP1 = p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
     return isP1 ? currentEntry.cpuDeckCount : currentEntry.playerDeckCount;
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog, playerName]);
@@ -664,7 +670,7 @@ function BattleArena({
           <div className="w-full mt-4 z-10 flex flex-col items-center gap-2">
             {!isReplayFinished ? (
               <button
-                disabled={isLiveMode && (battleSession.requiredAction !== 'DRAW' || (battleSession.turnOwner === opponent && !isLiveMode))}
+                disabled={isLiveMode && (battleSession.requiredAction !== 'DRAW' || (battleSession.turnOwner === opponent && !opponentIsNPC))}
                 onClick={() => {
                   playSE('click');
                   if (isLiveMode) {

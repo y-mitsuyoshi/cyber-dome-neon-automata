@@ -557,6 +557,7 @@ function App() {
               onStep={handleStepBattle}
               onSubmitAction={handleSubmitBattleAction}
               loading={loading}
+              opponentIsNPC={gameState.npcs.some((n: any) => n.name === gameState.opponent && n.isNpc) || gameState.opponent === 'CPU'}
             />
           ) : (
             <Standings

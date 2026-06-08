@@ -129,6 +129,20 @@ func HandleBattleStep(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Verify turn ownership
+	isTurnOwner := session.TurnOwner == req.PlayerName
+	isNPCTurn := false
+	if session.TurnOwner == session.Player1Name {
+		isNPCTurn = isP1NPC
+	} else if session.TurnOwner == session.Player2Name {
+		isNPCTurn = isP2NPC
+	}
+
+	if !isTurnOwner && !isNPCTurn {
+		writeError(w, http.StatusForbidden, "It is not your turn to draw")
+		return
+	}
+
 	// Step the battle
 	engine.StepBattle(session, isP1NPC, isP2NPC)
 

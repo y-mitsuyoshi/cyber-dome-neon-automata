@@ -574,6 +574,8 @@ func resolveRound(gs *models.GameState) {
 				p1.Deck,
 				p2.Deck,
 			)
+			session.Player1Wins = p1.Wins
+			session.Player2Wins = p2.Wins
 
 			// Run StepBattle to completion (both are NPCs)
 			for !session.IsFinished {
@@ -627,6 +629,8 @@ func resolveRound(gs *models.GameState) {
 				p1.Deck,
 				p2.Deck,
 			)
+			session.Player1Wins = p1.Wins
+			session.Player2Wins = p2.Wins
 			gs.BattleSessions[p1.Name] = session
 			gs.BattleSessions[p2.Name] = session
 		}

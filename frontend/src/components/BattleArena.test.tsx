@@ -55,6 +55,7 @@ describe('BattleArena', () => {
         onStep={async () => {}}
         onSubmitAction={async (_actionType, _cardIds) => {}}
         loading={false}
+        opponentIsNPC={true}
       />
     );
     expect(container).toBeDefined();
@@ -73,6 +74,7 @@ describe('BattleArena', () => {
         onStep={async () => {}}
         onSubmitAction={async (_actionType, _cardIds) => {}}
         loading={false}
+        opponentIsNPC={true}
       />
     );
     expect(container).toBeDefined();

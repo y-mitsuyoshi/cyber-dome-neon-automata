@@ -161,6 +161,10 @@ type BattleSession struct {
 	Player2Mem          []MemorySlot             `json:"player2Mem"`
 	Player1Discard      []Card                   `json:"player1Discard"` // Banish pile for player1
 	Player2Discard      []Card                   `json:"player2Discard"` // Banish pile for player2
+	Player1Wins         int                      `json:"player1Wins"`
+	Player2Wins         int                      `json:"player2Wins"`
+	Player1NextAttackBuff int                    `json:"player1NextAttackBuff"`
+	Player2NextAttackBuff int                    `json:"player2NextAttackBuff"`
 	FlagHolder          string                   `json:"flagHolder"`
 	FlagPower           int                      `json:"flagPower"`
 	Step                int                      `json:"step"`

@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Cpu, Bug, HardDrive, User, Zap, Shield, Building, Rocket, Film, Anchor, Ghost, Ticket, Skull, Grid } from 'lucide-react';
+import { Cpu, Bug, HardDrive, User, Zap, Shield, Building, Rocket, Film, Ghost, Skull, Grid } from 'lucide-react';
 import type { Card } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';

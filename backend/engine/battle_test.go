@@ -57,26 +57,26 @@ func TestBenchPowerBonus(t *testing.T) {
 	}
 }
 
-func TestCountAIInMemory(t *testing.T) {
+func TestCountAttributeInMemory(t *testing.T) {
 	mem := []models.MemorySlot{
 		{
-			CardName: "AI Card",
+			CardName: "Orbit Card",
 			Cards: []models.Card{
-				{Attribute: "AI"},
-				{Attribute: "AI"},
+				{Attribute: "Orbit"},
+				{Attribute: "Orbit"},
 			},
 			Count: 2,
 		},
 		{
-			CardName: "Virus Card",
+			CardName: "Sector Card",
 			Cards: []models.Card{
-				{Attribute: "Virus"},
+				{Attribute: "Sector"},
 			},
 			Count: 1,
 		},
 	}
 	
-	count := countAIInMemory(mem)
+	count := countAttributeInMemory(mem, "Orbit")
 	if count != 2 {
 		t.Errorf("Expected 2, got %d", count)
 	}
