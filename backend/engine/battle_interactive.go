@@ -323,6 +323,62 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 		} else {
 			effectText = "山札が空のため、除外できませんでした"
 		}
+	case "pyrotechnist":
+		// Pyrotechnist: Buff fans +3 if active memory is full (6 slots filled)
+		if uniqueSlotCount(*activeMem) >= 6 {
+			effectText = "バッファオーバーフロー：ベンチが満杯なため、ファン+3を獲得！"
+		} else {
+			effectText = "ベンチが満杯ではないため、ファン獲得効果は発動しませんでした"
+		}
+	case "necromancer":
+		// Necromancer: Automatically return the lowest power card on bench to top of deck
+		var lowestCard *models.Card
+		for _, slot := range *activeMem {
+			if len(slot.Cards) > 0 {
+				c := &slot.Cards[0]
+				if lowestCard == nil || c.Power < lowestCard.Power {
+					lowestCard = c
+				}
+			}
+		}
+		if lowestCard != nil {
+			c, found := removeCardFromMemory(activeMem, lowestCard.ID)
+			if found {
+				*activeDeck = append([]models.Card{c}, *activeDeck...)
+				effectText = fmt.Sprintf("リサイクルビンの効果でベンチから %s を山札の上に戻しました", c.Name)
+			}
+		} else {
+			effectText = "ベンチが空のため、山札に戻せませんでした"
+		}
+	case "siren":
+		// Siren: Automatically banish the highest power card from opponent's bench
+		var highestCard *models.Card
+		var oppMem *[]models.MemorySlot
+		var oppDiscard *[]models.Card
+		if session.TurnOwner == session.Player1Name {
+			oppMem = &session.Player2Mem
+			oppDiscard = &session.Player2Discard
+		} else {
+			oppMem = &session.Player1Mem
+			oppDiscard = &session.Player1Discard
+		}
+		for _, slot := range *oppMem {
+			if len(slot.Cards) > 0 {
+				c := &slot.Cards[0]
+				if highestCard == nil || c.Power > highestCard.Power {
+					highestCard = c
+				}
+			}
+		}
+		if highestCard != nil {
+			c, found := removeCardFromMemory(oppMem, highestCard.ID)
+			if found {
+				*oppDiscard = append(*oppDiscard, c)
+				effectText = fmt.Sprintf("フィッシングプログラムの効果で相手のベンチから %s を除外しました", c.Name)
+			}
+		} else {
+			effectText = "相手のベンチが空のため、除外効果は発動しませんでした"
+		}
 	}
 
 	// Re-calculate power after immediate reveal effects

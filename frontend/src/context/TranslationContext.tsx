@@ -461,7 +461,7 @@ const cardDictJa: Record<string, { name: string; effect: string }> = {
   b_band: { name: "シナプスバンド", effect: "このカードがベンチにある場合、オービット（Orbit）属性のパワー+1" },
   b_clone: { name: "レプリカエージェント", effect: "このカードの選択時、★1を得る。" },
   b_alien: { name: "ゼノウイルス", effect: "" },
-  b_cowboy: { name: "データバガボンド", effect: "このカードがフラッグを手に入れたら、相手の山札の一番上のカードをベンチに送る。" },
+  b_cowboy: { name: "データバガボンド", effect: "このカードがフラッグを手に入れたら、相手のベンチにある最もパワーの高いカード1枚を除外エリアに送る。" },
   b_comic: { name: "ホロヒーロー", effect: "このカードがフラッグを失う際、次のキャラクターの攻撃時、パワー+2" },
   b_director: { name: "シスオペ", effect: "このカードがベンチにある場合、ホロメディア（HoloMedia）属性の攻撃時のパワー+1" },
   b_lion: { name: "サイバーライオン", effect: "" },
@@ -471,10 +471,10 @@ const cardDictJa: Record<string, { name: string; effect: string }> = {
   b_shark: { name: "サイバーシャーク", effect: "" },
   b_ghost: { name: "ファントムスヌープ", effect: "相手の山札の一番上のカードを相手の除外エリアに置く。" },
   b_teenager: { name: "スクリプトキディ", effect: "ベンチにあるデーモン（Daemon）属性のカード1枚につき、パワー+2" },
-  b_necromancer: { name: "リサイクルビン", effect: "ベンチにパワー2のカードがあれば、1枚を山札の一番上に戻して良い。" },
+  b_necromancer: { name: "リサイクルビン", effect: "ベンチにある最もパワーの低いカード1枚を自分の山札の一番上に戻す。" },
   b_bat: { name: "サイバーバット", effect: "" },
   b_mime: { name: "ミラープログラム", effect: "ベンチの空きの数だけ、パワー+3" },
-  b_pyrotechnist: { name: "バッファオーバーロード", effect: "このカードが出たとき、山札の残り枚数が1枚以下なら、★+2" },
+  b_pyrotechnist: { name: "バッファオーバーロード", effect: "このカードが出たとき、ベンチが満杯（6スロットすべて埋まっている）なら、★+3" },
   b_fortune_teller: { name: "予測モデル", effect: "このカードがフラッグを失う際、山札を見て、好きなカードを一番上に移動させて良い。" },
   b_duck: { name: "サイバーダック", effect: "" },
 
@@ -490,7 +490,7 @@ const cardDictJa: Record<string, { name: string; effect: string }> = {
   c_hero: { name: "サイバーヒーロー", effect: "このカードがフラッグを手に入れたら、★+2" },
   c_trex: { name: "Tウイルスレックス", effect: "" },
   c_villain: { name: "ヴィランプログラム", effect: "このカードを出したら、Aデッキのカードを1枚見ないで、自分の山札の一番上に置く。" },
-  c_siren: { name: "フィッシングプログラム", effect: "相手のベンチのカード1枚を相手の除外エリアに置いても良い。" },
+  c_siren: { name: "フィッシングプログラム", effect: "相手のベンチにある最もパワーの高いカード1枚を相手の除外エリアに送る。" },
   c_kraken: { name: "クラーケンICE", effect: "" },
   c_submarine: { name: "サブネットダイバー", effect: "自分の山札の一番下のカードを自分の除外エリアに置く。" },
   c_vampire: { name: "ヴァンパイアICE", effect: "自分のベンチにBデッキのカードがあれば、1枚を山札の一番上に戻して良い。" },
@@ -549,7 +549,7 @@ const cardDictEn: Record<string, { name: string; effect: string }> = {
   b_band: { name: "Synapse Band", effect: "If this card is on the bench, Orbit cards gain Power +1." },
   b_clone: { name: "Replica Agent", effect: "When choosing this card, gain 1 Star." },
   b_alien: { name: "Xenovirus", effect: "" },
-  b_cowboy: { name: "Data Vagabond", effect: "When this card claims the flag, send the opponent's top deck card to the bench." },
+  b_cowboy: { name: "Data Vagabond", effect: "When this card claims the flag, banish the highest power card from the opponent's bench." },
   b_comic: { name: "Holo Hero", effect: "When this card loses the flag, the next character gains Power +2 on attack." },
   b_director: { name: "SysOp", effect: "If this card is on the bench, HoloMedia cards gain Power +1 on attack." },
   b_lion: { name: "Cyber Lion", effect: "" },
@@ -559,10 +559,10 @@ const cardDictEn: Record<string, { name: string; effect: string }> = {
   b_shark: { name: "Cyber Shark", effect: "" },
   b_ghost: { name: "Phantom Snoop", effect: "Place the opponent's top deck card into their memory area." },
   b_teenager: { name: "Script Kiddie", effect: "For each Daemon card on the bench, Power +2." },
-  b_necromancer: { name: "Recycle Bin", effect: "If there is a card with Power 2 on the bench, you may return 1 card to the top of your deck." },
+  b_necromancer: { name: "Recycle Bin", effect: "Return the lowest power card on your bench to the top of your deck." },
   b_bat: { name: "Cyber Bat", effect: "" },
   b_mime: { name: "Mirror Program", effect: "Power +3 for each empty slot on the bench." },
-  b_pyrotechnist: { name: "Buffer Overload", effect: "When played, if your deck has 1 or fewer cards, Stars +2." },
+  b_pyrotechnist: { name: "Buffer Overload", effect: "When played, if your bench is full (all 6 slots filled), Stars +3." },
   b_fortune_teller: { name: "Predictive Model", effect: "When this card loses the flag, look through your deck and you may move any card to the top." },
   b_duck: { name: "Cyber Duck", effect: "" },
 
@@ -578,7 +578,7 @@ const cardDictEn: Record<string, { name: string; effect: string }> = {
   c_hero: { name: "Cyber Hero", effect: "When this card claims the flag, Stars +2." },
   c_trex: { name: "T-Virus Rex", effect: "" },
   c_villain: { name: "Villain Program", effect: "When played, place 1 random card from Deck A onto the top of your deck." },
-  c_siren: { name: "Phishing Program", effect: "You may place 1 card from the opponent's bench into their memory area." },
+  c_siren: { name: "Phishing Program", effect: "Banish the highest power card from the opponent's bench." },
   c_kraken: { name: "Kraken ICE", effect: "" },
   c_submarine: { name: "Subnet Diver", effect: "Place the bottom card of your deck into your memory area." },
   c_vampire: { name: "Vampire ICE", effect: "If there is a Deck B card on your bench, you may return 1 card to the top of your deck." },
@@ -689,7 +689,7 @@ const jaCardNameToEn: Record<string, string> = {
   "電脳テディベア": "Cyber Teddybear"
 };
 
-export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const saved = localStorage.getItem('cyber_dome_locale');
     if (saved === 'ja' || saved === 'en') {
