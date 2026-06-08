@@ -212,7 +212,7 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 		players[i] = p
 		
 		// Generate initial shop for each player
-		shop := engine.GenerateShop(10)
+		shop := engine.GenerateShop(10, 1)
 		shops[lp.Name] = &shop
 	}
 

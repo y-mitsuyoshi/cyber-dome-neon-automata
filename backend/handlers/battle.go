@@ -249,3 +249,65 @@ func HandleBattleAction(w http.ResponseWriter, r *http.Request) {
 func replaceStrings(s, old, new string) string {
 	return strings.ReplaceAll(s, old, new)
 }
+
+// HandleBattleComplete marks a player as ready to proceed from battle view to results screen.
+// POST /api/battle/complete
+func HandleBattleComplete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	var req struct {
+		GameID     string `json:"gameId"`
+		PlayerName string `json:"playerName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.PlayerName == "" {
+		req.PlayerName = "PLAYER_ONE"
+	}
+
+	gs, ok := getGame(req.GameID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "Game not found")
+		return
+	}
+
+	gs.Mu.Lock()
+	defer gs.Mu.Unlock()
+
+	if gs.Phase != "battle" {
+		writeError(w, http.StatusBadRequest, "Cannot complete battle in phase: "+gs.Phase)
+		return
+	}
+
+	// Mark caller as ready for results phase
+	gs.ReadyPlayers[req.PlayerName] = true
+
+	// Check if all human players are ready to proceed to results
+	humanCount := 0
+	readyCount := 0
+	for _, p := range gs.Players {
+		if !p.IsNPC {
+			humanCount++
+			if gs.ReadyPlayers[p.Name] {
+				readyCount++
+			}
+		}
+	}
+
+	if readyCount >= humanCount {
+		// All humans are ready, transition to results phase
+		gs.Phase = "results"
+		gs.ReadyPlayers = make(map[string]bool)
+		gs.BattleSessions = make(map[string]*models.BattleSession) // Clear sessions
+		
+		go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+	}
+
+	WritePlayerGameState(w, gs, req.PlayerName)
+}

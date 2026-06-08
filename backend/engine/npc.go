@@ -105,15 +105,13 @@ func buildBiasedDeck(pool []models.Card, strategy string, size int) []models.Car
 }
 
 // NPCShopPhase simulates a symmetrical shop phase for an NPC player.
-// They receive 10 new credits (handled outside or inside this function),
-// then browse cards, buy matching ones, reroll if credits allow, and delete bad cards.
-func NPCShopPhase(npc *models.Player) {
+func NPCShopPhase(npc *models.Player, round int) {
 	strategy := npc.AIStrategy
 	
 	// Max 3 purchase/reroll iterations to prevent infinite loops and simulate human speed
 	for iter := 0; iter < 3; iter++ {
 		// Generate standard shop of 3 cards
-		shop := GenerateShop(npc.Credits)
+		shop := GenerateShop(npc.Credits, round)
 		boughtAny := false
 
 		// 1. Evaluate and buy matching cards

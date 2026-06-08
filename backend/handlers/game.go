@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -249,7 +250,7 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 
 	shops := make(map[string]*models.ShopState)
 	for _, p := range players {
-		shop := engine.GenerateShop(10)
+		shop := engine.GenerateShop(10, 1)
 		shops[p.Name] = &shop
 	}
 
@@ -463,7 +464,7 @@ func HandleKickPlayer(w http.ResponseWriter, r *http.Request) {
 	WritePlayerGameState(w, gs, req.HostName)
 }
 
-// resolveRound starts the interactive battle phase and initializes BattleSessions for all matchups.
+// resolveRound starts the battle phase and simulates all matchups instantly.
 func resolveRound(gs *models.GameState) {
 	gs.Phase = "battle"
 	gs.ReadyPlayers = make(map[string]bool)
@@ -505,88 +506,88 @@ func resolveRound(gs *models.GameState) {
 			continue
 		}
 
-		// 2. Handle Human/NPC vs Human/NPC Match
+		// 2. Handle Actual Match
 		p1 := &gs.Players[p1Idx]
 		p2 := &gs.Players[p2Idx]
 
-		sessionID := generateID()
-		// Clone decks to initialize the session (InitializeBattleSession shuffles and draws internally)
-		session := engine.InitializeBattleSession(sessionID, p1.Name, p2.Name, p1.CloneDeck(), p2.CloneDeck())
+		// Shuffle decks before running battle
+		p1.ShuffleDeck()
+		p2.ShuffleDeck()
 
-		// Symmetrical: If BOTH are NPCs, fully simulate the battle session to completion instantly!
-		if p1.IsNPC && p2.IsNPC {
-			for !session.IsFinished {
-				// NPC 1 move
-				p1Action := engine.EvaluateBestMove(session.Player1Hand, p1.AIStrategy, session.Player1Mem, session.Player2Mem, session.FlagPower, session.FlagHolder == p2.Name)
-				p1Action.PlayerName = p1.Name
-				session.PendingActions[p1.Name] = &p1Action
+		// Run simulation
+		battleRes := engine.RunBattle(p1.CloneDeck(), p2.CloneDeck())
 
-				// NPC 2 move
-				p2Action := engine.EvaluateBestMove(session.Player2Hand, p2.AIStrategy, session.Player2Mem, session.Player1Mem, session.FlagPower, session.FlagHolder == p1.Name)
-				p2Action.PlayerName = p2.Name
-				session.PendingActions[p2.Name] = &p2Action
+		// Replace generic "player" and "cpu" names with actual player names in the result
+		adaptBattleResult(&battleRes, p1.Name, p2.Name)
 
-				// Step battle
-				engine.StepBattle(session)
+		// Apply standings increases
+		winnerName := battleRes.Winner
+		fansGained := battleRes.FansGained
+
+		for i := range gs.Players {
+			if gs.Players[i].Name == winnerName {
+				gs.Players[i].Wins++
+				gs.Players[i].Fans += fansGained
 			}
-
-			// Apply wins and fans gained
-			winnerName := session.Winner
-			loserName := session.Loser
-			fansGained := 2
-			if session.Step < 3 {
-				fansGained = 1
-			}
-			// Memory overflow awards 3 fans (highest stakes finish)
-			for _, entry := range session.Log {
-				if entry.Action == "memory_overflow" {
-					fansGained = 3
-					break
-				}
-			}
-
-			for i := range gs.Players {
-				if gs.Players[i].Name == winnerName {
-					gs.Players[i].Wins++
-					gs.Players[i].Fans += fansGained
-				}
-			}
-
-			battleRes := models.BattleResult{
-				Winner:     winnerName,
-				Loser:      loserName,
-				Reason:     fmt.Sprintf("%s was bypassed or suffered fatal synaptic overflow.", loserName),
-				FansGained: fansGained,
-				Log:        session.Log,
-			}
-
-			gs.LastResults[session.Player1Name] = &battleRes
-			gs.BattleLogs[session.Player1Name] = session.Log
-
-			gs.LastResults[session.Player2Name] = &battleRes
-			gs.BattleLogs[session.Player2Name] = session.Log
-		} else {
-			// Symmetrical: Human is involved, keep active session in the map
-			gs.BattleSessions[p1.Name] = session
-			gs.BattleSessions[p2.Name] = session
-
-			// Synchronize player Hand and Deck in game state
-			p1.Hand = session.Player1Hand
-			p1.Deck = session.Player1Deck
-			p2.Hand = session.Player2Hand
-			p2.Deck = session.Player2Deck
 		}
-	}
 
-	// Symmetrical: Check if everyone instantly completed (all got BYEs)
-	checkAndAdvanceResults(gs)
+		// Store results for both players
+		gs.LastResults[p1.Name] = &battleRes
+		gs.BattleLogs[p1.Name] = battleRes.Log
+
+		gs.LastResults[p2.Name] = &battleRes
+		gs.BattleLogs[p2.Name] = battleRes.Log
+	}
 
 	// Broadcast transition event to all connected clients
 	go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
 }
 
+// adaptBattleResult replaces generic "player" and "cpu" strings with actual names
+func adaptBattleResult(res *models.BattleResult, p1Name, p2Name string) {
+	if res.Winner == "player" {
+		res.Winner = p1Name
+	} else if res.Winner == "cpu" {
+		res.Winner = p2Name
+	}
+
+	if res.Loser == "player" {
+		res.Loser = p1Name
+	} else if res.Loser == "cpu" {
+		res.Loser = p2Name
+	}
+
+	for i := range res.Log {
+		entry := &res.Log[i]
+		if entry.Player == "player" {
+			entry.Player = p1Name
+		} else if entry.Player == "cpu" {
+			entry.Player = p2Name
+		}
+
+		if entry.FlagHolder == "player" {
+			entry.FlagHolder = p1Name
+		} else if entry.FlagHolder == "cpu" {
+			entry.FlagHolder = p2Name
+		}
+
+		entry.Details = strings.ReplaceAll(entry.Details, "player", p1Name)
+		entry.Details = strings.ReplaceAll(entry.Details, "cpu", p2Name)
+		entry.Details = strings.ReplaceAll(entry.Details, "Player", p1Name)
+		entry.Details = strings.ReplaceAll(entry.Details, "CPU", p2Name)
+
+		entry.EffectTriggered = strings.ReplaceAll(entry.EffectTriggered, "player", p1Name)
+		entry.EffectTriggered = strings.ReplaceAll(entry.EffectTriggered, "cpu", p2Name)
+		entry.EffectTriggered = strings.ReplaceAll(entry.EffectTriggered, "Player", p1Name)
+		entry.EffectTriggered = strings.ReplaceAll(entry.EffectTriggered, "CPU", p2Name)
+	}
+}
+
 // checkAndAdvanceResults checks if all active battles have finished and advances the phase to results.
 func checkAndAdvanceResults(gs *models.GameState) {
+	if gs.Phase != "battle" {
+		return
+	}
 	activeBattlesLeft := false
 	for _, session := range gs.BattleSessions {
 		if !session.IsFinished {
@@ -595,7 +596,7 @@ func checkAndAdvanceResults(gs *models.GameState) {
 		}
 	}
 
-	if !activeBattlesLeft && len(gs.BattleSessions) > 0 {
+	if !activeBattlesLeft {
 		gs.Phase = "results"
 		gs.ReadyPlayers = make(map[string]bool)
 		gs.BattleSessions = make(map[string]*models.BattleSession) // Clear sessions
@@ -624,10 +625,10 @@ func advanceRound(gs *models.GameState) {
 
 			if p.IsNPC {
 				// Simulate symmetrical shop AI for NPCs!
-				engine.NPCShopPhase(p)
+				engine.NPCShopPhase(p, gs.CurrentRound)
 			} else {
 				// Generate fresh shop for human players
-				shop := engine.GenerateShop(p.Credits)
+				shop := engine.GenerateShop(p.Credits, gs.CurrentRound)
 				gs.Shops[p.Name] = &shop
 			}
 		}

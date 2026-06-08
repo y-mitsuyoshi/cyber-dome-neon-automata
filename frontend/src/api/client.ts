@@ -201,3 +201,11 @@ export async function startGame(code: string): Promise<{ gameId: string }> {
     body: JSON.stringify({ code }),
   });
 }
+
+export async function completeBattle(gameId: string, playerName: string): Promise<GameState> {
+  const raw = await apiFetch<RawGameState>('/api/battle/complete', {
+    method: 'POST',
+    body: JSON.stringify({ gameId, playerName }),
+  });
+  return mapGameState(raw);
+}

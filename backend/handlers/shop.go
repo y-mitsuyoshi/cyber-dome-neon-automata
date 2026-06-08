@@ -191,7 +191,7 @@ func HandleRerollShop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credits, errMsg := engine.RerollShop(shop, p.Credits)
+	credits, errMsg := engine.RerollShop(shop, p.Credits, gs.CurrentRound)
 	if errMsg != "" {
 		writeError(w, http.StatusBadRequest, errMsg)
 		return

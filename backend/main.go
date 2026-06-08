@@ -35,6 +35,7 @@ func main() {
 	mux.HandleFunc("/api/tournament/battle", handlers.HandleBattle)
 	mux.HandleFunc("/api/tournament/next-round", handlers.HandleNextRound)
 	mux.HandleFunc("/api/battle/action", handlers.HandleBattleAction)
+	mux.HandleFunc("/api/battle/complete", handlers.HandleBattleComplete)
 
 	// Lobby REST endpoints
 	mux.HandleFunc("/api/lobby/create", handlers.HandleCreateLobby)
@@ -61,6 +62,7 @@ func main() {
 	fmt.Println("  POST /api/tournament/battle")
 	fmt.Println("  POST /api/tournament/next-round")
 	fmt.Println("  POST /api/battle/action")
+	fmt.Println("  POST /api/battle/complete")
 	fmt.Println("  POST /api/lobby/create")
 	fmt.Println("  POST /api/lobby/join")
 	fmt.Println("  POST /api/lobby/add-npc")

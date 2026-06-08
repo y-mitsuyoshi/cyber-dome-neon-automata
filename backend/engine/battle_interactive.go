@@ -427,7 +427,8 @@ func StepBattle(session *models.BattleSession) {
 		p1CardPtr = &models.BattleLogCard{
 			ID:        c1.ID,
 			Name:      c1.Name,
-			Power:     c1.Power,
+			Power:     p1Power,
+			BasePower: c1.Power,
 			Attribute: c1.Attribute,
 		}
 	}
@@ -436,7 +437,8 @@ func StepBattle(session *models.BattleSession) {
 		p2CardPtr = &models.BattleLogCard{
 			ID:        c2.ID,
 			Name:      c2.Name,
-			Power:     c2.Power,
+			Power:     p2Power,
+			BasePower: c2.Power,
 			Attribute: c2.Attribute,
 		}
 	}

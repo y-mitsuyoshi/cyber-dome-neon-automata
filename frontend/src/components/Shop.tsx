@@ -83,7 +83,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
         </div>
 
         {/* Shop cards */}
-        <div className="flex justify-center gap-6 mb-8">
+        <div className="flex justify-center gap-6 mb-8 flex-wrap">
           {shopCards.map((card, i) => (
             <div key={card.id || i} className="animate-slide-in" style={{ animationDelay: `${i * 0.15}s` }}>
               <CardDisplay
@@ -136,7 +136,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
             `}
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            {t('rerollText')}
+            {t('rerollText')} <span className="text-[11px] text-neon-cyan opacity-80">(1¢)</span>
           </button>
 
           <button

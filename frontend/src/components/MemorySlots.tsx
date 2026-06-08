@@ -70,47 +70,65 @@ function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
           const stackCount = slot.length;
 
           return (
-            <div
-              key={i}
-              className={`
-                relative rounded border px-2 py-1.5 text-left
-                transition-all duration-300
-                ${isEmpty
-                  ? 'border-cyber-border/30 bg-cyber-darker/50'
-                  : isDanger
-                  ? `border-neon-red/60 bg-red-900/20 animate-warning-pulse`
-                  : isWarning
-                  ? `border-neon-amber/50 bg-amber-900/20`
-                  : `border-neon-cyan/30 bg-cyan-900/10`
-                }
-              `}
-              style={
-                !isEmpty
-                  ? {
-                      boxShadow: isDanger
-                        ? '0 0 8px rgba(255,0,64,0.2)'
-                        : '0 0 5px rgba(0,240,255,0.1)',
-                    }
-                  : undefined
-              }
-            >
-              {isEmpty ? (
-                <div className="text-[9px] text-cyber-border uppercase tracking-wider font-mono">
-                  {t('emptySlotLabel')}
-                </div>
-              ) : (
+            <div key={i} className="relative">
+              {/* Stack visual effect layers */}
+              {!isEmpty && stackCount > 1 && (
                 <>
-                  <div className="text-[10px] text-cyber-text truncate font-mono leading-tight">
-                    {translateCardName(slotName || '')}
-                  </div>
-                  {stackCount > 1 && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-neon-magenta text-[8px] font-bold text-white flex items-center justify-center"
-                      style={{ boxShadow: '0 0 6px rgba(255,0,255,0.5)' }}>
-                      {stackCount}
-                    </div>
+                  <div className={`absolute inset-0 translate-x-1 translate-y-1 rounded border -z-10 ${
+                    isDanger ? 'border-neon-red/20 bg-red-950/20' :
+                    isWarning ? 'border-neon-amber/20 bg-amber-950/20' :
+                    'border-neon-cyan/15 bg-cyan-950/10'
+                  }`} />
+                  {stackCount > 2 && (
+                    <div className={`absolute inset-0 translate-x-2 translate-y-2 rounded border -z-20 ${
+                      isDanger ? 'border-neon-red/10 bg-red-950/10' :
+                      isWarning ? 'border-neon-amber/10 bg-amber-950/10' :
+                      'border-neon-cyan/5 bg-cyan-950/5'
+                    }`} />
                   )}
                 </>
               )}
+              <div
+                className={`
+                  relative rounded border px-2 py-1.5 text-left
+                  transition-all duration-300
+                  ${isEmpty
+                    ? 'border-cyber-border/30 bg-cyber-darker/50'
+                    : isDanger
+                    ? `border-neon-red/60 bg-red-900/20 animate-warning-pulse`
+                    : isWarning
+                    ? `border-neon-amber/50 bg-amber-900/20`
+                    : `border-neon-cyan/30 bg-cyan-900/10`
+                  }
+                `}
+                style={
+                  !isEmpty
+                    ? {
+                        boxShadow: isDanger
+                          ? '0 0 8px rgba(255,0,64,0.2)'
+                          : '0 0 5px rgba(0,240,255,0.1)',
+                      }
+                    : undefined
+                }
+              >
+                {isEmpty ? (
+                  <div className="text-[9px] text-cyber-border uppercase tracking-wider font-mono">
+                    {t('emptySlotLabel')}
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-[10px] text-cyber-text truncate font-mono leading-tight">
+                      {translateCardName(slotName || '')}
+                    </div>
+                    {stackCount > 1 && (
+                      <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-neon-magenta text-[8px] font-black text-white flex items-center justify-center border border-white/20 animate-pulse"
+                        style={{ boxShadow: '0 0 8px rgba(255,0,255,0.6)' }}>
+                        x{stackCount}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           );
         })}

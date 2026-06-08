@@ -552,6 +552,7 @@ func (bs *BattleState) logEntry(action, side string, card *models.Card, power in
 			ID:        card.ID,
 			Name:      card.Name,
 			Power:     card.Power,
+			BasePower: card.Power,
 			Attribute: card.Attribute,
 		}
 	}
@@ -623,6 +624,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 		challengerPower := 0
 		var revealedCards []models.Card
 		flagTaken := false
+		winCardPower := 0
 
 		for {
 			var challengerDeck *[]models.Card
@@ -660,6 +662,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 
 			if challengerPower > bs.FlagPower {
 				flagTaken = true
+				winCardPower = ePower
 				break
 			}
 		}
@@ -753,7 +756,9 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 
 			// Update flag
 			bs.FlagHolder = newFlagHolder
-			bs.FlagPower = challengerPower
+			if newFlagHolder != oldFlagHolder {
+				bs.FlagPower = winCardPower
+			}
 
 			bs.logEntry("flag_change", newFlagHolder, &winCard, bs.FlagPower,
 				fmt.Sprintf("Flag claimed by %s", newFlagHolder), bs.FlagHolder,

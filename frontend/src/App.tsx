@@ -24,6 +24,7 @@ import {
   addNPC,
   removeNPC,
   startGame,
+  completeBattle,
 } from './api/client';
 
 type Screen = 'title' | 'lobby' | 'game';
@@ -41,6 +42,7 @@ function App() {
   // Standby waiting states for multiplayer sync
   const [waitingForBattle, setWaitingForBattle] = useState<boolean>(false);
   const [waitingForNextRound, setWaitingForNextRound] = useState<boolean>(false);
+  const [waitingForResults, setWaitingForResults] = useState<boolean>(false);
 
   const { locale, setLocale, t } = useTranslation();
 
@@ -137,6 +139,9 @@ function App() {
           if (state.phase === 'battle') {
             setWaitingForBattle(false);
           }
+          if (state.phase === 'results') {
+            setWaitingForResults(false);
+          }
           if (state.phase === 'shop') {
             setWaitingForNextRound(false);
           }
@@ -177,6 +182,9 @@ function App() {
           setGameState(state);
           if (state.phase === 'battle') {
             setWaitingForBattle(false);
+          }
+          if (state.phase === 'results') {
+            setWaitingForResults(false);
           }
           if (state.phase === 'shop') {
             setWaitingForNextRound(false);
@@ -369,15 +377,24 @@ function App() {
     }
   };
 
-  const handleBattleComplete = () => {
+  const handleBattleComplete = async () => {
     if (!gameState) return;
-    setGameState(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        phase: 'results' as const,
-      };
-    });
+    playSE('click');
+    setLoading(true);
+    setError(null);
+    try {
+      const state = await completeBattle(gameState.gameId, playerName);
+      setGameState(state);
+      // If multiplayer and phase is still battle (waiting for others), show standby overlay
+      if (lobbyCode && state.phase === 'battle') {
+        setWaitingForResults(true);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Sector breach detected.';
+      setError(`BATTLE_COMPLETE_FAILED: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleNextRound = async () => {
@@ -412,6 +429,7 @@ function App() {
     setError(null);
     setWaitingForBattle(false);
     setWaitingForNextRound(false);
+    setWaitingForResults(false);
   };
 
   // Render screens based on screen state
@@ -454,6 +472,18 @@ function App() {
           </h2>
           <p className="text-xs font-mono text-cyber-text-dim max-w-sm uppercase tracking-wider animate-pulse">
             {t('advancingSectorDesc')}
+          </p>
+        </div>
+      )}
+
+      {waitingForResults && (
+        <div className="fixed inset-0 z-40 bg-cyber-dark/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in p-4 text-center">
+          <ShieldAlert size={48} className="text-neon-cyan animate-pulse mb-4 text-glow-cyan" />
+          <h2 className="text-xl font-bold tracking-[0.25em] text-neon-cyan text-glow-cyan uppercase mb-2">
+            {t('waitingForOpponents') || 'WAITING FOR OPPONENTS'}
+          </h2>
+          <p className="text-xs font-mono text-cyber-text-dim max-w-sm uppercase tracking-wider animate-pulse">
+            {t('waitingForOpponentsDesc') || 'WAITING FOR OTHER COMMANDERS TO FINISH REPLAY ANALYSES...'}
           </p>
         </div>
       )}

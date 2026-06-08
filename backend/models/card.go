@@ -97,6 +97,7 @@ type BattleLogCard struct {
 	ID        string `json:"id,omitempty"`
 	Name      string `json:"name"`
 	Power     int    `json:"power"`
+	BasePower int    `json:"basePower,omitempty"`
 	Attribute string `json:"attribute"`
 }
 

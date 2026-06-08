@@ -14,6 +14,7 @@ export interface BattleLogCard {
   id?: string;
   name: string;
   power: number;
+  basePower?: number;
   attribute: 'Virus' | 'AI' | 'Hardware' | 'Netrunner' | string;
 }
 

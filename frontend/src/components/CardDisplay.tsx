@@ -10,6 +10,7 @@ interface CardDisplayProps {
   onClick?: () => void;
   disabled?: boolean;
   compact?: boolean;
+  basePower?: number;
 }
 
 const attributeConfig = {
@@ -19,7 +20,7 @@ const attributeConfig = {
   Netrunner: { color: 'text-green-400', bg: 'bg-green-900/30', border: 'border-green-500/50', glow: '#00ff66', icon: User },
 };
 
-function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false }: CardDisplayProps) {
+function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower }: CardDisplayProps) {
   const { translateCard, t } = useTranslation();
   const { playSE } = useAudio();
   const hoverGuard = useRef<number>(0);
@@ -72,11 +73,19 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
   }, [card.rarity]);
 
   if (compact) {
+    const isBuffed = basePower !== undefined && basePower !== displayCard.power;
     return (
       <div className={`flex items-center gap-2 px-2 py-1 rounded border ${attr.border} ${attr.bg} text-xs`}>
         <AttrIcon size={12} className={attr.color} />
         <span className="text-cyber-text truncate flex-1">{displayCard.name}</span>
-        <span className={`font-bold ${attr.color}`}>{displayCard.power}</span>
+        <span className={`font-bold flex items-center gap-1 ${attr.color}`}>
+          {displayCard.power}
+          {isBuffed && (
+            <span className={`text-[8px] font-bold ${displayCard.power > basePower ? 'text-emerald-400' : 'text-rose-400'}`}>
+              ({displayCard.power > basePower ? `+${displayCard.power - basePower}` : `${displayCard.power - basePower}`})
+            </span>
+          )}
+        </span>
       </div>
     );
   }
@@ -149,16 +158,21 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
           <span className={`text-xs font-bold ${attr.color}`}>{displayCard.attribute}</span>
         </div>
         <div
-          className="relative flex items-center justify-center w-12 h-12 rounded-lg border-2"
+          className="relative flex flex-col items-center justify-center w-12 h-12 rounded-lg border-2"
           style={{
             borderColor: attr.glow,
             boxShadow: `0 0 10px ${attr.glow}40, inset 0 0 10px ${attr.glow}20`,
           }}
         >
-          <Zap size={10} className={`absolute top-0.5 right-0.5 ${attr.color} opacity-50`} />
-          <span className={`text-xl font-black ${attr.color}`} style={{ textShadow: `0 0 10px ${attr.glow}` }}>
+          <Zap size={8} className={`absolute top-0.5 right-0.5 ${attr.color} opacity-50`} />
+          <span className={`text-lg font-black leading-none ${attr.color}`} style={{ textShadow: `0 0 10px ${attr.glow}` }}>
             {displayCard.power}
           </span>
+          {basePower !== undefined && basePower !== displayCard.power && (
+            <span className={`text-[8px] font-black leading-none mt-0.5 ${displayCard.power > basePower ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {displayCard.power > basePower ? `+${displayCard.power - basePower}` : `${displayCard.power - basePower}`}
+            </span>
+          )}
         </div>
       </div>
 
