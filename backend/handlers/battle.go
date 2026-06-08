@@ -306,13 +306,13 @@ func finalizeBattleSession(gs *models.GameState, session *models.BattleSession) 
 	bonus := calculateBonusFans(session.Log, winnerName)
 	fansGained += bonus
 
-	// Check if winning card has Hero effect (+3 Fans)
+	// Check if winning card has Hero effect (+2 Fans)
 	var winningCard *models.Card
 	if len(session.ActiveCards) > 0 {
 		winningCard = &session.ActiveCards[0]
 	}
 	if winningCard != nil && winningCard.EffectType == "hero" {
-		fansGained += 3
+		fansGained += 2
 	}
 
 	// Apply standings increases

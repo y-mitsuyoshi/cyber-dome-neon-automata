@@ -200,14 +200,14 @@ function App() {
   }, [connected]);
 
   // OFFLINE SOLO START
-  const handleStartSolo = async () => {
+  const handleStartSolo = async (name: string) => {
     playSE('click');
     setLoading(true);
     setError(null);
-    setPlayerName('PLAYER_ONE');
+    setPlayerName(name);
     setLobbyCode(null);
     try {
-      const state = await createNewGame();
+      const state = await createNewGame(name);
       setGameState(state);
       setScreen('game');
     } catch (err: unknown) {

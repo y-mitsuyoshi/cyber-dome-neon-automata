@@ -130,29 +130,58 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 			// Find jester in active cards and buff it
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += 3
-					effectText = "ベンチにパワー1のカードがあるため、パワー+3"
+					session.ActiveCards[i].Power += 2
+					effectText = "ベンチにパワー1のカードがあるため、パワー+2"
 					break
 				}
 			}
 		}
 	case "hermit":
-		if !hasCityCard(activeMem) {
+		leakCount := len(*activeDiscard)
+		if leakCount > 0 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += 2
-					effectText = "ベンチにシティ属性がないため、パワー+2"
+					session.ActiveCards[i].Power += leakCount
+					effectText = fmt.Sprintf("除外エリアのカード数 (%d) 分パワー+%d", leakCount, leakCount)
+					break
+				}
+			}
+		}
+	case "pig":
+		var oppMem *[]models.MemorySlot
+		if session.TurnOwner == session.Player1Name {
+			oppMem = &session.Player2Mem
+		} else {
+			oppMem = &session.Player1Mem
+		}
+		attrCount := countUniqueAttributes(oppMem)
+		if attrCount > 0 {
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += attrCount
+					effectText = fmt.Sprintf("相手ベンチの属性種類数 (%d) 分パワー+%d", attrCount, attrCount)
+					break
+				}
+			}
+		}
+	case "talent":
+		deckCount := len(*activeDeck)
+		if deckCount % 2 == 0 {
+			for i := range session.ActiveCards {
+				if session.ActiveCards[i].ID == card.ID {
+					session.ActiveCards[i].Power += 3
+					effectText = "山札の残り枚数が偶数のため、パワー+3"
 					break
 				}
 			}
 		}
 	case "stable_boy":
-		count3 := countPower3Cards(activeMem)
-		if count3 > 0 {
+		count2 := countPower2Cards(activeMem)
+		if count2 > 0 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += count3
-					effectText = fmt.Sprintf("ベンチのパワー3カード数 (%d) 分パワー+%d", count3, count3)
+					session.ActiveCards[i].Power += count2
+					effectText = fmt.Sprintf("ベンチのパワー2カード数 (%d) 分パワー+%d", count2, count2)
 					break
 				}
 			}
@@ -167,21 +196,22 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 			}
 		}
 	case "merman":
-		if hasAttributeCard(activeMem, "DeepWeb") {
+		deepCount := countAttributeInMemory(*activeMem, "DeepWeb")
+		if deepCount >= 2 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += 3
-					effectText = "ベンチにディープウェブ属性があるため、パワー+3"
+					session.ActiveCards[i].Power += 4
+					effectText = "ベンチにディープウェブ属性のカードが2枚以上あるため、パワー+4"
 					break
 				}
 			}
 		}
 	case "lifeguard":
-		if len(*activeDeck) <= 1 {
+		if len(*activeDeck) <= 3 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += 2
-					effectText = "山札が1枚以下のため、パワー+2"
+					session.ActiveCards[i].Power += 4
+					effectText = "山札が3枚以下のため、パワー+4"
 					break
 				}
 			}
@@ -191,8 +221,8 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 		if daemonCount > 0 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += daemonCount
-					effectText = fmt.Sprintf("ベンチのデーモン属性数 (%d) 分パワー+%d", daemonCount, daemonCount)
+					session.ActiveCards[i].Power += daemonCount * 2
+					effectText = fmt.Sprintf("ベンチのデーモン属性数 (%d) 分パワー+%d", daemonCount, daemonCount*2)
 					break
 				}
 			}
@@ -202,8 +232,8 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 		if emptySlots > 0 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += emptySlots
-					effectText = fmt.Sprintf("ベンチの空き数 (%d) 分パワー+%d", emptySlots, emptySlots)
+					session.ActiveCards[i].Power += emptySlots * 3
+					effectText = fmt.Sprintf("ベンチの空き数 (%d) 分パワー+%d", emptySlots, emptySlots*3)
 					break
 				}
 			}
@@ -888,30 +918,24 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 			// Handled on backend: we will increase the player's fans at the end of the battle
 			// But for now, we just log it
 		} else if winningCard.EffectType == "cowboy" {
-			// Cowboy: Send top card of opponent's deck to their bench
-			if len(*oppDeck) > 0 {
-				c := (*oppDeck)[0]
-				*oppDeck = (*oppDeck)[1:]
-				added := addToMemory(oppMem, c)
-				if !added {
-					session.IsFinished = true
-					session.Winner = activePlayerName
-					session.Loser = oppPlayerName
-					session.Log = append(session.Log, models.BattleLogEntry{
-						Step:            session.Step,
-						Action:          "memory_overflow",
-						Player:          oppPlayerName,
-						CurrentPower:    session.FlagPower,
-						PlayerMemSlots:  memSlotNames(session.Player1Mem),
-						CPUMemSlots:     memSlotNames(session.Player2Mem),
-						PlayerDeckCount: len(session.Player1Deck),
-						CPUDeckCount:    len(session.Player2Deck),
-						FlagHolder:      session.FlagHolder,
-						Details:         fmt.Sprintf("カウボーイの効果でベンチへ送られたカードにより、%s のベンチが溢れて敗北しました", oppPlayerName),
-					})
-					return
+			// Cowboy: Banish highest power card from opponent's bench
+			var highestCard *models.Card
+			for _, slot := range *oppMem {
+				if len(slot.Cards) > 0 {
+					c := &slot.Cards[0]
+					if highestCard == nil || c.Power > highestCard.Power {
+						highestCard = c
+					}
 				}
-				effectText = fmt.Sprintf("カウボーイの効果で相手の山札の上の %s をベンチに送りました", c.Name)
+			}
+			if highestCard != nil {
+				c, found := removeCardFromMemory(oppMem, highestCard.ID)
+				if found {
+					*oppDiscard = append(*oppDiscard, c)
+					effectText = fmt.Sprintf("データバガボンドの効果で相手のベンチから %s を除外しました", c.Name)
+				}
+			} else {
+				effectText = "相手のベンチが空のため、除外効果は発動しませんでした"
 			}
 		}
 
@@ -1105,6 +1129,26 @@ func countPower3Cards(mem *[]models.MemorySlot) int {
 		}
 	}
 	return count
+}
+
+func countPower2Cards(mem *[]models.MemorySlot) int {
+	count := 0
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 && slot.Cards[0].Power == 2 {
+			count += slot.Count
+		}
+	}
+	return count
+}
+
+func countUniqueAttributes(mem *[]models.MemorySlot) int {
+	attrs := make(map[string]bool)
+	for _, slot := range *mem {
+		if len(slot.Cards) > 0 {
+			attrs[slot.Cards[0].Attribute] = true
+		}
+	}
+	return len(attrs)
 }
 
 func hasAttributeCard(mem *[]models.MemorySlot, attr string) bool {

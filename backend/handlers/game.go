@@ -256,13 +256,26 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var req struct {
+		PlayerName string `json:"playerName"`
+	}
+	// Decode request body if present
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	playerName := req.PlayerName
+	if playerName == "" {
+		playerName = "PLAYER_ONE"
+	}
+
 	gameID := generateID()
 
 	// Create single player
 	startDeck := engine.StarterDeck()
 
 	player := models.Player{
-		Name:    "PLAYER_ONE",
+		Name:    playerName,
 		Credits: 10,
 		Deck:    startDeck,
 		Wins:    0,
@@ -286,7 +299,7 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 
 	gs := &models.GameState{
 		GameID:         gameID,
-		HostName:       "PLAYER_ONE",
+		HostName:       playerName,
 		CurrentRound:   1,
 		MaxRounds:      8,
 		Phase:          "shop",
@@ -317,7 +330,7 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 	GameStore.Games[gameID] = gs
 	GameStore.Unlock()
 
-	WritePlayerGameState(w, gs, "PLAYER_ONE")
+	WritePlayerGameState(w, gs, playerName)
 }
 
 // HandleGameState returns the current player-centric game state.
@@ -573,7 +586,7 @@ func resolveRound(gs *models.GameState) {
 				fansGained = 1
 			}
 
-			// Check for Hero effect bonus (+3 Fans) if hero was winning card
+			// Check for Hero effect bonus (+2 Fans) if hero was winning card
 			// We can scan the log details or simply check the winning card's effect
 			// Let's check if the winning card has c_hero effect
 			// Since we want to award Hero bonus:
@@ -582,7 +595,7 @@ func resolveRound(gs *models.GameState) {
 				winningCard = &session.ActiveCards[0]
 			}
 			if winningCard != nil && winningCard.EffectType == "hero" {
-				fansGained += 3
+				fansGained += 2
 			}
 
 			winnerName := session.Winner

@@ -5,7 +5,7 @@ import { useAudio } from '../context/AudioContext';
 import ManualModal from './ManualModal';
 
 interface TitleScreenProps {
-  onStartSolo: () => void;
+  onStartSolo: (name: string) => void;
   onCreateLobby: (name: string) => void;
   onJoinLobby: (code: string, name: string) => void;
   loading: boolean;
@@ -114,7 +114,7 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
         <div className="flex flex-col gap-4 max-w-sm mx-auto">
           {/* Jack In Solo */}
           <button
-            onClick={() => { playSE('click'); onStartSolo(); }}
+            onClick={() => { playSE('click'); onStartSolo(getActiveName()); }}
             onMouseEnter={() => { setHoveredSolo(true); playSE('hover'); }}
             onMouseLeave={() => setHoveredSolo(false)}
             disabled={loading}

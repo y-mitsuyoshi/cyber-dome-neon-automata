@@ -98,8 +98,11 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // SOLO / OFFLINE ENTRYPOINT
-export async function createNewGame(): Promise<GameState> {
-  const raw = await apiFetch<RawGameState>('/api/game/new', { method: 'POST' });
+export async function createNewGame(playerName: string): Promise<GameState> {
+  const raw = await apiFetch<RawGameState>('/api/game/new', {
+    method: 'POST',
+    body: JSON.stringify({ playerName }),
+  });
   return mapGameState(raw);
 }
 
