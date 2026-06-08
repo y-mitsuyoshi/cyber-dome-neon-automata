@@ -176,7 +176,9 @@ function App() {
 
   // 3. Auto-resync game state on WebSocket reconnection
   const gameStateRef = useRef(gameState);
-  gameStateRef.current = gameState;
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
   useEffect(() => {
     if (connected && screen === 'game' && gameStateRef.current) {
       const gs = gameStateRef.current;

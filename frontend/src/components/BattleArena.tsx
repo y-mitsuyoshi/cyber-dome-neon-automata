@@ -62,6 +62,7 @@ function BattleArena({
   loading: _loading,
   opponentIsNPC,
 }: BattleArenaProps) {
+  "use no memo";
   const { playSE } = useAudio();
   const { t, translateBattleDetail } = useTranslation();
   const [showDeckModal, setShowDeckModal] = useState(false);
@@ -159,7 +160,7 @@ function BattleArena({
         playSE('defeat');
       }
     }
-  }, [currentLogIndex, activeLog, playerName, opponent, playSE, hasLog, isLiveMode, battleSession?.isFinished]);
+  }, [currentLogIndex, activeLog, playerName, opponent, playSE, hasLog, isLiveMode, battleSession?.isFinished, battleLog.length]);
 
   // Helper to parse live slots
   const mapLiveMemSlots = (slots: { count: number; cardName: string }[]): string[][] => {
@@ -236,13 +237,15 @@ function BattleArena({
     }
     // Playback logic
     if (!hasLog || currentLogIndex < 0) return null;
+    let foundCard: BattleLogCard | Card | null = null;
     for (let i = currentLogIndex; i >= 0; i--) {
       const entry = battleLog[i];
       if (entry && entry.action === 'flag_change' && entry.card) {
-        return convertToFullCard(entry.card);
+        foundCard = entry.card;
+        break;
       }
     }
-    return null;
+    return foundCard ? convertToFullCard(foundCard) : null;
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, hasLog]);
 
   const currentClashCards = useMemo(() => {
@@ -279,7 +282,7 @@ function BattleArena({
     }
     const currentEntry = hasLog ? battleLog[currentLogIndex] : null;
     return currentEntry ? currentEntry.player === opponent && currentEntry.action === 'reveal' : false;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, opponent, hasLog]);
+  }, [isLiveMode, battleSession, currentLogIndex, battleLog, opponent, hasLog, playerName]);
 
   const isReplayFinished = isLiveMode ? battleSession.isFinished : (currentLogIndex >= battleLog.length - 1);
   const flagHolderName = isLiveMode ? battleSession.flagHolder : (hasLog ? activeLog[currentLogIndex].flagHolder : 'None');
