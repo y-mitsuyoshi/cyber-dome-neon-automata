@@ -216,6 +216,7 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 	if len(players)%2 == 0 {
 		maxRounds = len(players) - 1
 	}
+	maxRounds += 1 // Add 1 round for the Finals
 
 	// Generate initial pairings for Round 1
 	matchups := engine.GetMatchups(1, len(players))

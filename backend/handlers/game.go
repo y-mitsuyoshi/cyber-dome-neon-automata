@@ -54,7 +54,39 @@ func buildStandings(gs *models.GameState, activePlayer string) []models.Standing
 			IsPlayer: p.Name == activePlayer,
 		})
 	}
+
+	var finalWinner, finalLoser string
+	if gs.CurrentRound > gs.MaxRounds {
+		for _, res := range gs.LastResults {
+			if res != nil && res.Winner != "" && res.Winner != "BYE" {
+				finalWinner = res.Winner
+				finalLoser = res.Loser
+				break
+			}
+		}
+	}
+
 	sort.Slice(entries, func(i, j int) bool {
+		if finalWinner != "" {
+			if entries[i].Name == finalWinner {
+				return true
+			}
+			if entries[j].Name == finalWinner {
+				return false
+			}
+			if entries[i].Name == finalLoser {
+				if entries[j].Name == finalWinner {
+					return false
+				}
+				return true
+			}
+			if entries[j].Name == finalLoser {
+				if entries[i].Name == finalWinner {
+					return true
+				}
+				return false
+			}
+		}
 		if entries[i].Wins != entries[j].Wins {
 			return entries[i].Wins > entries[j].Wins
 		}
@@ -256,7 +288,7 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 		GameID:         gameID,
 		HostName:       "PLAYER_ONE",
 		CurrentRound:   1,
-		MaxRounds:      7,
+		MaxRounds:      8,
 		Phase:          "shop",
 		Players:        players,
 		Shops:          make(map[string]*models.ShopState),
@@ -659,30 +691,53 @@ func advanceRound(gs *models.GameState) {
 		gs.Phase = "results"
 	} else {
 		gs.CurrentRound++
-		gs.Phase = "shop"
 
 		// Reset ready players and results maps for the new round
 		gs.ReadyPlayers = make(map[string]bool)
 		gs.BattleLogs = make(map[string][]models.BattleLogEntry)
 		gs.LastResults = make(map[string]*models.BattleResult)
 
-		// Process shop phase start for everyone
-		for i := range gs.Players {
-			p := &gs.Players[i]
-			p.Credits += 10 // Gain 10 shop credits
-
-			if p.IsNPC {
-				// Simulate symmetrical shop AI for NPCs!
-				engine.NPCShopPhase(gs, p, gs.CurrentRound)
-			} else {
-				// Generate fresh shop for human players
-				shop := engine.GenerateShop(gs, gs.CurrentRound)
-				gs.Shops[p.Name] = &shop
+		if gs.CurrentRound == gs.MaxRounds {
+			// Finals! Pair up the top 2 players based on standings
+			standings := buildStandings(gs, "")
+			if len(standings) >= 2 {
+				top1Name := standings[0].Name
+				top2Name := standings[1].Name
+				
+				top1Idx := -1
+				top2Idx := -1
+				for idx, p := range gs.Players {
+					if p.Name == top1Name {
+						top1Idx = idx
+					} else if p.Name == top2Name {
+						top2Idx = idx
+					}
+				}
+				gs.Matchups = [][2]int{ {top1Idx, top2Idx} }
 			}
-		}
+			// Start battle phase immediately for the finals
+			resolveRound(gs)
+		} else {
+			gs.Phase = "shop"
 
-		// Generate matchups for the new round
-		gs.Matchups = engine.GetMatchups(gs.CurrentRound, len(gs.Players))
+			// Process shop phase start for everyone
+			for i := range gs.Players {
+				p := &gs.Players[i]
+				p.Credits += 10 // Gain 10 shop credits
+
+				if p.IsNPC {
+					// Simulate symmetrical shop AI for NPCs!
+					engine.NPCShopPhase(gs, p, gs.CurrentRound)
+				} else {
+					// Generate fresh shop for human players
+					shop := engine.GenerateShop(gs, gs.CurrentRound)
+					gs.Shops[p.Name] = &shop
+				}
+			}
+
+			// Generate matchups for the new round
+			gs.Matchups = engine.GetMatchups(gs.CurrentRound, len(gs.Players))
+		}
 	}
 
 	// Broadcast new round state update to all players

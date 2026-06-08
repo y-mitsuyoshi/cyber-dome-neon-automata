@@ -21,8 +21,12 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
     return b.fans - a.fans;
   });
 
-  const { t, translateBattleResult } = useTranslation();
+  const { t, translateBattleResult, locale } = useTranslation();
   const isFinalRound = round >= maxRounds;
+
+  const roundLabel = round === maxRounds
+    ? (locale === 'ja' ? '決勝戦 / FINALS' : 'FINALS')
+    : t('roundOf', { round: round, maxRounds: maxRounds - 1 });
 
   // Localize Go backend match results banner
   const displayResult = translateBattleResult(battleResult);
@@ -84,7 +88,7 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
             {t('standingsHeader')}
           </h2>
           <p className="text-xs text-cyber-text-dim tracking-wider mt-2">
-            {t('roundOf', { round: round, maxRounds: maxRounds })}
+            {roundLabel}
           </p>
         </div>
 
