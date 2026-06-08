@@ -127,14 +127,14 @@ function App() {
       initGame();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wsGameId]);
+  }, [wsGameId, playerName]);
 
   // 2. Listen for WS round/phase sync event
   useEffect(() => {
     if (phaseTrigger && gameState) {
       const syncState = async () => {
         try {
-          const state = await getGameState(gameState.gameId, playerName);
+          const state = await getGameState(gameState.gameId, gameState.player.name);
           setGameState(state);
           // Auto release standby blocks once state phase updates
           if (state.phase === 'battle') {
@@ -155,14 +155,14 @@ function App() {
       syncState();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phaseTrigger]);
+  }, [phaseTrigger, gameState]);
 
   // 2.5 Listen for WS battle events
   useEffect(() => {
     if (battleTrigger && gameState) {
       const syncBattleState = async () => {
         try {
-          const state = await getGameState(gameState.gameId, playerName);
+          const state = await getGameState(gameState.gameId, gameState.player.name);
           setGameState(state);
         } catch (_err) {
           // Silent fallback on battle sync
@@ -172,14 +172,14 @@ function App() {
       };
       syncBattleState();
     }
-  }, [battleTrigger, gameState, playerName, resetBattleTrigger]);
+  }, [battleTrigger, gameState, resetBattleTrigger]);
 
   // 3. Auto-resync game state on WebSocket reconnection
   useEffect(() => {
     if (connected && screen === 'game' && gameState) {
       const syncOnReconnect = async () => {
         try {
-          const state = await getGameState(gameState.gameId, playerName);
+          const state = await getGameState(gameState.gameId, gameState.player.name);
           setGameState(state);
           if (state.phase === 'battle') {
             setWaitingForBattle(false);
@@ -197,7 +197,7 @@ function App() {
       syncOnReconnect();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected]);
+  }, [connected, gameState]);
 
   // OFFLINE SOLO START
   const handleStartSolo = async (name: string) => {
@@ -300,7 +300,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const state = await buyCard(gameState.gameId, index, playerName);
+      const state = await buyCard(gameState.gameId, index, gameState.player.name);
       setGameState(state);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Refused by core protocol.';
@@ -316,7 +316,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const state = await rerollShop(gameState.gameId, playerName);
+      const state = await rerollShop(gameState.gameId, gameState.player.name);
       setGameState(state);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Grid connection instability.';
@@ -332,7 +332,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const state = await deleteCard(gameState.gameId, index, playerName);
+      const state = await deleteCard(gameState.gameId, index, gameState.player.name);
       setGameState(state);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Memory core locked.';
@@ -348,7 +348,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const state = await startBattle(gameState.gameId, playerName);
+      const state = await startBattle(gameState.gameId, gameState.player.name);
       setGameState(state);
 
       // If multiplayer and server returns shop phase (it means not everyone is ready), show standby overlay
@@ -368,7 +368,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const state = await stepBattle(gameState.gameId, playerName);
+      const state = await stepBattle(gameState.gameId, gameState.player.name);
       setGameState(state);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Step advanced failed.';
@@ -383,7 +383,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const state = await submitBattleAction(gameState.gameId, playerName, actionType, cardIds);
+      const state = await submitBattleAction(gameState.gameId, gameState.player.name, actionType, cardIds);
       setGameState(state);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Neural network overflow.';
@@ -399,7 +399,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const state = await completeBattle(gameState.gameId, playerName);
+      const state = await completeBattle(gameState.gameId, gameState.player.name);
       setGameState(state);
       // If multiplayer and phase is still battle (waiting for others), show standby overlay
       if (lobbyCode && state.phase === 'battle') {
@@ -422,7 +422,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const state = await nextRound(gameState.gameId, playerName);
+      const state = await nextRound(gameState.gameId, gameState.player.name);
       setGameState(state);
       
       // If multiplayer and server returns results phase (it means not everyone clicked next round), show standby overlay

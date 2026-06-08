@@ -689,6 +689,12 @@ const jaCardNameToEn: Record<string, string> = {
   "電脳テディベア": "Cyber Teddybear"
 };
 
+// English Card Name to Japanese mapping (derived automatically)
+const enCardNameToJa: Record<string, string> = {};
+Object.entries(jaCardNameToEn).forEach(([jaName, enName]) => {
+  enCardNameToJa[enName] = jaName;
+});
+
 export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [locale, setLocaleState] = useState<Locale>(() => {
     const saved = localStorage.getItem('cyber_dome_locale');
@@ -790,9 +796,38 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     } else {
       // locale === 'ja'
+      // 1. Replace all English card names with Japanese
+      Object.entries(enCardNameToJa).forEach(([enName, jaName]) => {
+        translated = translated.replace(new RegExp(enName, 'g'), jaName);
+      });
+
+      // 2. Apply translations for battle log patterns
       const phrasesJa = [
-        { pattern: /(.*) has no cards left in deck. (.*) wins!/, replacement: "$1 の山札がなくなりました。$2 の勝利です！" },
+        // Side/identity replacements
+        { pattern: /\bplayer\b/gi, replacement: "あなた" },
+        { pattern: /\bcpu\b/gi, replacement: "対戦相手" },
+
+        // Logs
+        { pattern: /(.*) has no cards left in deck\. (.*) wins!/, replacement: "$1 の山札がなくなりました。$2 の勝利です！" },
+        { pattern: /(.*) \(AI\) has no cards left in deck\. (.*) wins!/, replacement: "$1 (AI) の山札がなくなりました。$2 の勝利です！" },
+        { pattern: /Deck empty\. (.*) wins!/, replacement: "デッキが空になりました。$1 の勝利です！" },
+        { pattern: /Both decks empty\. (.*) wins by flag holding/, replacement: "両者のデッキが空になりました。フラグを保持している $1 の勝利です！" },
+        { pattern: /Opponent (.*) deck empty\. (.*) wins/, replacement: "対戦相手 $1 の山札がなくなりました。$2 の勝利です！" },
+        { pattern: /Your deck empty\. (.*) wins/, replacement: "あなたの山札がなくなりました。$1 の勝利です！" },
+        { pattern: /Max steps reached\. (.*) wins!/, replacement: "規定ステップ数に達しました。$1 の勝利です！" },
+        { pattern: /Max steps reached\. Flag holder (.*) wins/, replacement: "規定ステップ数に達しました。フラグホルダー $1 の勝利です！" },
+        { pattern: /Bench overflow\. (.*) wins!/, replacement: "ベンチ容量超過！$1 の勝利です！" },
+        { pattern: /Memory capacity exceeded\. (.*) wins!/, replacement: "メモリ上限超過！$1 の勝利です！" },
+        { pattern: /Memory Overflow: (.*) lost/, replacement: "メモリ上限超過：$1 の敗北" },
+        { pattern: /(.*) claims the flag/, replacement: "$1 がフラグを確保しました" },
+        { pattern: /Claims flag! Defense power: (\d+)/, replacement: "フラグ奪取！防衛パワー: $1" },
         { pattern: /(.*) played (.*) \(Power: (\d+)\)/, replacement: "$1 が $2 (パワー: $3) をプレイしました" },
+        { pattern: /(.*) was benched/, replacement: "$1 はベンチへ送られました" },
+        { pattern: /No cards left/, replacement: "山札がありません" },
+        { pattern: /(.*) triggered\. Active power: (\d+) \(illusionist effect: \+(\d+)\)/, replacement: "$1 がトリガーされました。現在のパワー: $2 (イリュージョニスト効果: +$3)" },
+        { pattern: /(.*) triggered\. Active power: (\d+)/, replacement: "$1 がトリガーされました。現在のパワー: $2" },
+        { pattern: /(.*) triggered\. Banner redirected!/, replacement: "$1 がトリガーされました。フラグがリダイレクトされました！" },
+        { pattern: /(.*) triggered/, replacement: "$1 がトリガーされました" },
       ];
 
       phrasesJa.forEach(({ pattern, replacement }) => {
