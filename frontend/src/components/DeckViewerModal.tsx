@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Layers, Trash2, AlertCircle } from 'lucide-react';
 import type { Card } from '../types/game';
 import CardDisplay from './CardDisplay';
@@ -39,8 +40,8 @@ export default function DeckViewerModal({
     setDeleteConfirmIndex(null);
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-cyber-dark/95 backdrop-blur-md flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[150] bg-cyber-dark/95 backdrop-blur-md flex items-center justify-center p-4">
       <div className="w-full max-w-5xl max-h-[85vh] bg-cyber-darker border-2 border-neon-magenta/40 p-6 rounded-lg shadow-[0_0_30px_rgba(255,0,255,0.15)] relative flex flex-col animate-slide-in">
         {/* Header */}
         <div className="flex justify-between items-center mb-4 border-b border-neon-magenta/20 pb-4">
@@ -136,6 +137,7 @@ export default function DeckViewerModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

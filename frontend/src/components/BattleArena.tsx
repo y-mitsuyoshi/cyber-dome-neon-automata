@@ -446,6 +446,21 @@ function BattleArena({
     );
   }, [selectedCards, choiceConfig]);
 
+  // Who is the current flag holder in human-readable form for the board layout.
+  const flagIsMine = flagHolderName === playerName;
+  const flagIsOpponent = flagHolderName === opponent;
+
+  // Challenger stack ownership — whose cards are stacked in the challenger zone.
+  const challengerOwnerIsMe = currentClashCards.length > 0 && latestPlayerIsMe;
+  const challengerOwnerIsOpponent = currentClashCards.length > 0 && latestPlayerIsOpponent;
+
+  // How many challenger cards are still needed to surpass the defender's power.
+  // Show this as an explicit "still need X power" hint.
+  const remainingPowerNeeded = useMemo(() => {
+    if (!currentFlagCard || currentClashCards.length === 0) return null;
+    return Math.max(0, flagPowerValue - challengerPower + 1);
+  }, [currentFlagCard, currentClashCards, flagPowerValue, challengerPower]);
+
   const speedOptions = [
     { label: '0.5x', value: 1600 },
     { label: '1.0x', value: 1000 },
@@ -453,21 +468,40 @@ function BattleArena({
     { label: '4.0x', value: 200 },
   ];
 
+  // Helper: determines if the challenger stack has just surged past the defender
+  // — drives the "CLASH!" impact animation.
+  const [clashImpact, setClashImpact] = useState(false);
+  useEffect(() => {
+    if (challengerPower > 0 && flagPowerValue > 0 && challengerPower >= flagPowerValue && currentClashCards.length > 0) {
+      setClashImpact(true);
+      const t = setTimeout(() => setClashImpact(false), 700);
+      return () => clearTimeout(t);
+    }
+  }, [challengerPower, flagPowerValue, currentClashCards.length]);
+
   return (
-    <div className="min-h-screen bg-cyber-dark relative overflow-hidden flex flex-col justify-between p-4 select-none">
+    <div className="min-h-screen bg-cyber-dark relative overflow-hidden flex flex-col p-3 select-none">
       {/* Background gradients */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 20%, rgba(0,240,255,0.03) 0%, transparent 60%), radial-gradient(ellipse at 50% 80%, rgba(255,0,255,0.03) 0%, transparent 60%)',
+            'radial-gradient(ellipse at 50% 8%, rgba(255,0,255,0.06) 0%, transparent 55%), radial-gradient(ellipse at 50% 92%, rgba(0,240,255,0.06) 0%, transparent 55%)',
         }}
       />
       <div className="absolute inset-0 cyber-grid pointer-events-none" />
 
-      {/* 1. Header Layer */}
+      {/* Full-board flash overlay for flag capture events */}
+      {flashState && (
+        <div
+          className={`absolute inset-0 pointer-events-none z-50 animate-fade-in ${flashState === 'cyan' ? 'bg-neon-cyan/10' : 'bg-neon-magenta/10'}`}
+          style={{ animationDuration: '120ms' }}
+        />
+      )}
+
+      {/* ================= 1. HEADER ================= */}
       <div className="relative z-10 max-w-7xl mx-auto w-full text-center">
-        <h2 className="text-xl font-black tracking-[0.3em] uppercase text-neon-magenta text-glow-magenta font-mono animate-slide-in">
+        <h2 className="text-lg font-black tracking-[0.3em] uppercase text-neon-magenta text-glow-magenta font-mono animate-slide-in">
           {t('battleArenaHeader')}
         </h2>
         <div className="flex items-center justify-center gap-6 mt-1 font-mono text-xs">
@@ -483,64 +517,261 @@ function BattleArena({
         </div>
       </div>
 
-      {/* 2. Main Dual Board Area */}
-      <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[220px_1fr_220px] gap-6 items-center my-4 flex-1">
-        
-        {/* Left Col: Local Player State */}
-        <div className="font-mono flex flex-col gap-3 self-start order-2 lg:order-1">
-          <MemorySlots
-            liveSlots={myLiveMemSlots}
-            slots={myMemSlots}
-            label={t('yourMemory')}
-            side="left"
-            accent="cyan"
-          />
-          <DiscardPile
-            cards={myDiscard}
-            label={t('yourDiscard') || 'YOUR DISCARD / 除外エリア'}
-            side="left"
-            accent="cyan"
-          />
-          <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 flex justify-between items-center">
-            <div>
-              <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
-              <div className="text-sm font-bold text-neon-cyan">{myDeckCount} {t('units') || 'Units'}</div>
-            </div>
-            <Layers size={18} className="text-neon-cyan/50" />
+      {/* ================= 2. BOARD — VERTICAL SPLIT ================= */}
+      {/* Top half = Opponent, Bottom half = Player. Center divider = Flag/Clash arena. */}
+      <div className="relative z-10 max-w-6xl mx-auto w-full flex-1 flex flex-col gap-2 my-2 min-h-[640px]">
+
+        {/* ===== OPPONENT ZONE (TOP) ===== */}
+        <div className={`relative border rounded-xl p-3 transition-all ${
+          flagIsOpponent ? 'border-neon-magenta/60 shadow-[0_0_20px_rgba(255,0,255,0.15)] bg-neon-magenta/5' :
+          challengerOwnerIsOpponent ? 'border-neon-magenta/40 bg-neon-magenta/5' :
+          'border-cyber-border/30 bg-cyber-surface/20'
+        }`}>
+          <div className="flex items-center gap-2 mb-2 font-mono">
+            <Cpu size={14} className="text-neon-magenta" />
+            <span className="text-neon-magenta font-bold text-xs uppercase tracking-widest">{opponent}</span>
+            {flagIsOpponent && (
+              <span className="ml-auto flex items-center gap-1 text-[10px] text-neon-magenta font-bold bg-neon-magenta/15 border border-neon-magenta/40 px-2 py-0.5 rounded">
+                <Flag size={10} className="animate-pulse" /> FLAG HOLDER / 支配中
+              </span>
+            )}
           </div>
 
-          <button
-            onClick={() => setShowDeckModal(true)}
-            className="flex items-center justify-center gap-2 border border-neon-cyan/45 hover:border-neon-cyan rounded p-2 bg-cyber-surface/30 text-neon-cyan font-bold hover:bg-neon-cyan/10 transition-all text-xs cursor-pointer uppercase tracking-wider font-mono shadow-[0_0_8px_rgba(0,240,255,0.1)]"
-          >
-            <Layers size={14} className="text-neon-cyan" />
-            {t('viewDeckBtn')}
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_140px_1fr] gap-3 items-start">
+            {/* Opponent bench (memory) */}
+            <div className="order-2 md:order-1">
+              <MemorySlots
+                liveSlots={opponentLiveMemSlots}
+                slots={opponentMemSlots}
+                label={t('npcMemoryLabel', { opponent })}
+                side="left"
+                accent="magenta"
+              />
+            </div>
+
+            {/* Opponent mini-stats */}
+            <div className="order-1 md:order-2 flex md:flex-col gap-2 justify-center">
+              <div className="border border-neon-magenta/30 rounded p-2 bg-cyber-surface/30 text-center flex-1 md:flex-none">
+                <div className="text-[8px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK'}</div>
+                <div className="text-sm font-bold text-neon-magenta">{opponentDeckCount}</div>
+              </div>
+              <div className="border border-cyber-border/30 rounded p-2 bg-cyber-surface/30 text-center flex-1 md:flex-none">
+                <div className="text-[8px] text-cyber-text-dim uppercase tracking-wider">DISCARD</div>
+                <div className="text-sm font-bold text-cyber-text-dim">{opponentDiscard.length}</div>
+              </div>
+            </div>
+
+            {/* Opponent discard */}
+            <div className="order-3">
+              <DiscardPile
+                cards={opponentDiscard}
+                label={t('opponentDiscard', { opponent })}
+                side="left"
+                accent="magenta"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Center: Duel Arena */}
-        <div className="flex flex-col items-center justify-between min-h-[460px] border border-cyber-border/20 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-6 relative order-1 lg:order-2 overflow-hidden">
-          
-          {/* Symmetrical Flash Overlays */}
-          {flashState === 'cyan' && (
-            <div className="absolute inset-0 bg-neon-cyan/20 border border-neon-cyan shadow-[inset_0_0_40px_rgba(0,240,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
-          )}
-          {flashState === 'magenta' && (
-            <div className="absolute inset-0 bg-neon-magenta/20 border border-neon-magenta shadow-[inset_0_0_40px_rgba(255,0,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
+        {/* ===== CENTER FLAG / CLASH ARENA ===== */}
+        <div className="relative border-2 border-cyber-border/40 rounded-xl bg-cyber-darker/60 backdrop-blur-sm p-3 overflow-hidden min-h-[260px]">
+          {/* Clash impact overlay */}
+          {clashImpact && (
+            <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+              <div className="text-neon-red text-glow-red font-black text-3xl tracking-widest animate-clash-impact font-mono">
+                CLASH!
+              </div>
+              <div className="absolute inset-0 border-2 border-neon-red rounded-xl animate-fade-in" style={{ animationDuration: '150ms' }} />
+            </div>
           )}
 
-          {/* Interactive Choice Overlay Panel */}
+          {/* Step / status line */}
+          <div className="flex items-center justify-between mb-2 font-mono text-[10px]">
+            <span className="text-cyber-text-dim uppercase tracking-widest">
+              {t('battleStep')} / 進捗: {isLiveMode ? activeLog.length : currentLogIndex + 1}{isLiveMode ? '' : ` / ${battleLog.length}`}
+            </span>
+            {isReplayFinished ? (
+              <span className="text-neon-green font-bold uppercase">RESOLVED / 決着</span>
+            ) : isMyDrawTurn ? (
+              <span className="text-neon-cyan font-bold uppercase animate-pulse">&gt;&gt; あなたのめくり番 &lt;&lt;</span>
+            ) : isOpponentDrawTurn ? (
+              <span className="text-neon-magenta font-bold uppercase animate-pulse">&gt;&gt; 相手のめくり番 &lt;&lt;</span>
+            ) : showChoiceUI ? (
+              <span className="text-neon-magenta font-bold uppercase animate-pulse">⚡ 効果選択中 ⚡</span>
+            ) : (
+              <span className="text-cyber-text-dim uppercase">STANDBY / 同調中</span>
+            )}
+          </div>
+
+          {/* Defender + Challenger arrangement:
+              Defender on the LEFT (or top on mobile), challenger stack on the RIGHT.
+              This makes the "stack attacking the flag" relationship visually obvious. */}
+          <div className="flex flex-col md:flex-row items-stretch gap-3">
+
+            {/* DEFENDER (FLAG) SIDE */}
+            <div className={`flex-1 border rounded-lg p-3 flex flex-col items-center justify-center transition-all ${
+              flagIsMine ? 'border-neon-cyan/50 bg-neon-cyan/5 shadow-[0_0_12px_rgba(0,240,255,0.12)]' :
+              flagIsOpponent ? 'border-neon-magenta/50 bg-neon-magenta/5 shadow-[0_0_12px_rgba(255,0,255,0.12)]' :
+              'border-cyber-border/30 bg-cyber-surface/10'
+            }`}>
+              <div className={`flex items-center gap-1.5 px-3 py-1 rounded border text-[10px] font-mono font-bold mb-2 ${
+                flagIsMine ? 'border-neon-cyan text-neon-cyan bg-cyan-950/20' :
+                flagIsOpponent ? 'border-neon-magenta text-neon-magenta bg-purple-950/20' :
+                'border-cyber-border text-cyber-text-dim bg-cyber-dark/50'
+              }`}>
+                <Flag size={11} className={flagIsMine || flagIsOpponent ? 'animate-pulse' : ''} />
+                <span className="uppercase">
+                  {flagIsMine ? (t('defendingYou') || 'あなたが支配中') :
+                   flagIsOpponent ? (t('defendingOpponent') || `${opponent} が支配中`) :
+                   (t('flagUnclaimed') || 'フラグなし')}
+                </span>
+                {flagPowerValue > 0 && <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">{flagPowerValue} POW</span>}
+              </div>
+
+              <div className="flex items-center justify-center min-h-[140px]">
+                {currentFlagCard ? (
+                  <div key={currentFlagCard.id + '_' + currentFlagCard.power} className="transform scale-90 animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
+                    <CardDisplay card={currentFlagCard} disabled />
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
+                    {t('noDefender') || '支配中のプログラムなし'}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* CHALLENGER STACK SIDE */}
+            <div className={`flex-1 border rounded-lg p-3 flex flex-col items-center justify-center transition-all relative ${
+              challengerOwnerIsMe ? 'border-neon-cyan/50 bg-neon-cyan/5 shadow-[0_0_12px_rgba(0,240,255,0.12)]' :
+              challengerOwnerIsOpponent ? 'border-neon-magenta/50 bg-neon-magenta/5 shadow-[0_0_12px_rgba(255,0,255,0.12)]' :
+              'border-cyber-border/30 bg-cyber-surface/10'
+            }`}>
+              <div className="flex items-center gap-2 mb-2 text-[10px] font-mono flex-wrap justify-center">
+                <span className="text-cyber-text-dim uppercase tracking-widest">
+                  {t('challengerZone') || '挑戦者スタック'}
+                </span>
+                {challengerPower > 0 && (
+                  <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/20">
+                    {t('totalPower') || '計'} {challengerPower} POW
+                  </span>
+                )}
+                {challengerOwnerIsMe && (
+                  <span className="px-1.5 py-0.5 rounded border text-[9px] font-bold border-neon-cyan/40 text-neon-cyan bg-cyan-950/20">
+                    {t('playedByYou') || '▶ あなた'}
+                  </span>
+                )}
+                {challengerOwnerIsOpponent && (
+                  <span className="px-1.5 py-0.5 rounded border text-[9px] font-bold border-neon-magenta/40 text-neon-magenta bg-purple-950/20">
+                    {t('playedByOpponent', { opponent }) || `▶ ${opponent}`}
+                  </span>
+                )}
+              </div>
+
+              {/* "Still need" hint — surfaces how much more power is required to capture the flag. */}
+              {remainingPowerNeeded !== null && remainingPowerNeeded > 0 && (
+                <div className="mb-2 text-[10px] font-mono px-2 py-1 rounded border border-neon-amber/50 bg-amber-950/20 text-neon-amber animate-pulse">
+                  あと <span className="font-black text-glow-amber">{remainingPowerNeeded}</span> POW で制圧
+                </div>
+              )}
+              {remainingPowerNeeded === 0 && challengerPower > 0 && (
+                <div className="mb-2 text-[10px] font-mono px-2 py-1 rounded border border-neon-green/50 bg-green-950/20 text-neon-green animate-pulse font-bold">
+                  制圧成功 — 次の解決でフラッグ獲得！
+                </div>
+              )}
+
+              {/* CHALLENGERS-STYLE FANNED CARD STACK
+                  Cards overlap horizontally with a slight vertical stagger and rotation,
+                  so each card's top-left corner (name + power) stays visible. The latest
+                  card sits on top, fully visible. */}
+              <div className="flex items-center justify-center min-h-[160px] w-full relative">
+                {currentClashCards.length > 0 ? (
+                  <div className="relative flex items-center justify-center" style={{ minHeight: 160, minWidth: Math.max(220, 100 + currentClashCards.length * 38) }}>
+                    {currentClashCards.map((cCard, idx) => {
+                      const isLatest = idx === currentClashCards.length - 1;
+                      // Fan out: each older card shifted left, slight rotation & vertical offset.
+                      const xOffset = (idx - (currentClashCards.length - 1)) * 38;
+                      const yOffset = isLatest ? 0 : -((currentClashCards.length - 1 - idx) * 6);
+                      const rotation = (idx - (currentClashCards.length - 1)) * 4;
+                      return (
+                        <div
+                          key={cCard.id + '_' + idx}
+                          className="absolute transition-all duration-300 animate-card-reveal"
+                          style={{
+                            left: `calc(50% - 96px + ${xOffset}px)`,
+                            top: `calc(50% - 80px + ${yOffset}px)`,
+                            transform: `scale(${isLatest ? 0.92 : 0.7}) rotate(${rotation}deg)`,
+                            transformOrigin: 'bottom right',
+                            zIndex: isLatest ? 20 : idx + 1,
+                            opacity: isLatest ? 1 : 0.8,
+                          }}
+                        >
+                          {isLatest && (
+                            <div className="absolute inset-0 rounded-lg shadow-[0_0_18px_rgba(0,240,255,0.35)] pointer-events-none animate-fade-in" />
+                          )}
+                          <CardDisplay card={cCard} disabled />
+                        </div>
+                      );
+                    })}
+                    {/* Stack count badge */}
+                    {currentClashCards.length > 1 && (
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-30 min-w-[20px] h-5 px-2 rounded-full bg-neon-magenta text-[10px] font-black text-white flex items-center justify-center border border-white/20 animate-pulse"
+                        style={{ boxShadow: '0 0 10px rgba(255,0,255,0.7)' }}>
+                        x{currentClashCards.length}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
+                    {t('awaitingDraw') || 'ドロー待機中'}
+                  </div>
+                )}
+              </div>
+
+              {/* Latest effect banner */}
+              {latestHasEffect && (
+                <div className={`mt-2 w-full max-w-md mx-auto px-3 py-1.5 rounded border text-[10px] font-mono leading-relaxed animate-fade-in ${
+                  latestPlayerIsMe ? 'border-neon-cyan/40 bg-cyan-950/15 text-neon-cyan text-glow-cyan' :
+                  'border-neon-magenta/40 bg-purple-950/15 text-neon-magenta text-glow-magenta'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    <Zap size={11} className="mt-0.5 flex-shrink-0 animate-pulse" />
+                    <div>
+                      <div className="uppercase tracking-widest text-[9px] font-bold mb-0.5 opacity-80">
+                        {t('effectTriggered') || '効果発動'}
+                      </div>
+                      <div className="text-cyber-text font-semibold">{latestEffectText}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action resolution status */}
+          <div className="w-full mt-2 px-3 py-1.5 border border-cyber-border/10 rounded bg-cyber-dark/40 text-center">
+            <p className="text-[10px] font-mono text-cyber-text leading-relaxed">
+              {activeLog.length > 0
+                ? translateBattleDetail(activeLog[activeLog.length - 1].details)
+                : (t('initializingArenaLink') || 'INITIALIZING ARENA LINK...')}
+              {activeLog.length > 0 && activeLog[activeLog.length - 1].effectTriggered && activeLog[activeLog.length - 1].effectTriggered !== 'None' && activeLog[activeLog.length - 1].effectTriggered !== '' && (
+                <span className="text-neon-green block font-bold mt-1 text-[9px] animate-pulse">
+                  ⚡ {translateBattleDetail(activeLog[activeLog.length - 1].effectTriggered)}
+                </span>
+              )}
+            </p>
+          </div>
+
+          {/* Interactive choice overlay */}
           {showChoiceUI && choiceConfig && (
-            <div className="absolute inset-0 z-40 bg-cyber-darker/95 backdrop-blur-md flex flex-col items-center justify-center p-6 border-2 border-neon-magenta/40 rounded-xl animate-fade-in">
+            <div className="absolute inset-0 z-40 bg-cyber-darker/95 backdrop-blur-md flex flex-col items-center justify-center p-4 border-2 border-neon-magenta/40 rounded-xl animate-fade-in">
               <div className="text-neon-magenta text-glow-magenta font-black tracking-widest text-xs uppercase mb-1 animate-pulse">
                 ⚡ {choiceConfig.title} ⚡
               </div>
-              <p className="text-[10px] text-cyber-text-dim uppercase tracking-wider mb-4 text-center max-w-sm">
+              <p className="text-[10px] text-cyber-text-dim uppercase tracking-wider mb-3 text-center max-w-sm">
                 {choiceConfig.instructions}
               </p>
-
-              {/* Action Options Grid */}
-              <div className="flex gap-4 flex-wrap justify-center my-3 overflow-y-auto max-h-[220px] p-2">
+              <div className="flex gap-3 flex-wrap justify-center my-2 overflow-y-auto max-h-[180px] p-2">
                 {battleSession.actionOptions.map((optCard) => {
                   const fullCard = convertToFullCard(optCard);
                   const isSelected = selectedCards.includes(optCard.id);
@@ -563,20 +794,18 @@ function BattleArena({
                   );
                 })}
               </div>
-
-              {/* Controls */}
-              <div className="flex gap-4 mt-2">
+              <div className="flex gap-3 mt-2">
                 <button
                   onClick={handleConfirmChoice}
                   disabled={!isSelectionValid}
-                  className="px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-bold uppercase tracking-widest rounded bg-purple-950/20 hover:bg-purple-950/40 text-[10px] shadow-[0_0_10px_rgba(255,0,255,0.2)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  className="px-5 py-1.5 border-2 border-neon-magenta text-neon-magenta font-bold uppercase tracking-widest rounded bg-purple-950/20 hover:bg-purple-950/40 text-[10px] shadow-[0_0_10px_rgba(255,0,255,0.2)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {t('confirmChoice') || 'CONFIRM / 確定'}
                 </button>
                 {choiceConfig.isOptional && (
                   <button
                     onClick={handleSkipChoice}
-                    className="px-6 py-2 border border-cyber-border text-cyber-text-dim hover:text-white hover:border-white uppercase tracking-wider rounded bg-cyber-surface/10 hover:bg-cyber-surface/30 text-[10px] cursor-pointer"
+                    className="px-5 py-1.5 border border-cyber-border text-cyber-text-dim hover:text-white hover:border-white uppercase tracking-wider rounded bg-cyber-surface/10 hover:bg-cyber-surface/30 text-[10px] cursor-pointer"
                   >
                     {t('skipChoice') || 'SKIP / スキップ'}
                   </button>
@@ -584,253 +813,104 @@ function BattleArena({
               </div>
             </div>
           )}
-
-          {/* Top Step Counter */}
-          <div className="text-[10px] text-cyber-text-dim uppercase tracking-widest font-mono z-10">
-            {t('battleStep')} / 進捗: {isLiveMode ? activeLog.length : currentLogIndex + 1} {isLiveMode ? '' : `/ ${battleLog.length}`}
-          </div>
-
-          {/* Active Turn Indicator Banner */}
-          <div className="my-3 w-full max-w-md text-center z-10">
-            {isReplayFinished ? (
-              <div className="text-neon-green text-glow-green text-xs font-bold font-mono tracking-widest uppercase border border-neon-green/30 bg-green-950/15 py-1.5 rounded animate-pulse">
-                SYS_STATUS: CLASH RESOLVED / バトル決着
-              </div>
-            ) : isMyDrawTurn ? (
-              <div className="text-neon-cyan text-glow-cyan text-xs font-bold font-mono tracking-widest uppercase border border-neon-cyan/30 bg-cyan-950/15 py-1.5 rounded animate-pulse">
-                &gt;&gt; PLAYER DRAW TURN / あなたのめくり番 &lt;&lt;
-              </div>
-            ) : isOpponentDrawTurn ? (
-              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/30 bg-purple-950/15 py-1.5 rounded animate-pulse">
-                &gt;&gt; OPPONENT DRAW TURN / 相手のめくり番 &lt;&lt;
-              </div>
-            ) : showChoiceUI ? (
-              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/40 bg-purple-950/30 py-1.5 rounded animate-pulse">
-                ⚡ AWAITING YOUR CARD CHOICE / 効果選択待機中 ⚡
-              </div>
-            ) : isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer !== playerName ? (
-              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/20 bg-purple-950/10 py-1.5 rounded animate-pulse">
-                AWAITING OPPONENT DECISION / 相手の効果選択中...
-              </div>
-            ) : (
-              <div className="text-cyber-text-dim text-xs font-bold font-mono tracking-widest uppercase border border-cyber-border/20 bg-cyber-surface/10 py-1.5 rounded">
-                STANDBY PROTOCOL / 分析同調中
-              </div>
-            )}
-          </div>
-
-          {/* Core Arena Display */}
-          <div className="flex-1 w-full flex flex-col justify-center gap-4 my-2 z-10">
-            {/* DEFENDER ZONE */}
-            <div className={`flex flex-col items-center p-3 border rounded-lg bg-cyber-surface/5 transition-all ${
-              flagHolderName === playerName
-                ? 'border-neon-cyan/40 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
-                : flagHolderName === opponent
-                ? 'border-neon-magenta/40 shadow-[0_0_12px_rgba(255,0,255,0.1)]'
-                : 'border-cyber-border/20'
-            }`}>
-              <div
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all ${
-                  flagHolderName === playerName
-                    ? 'border-neon-cyan text-neon-cyan bg-cyan-950/10 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.15)]'
-                    : flagHolderName === opponent
-                    ? 'border-neon-magenta text-neon-magenta bg-purple-950/10 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.15)]'
-                    : 'border-cyber-border text-cyber-text-dim bg-cyber-dark/50'
-                }`}
-              >
-                <Flag size={12} className={flagHolderName === playerName ? 'animate-pulse text-neon-cyan animate-neon-pulse' : flagHolderName === opponent ? 'text-neon-magenta animate-pulse' : ''} />
-                <span className="uppercase">
-                  {flagHolderName === playerName
-                    ? t('defendingYou') || 'DEFENDING / あなたが支配中'
-                    : flagHolderName === opponent
-                    ? t('defendingOpponent') || `DEFENDING / ${opponent} が支配中`
-                    : t('flagUnclaimed') || 'FLAG UNCLAIMED / フラグなし'}
-                </span>
-                {flagPowerValue > 0 && <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">{flagPowerValue} POW</span>}
-              </div>
-
-              {/* Defender Card Visual */}
-              <div className="mt-3 flex items-center justify-center min-h-[140px]">
-                {currentFlagCard ? (
-                  <div key={currentFlagCard.id + '_' + currentFlagCard.power} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
-                    <CardDisplay card={currentFlagCard} disabled />
-                  </div>
-                ) : (
-                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
-                    {t('noDefender') || 'NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません'}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* CHALLENGER / ATTACKER ZONE */}
-            <div className={`flex flex-col items-center p-3 border rounded-lg bg-cyber-surface/5 transition-all ${
-              currentClashCards.length > 0 && latestPlayerIsMe
-                ? 'border-neon-cyan/40 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
-                : currentClashCards.length > 0 && latestPlayerIsOpponent
-                ? 'border-neon-magenta/40 shadow-[0_0_12px_rgba(255,0,255,0.1)]'
-                : 'border-cyber-border/20'
-            }`}>
-              <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2 flex-wrap justify-center">
-                <span>{t('challengerZone') || 'ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード'}</span>
-                {challengerPower > 0 && (
-                  <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
-                    {t('totalPower') || '計'} {challengerPower} POW
-                  </span>
-                )}
-                {currentClashCards.length > 0 && (latestPlayerIsMe || latestPlayerIsOpponent) && (
-                  <span className={`px-1.5 py-0.5 rounded border text-[9px] font-bold ${
-                    latestPlayerIsMe
-                      ? 'border-neon-cyan/40 text-neon-cyan bg-cyan-950/20'
-                      : 'border-neon-magenta/40 text-neon-magenta bg-purple-950/20'
-                  }`}>
-                    {latestPlayerIsMe ? (t('playedByYou') || '▶ あなたのプレイ') : (t('playedByOpponent', { opponent }) || `▶ ${opponent} のプレイ`)}
-                  </span>
-                )}
-              </div>
-
-              {/* Stacked drawn challenger cards — visualized as an overlapping stack so
-                  observers can see at a glance how many cards have been chained together. */}
-              <div className="flex items-center justify-center min-h-[160px] w-full px-2 relative">
-                {currentClashCards.length > 0 ? (
-                  <div className="relative flex items-center justify-center" style={{ minHeight: 160 }}>
-                    {currentClashCards.map((cCard, idx) => {
-                      const isLatest = idx === currentClashCards.length - 1;
-                      const offset = idx * 28; // px overlap offset
-                      return (
-                        <div
-                          key={cCard.id + '_' + idx}
-                          className="absolute transition-all duration-300"
-                          style={{
-                            left: `calc(50% - 96px + ${offset}px)`,
-                            transform: `scale(${isLatest ? 0.85 : 0.7})`,
-                            zIndex: isLatest ? 10 : idx + 1,
-                            opacity: isLatest ? 1 : 0.75,
-                          }}
-                        >
-                          {isLatest && (
-                            <div className="absolute inset-0 rounded-lg animate-card-reveal shadow-[0_0_18px_rgba(0,240,255,0.35)] pointer-events-none" />
-                          )}
-                          <CardDisplay card={cCard} disabled />
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
-                    {t('awaitingDraw') || 'AWAITING DECK DRAW INTRUSION / ドローされるのを待っています'}
-                  </div>
-                )}
-              </div>
-
-              {/* Latest played card effect banner — surfaces what the opponent just played. */}
-              {latestHasEffect && (
-                <div className={`mt-3 w-full max-w-md mx-auto px-3 py-2 rounded border text-[10px] font-mono leading-relaxed animate-fade-in ${
-                  latestPlayerIsMe
-                    ? 'border-neon-cyan/40 bg-cyan-950/15 text-neon-cyan text-glow-cyan'
-                    : 'border-neon-magenta/40 bg-purple-950/15 text-neon-magenta text-glow-magenta'
-                }`}>
-                  <div className="flex items-start gap-2">
-                    <Zap size={12} className="mt-0.5 flex-shrink-0 animate-pulse" />
-                    <div>
-                      <div className="uppercase tracking-widest text-[9px] font-bold mb-0.5 opacity-80">
-                        {t('effectTriggered') || 'EFFECT TRIGGERED / 効果発動'}
-                      </div>
-                      <div className="text-cyber-text font-semibold">
-                        {latestEffectText}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Action Resolution status details */}
-          <div className="w-full text-center mt-2 px-4 py-2 border border-cyber-border/10 rounded bg-cyber-dark/40 min-h-[50px] flex items-center justify-center z-10">
-            <p className="text-[10px] font-mono text-cyber-text leading-relaxed">
-              {activeLog.length > 0
-                ? translateBattleDetail(activeLog[activeLog.length - 1].details)
-                : t('initializingArenaLink') || 'INITIALIZING INTERACTIVE ARENA LINK...'}
-              {activeLog.length > 0 && activeLog[activeLog.length - 1].effectTriggered && activeLog[activeLog.length - 1].effectTriggered !== 'None' && activeLog[activeLog.length - 1].effectTriggered !== '' && (
-                <span className="text-neon-green block font-bold mt-1 text-[9px] animate-pulse">
-                  ⚡ {translateBattleDetail(activeLog[activeLog.length - 1].effectTriggered)}
-                </span>
-              )}
-            </p>
-          </div>
-
-          {/* Main Interactive Draw Button */}
-          <div className="w-full mt-4 z-10 flex flex-col items-center gap-2">
-            {!isReplayFinished ? (
-              <button
-                disabled={isLiveMode && (battleSession.requiredAction !== 'DRAW' || (battleSession.turnOwner === opponent && !opponentIsNPC))}
-                onClick={() => {
-                  playSE('click');
-                  if (isLiveMode) {
-                    onStep();
-                  } else {
-                    setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
-                  }
-                }}
-                className={`w-full max-w-xs py-2.5 px-5 rounded border-2 font-mono font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-md flex items-center justify-center gap-2 ${
-                  isMyDrawTurn
-                    ? 'border-neon-cyan text-neon-cyan bg-cyan-950/20 hover:bg-cyan-950/40 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)] animate-pulse'
-                    : isOpponentDrawTurn
-                    ? 'border-neon-magenta text-neon-magenta bg-purple-950/20 hover:bg-purple-950/40 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.2)]'
-                    : 'border-cyber-border text-cyber-text bg-cyber-surface/30 hover:bg-cyber-surface/50 font-medium disabled:opacity-40 disabled:cursor-not-allowed'
-                }`}
-              >
-                <Play size={14} className={isMyDrawTurn ? 'animate-bounce' : (isOpponentDrawTurn ? '' : '')} />
-                {isMyDrawTurn ? (
-                  <span>{t('drawNextCard') || 'DRAW CARD / カードをめくる'}</span>
-                ) : isOpponentDrawTurn ? (
-                  <span>{t('opponentDrawNext') || 'DRAW OPPONENT / 相手のカードをめくる'}</span>
-                ) : (
-                  <span>{t('nextStep') || 'NEXT STEP / 進む'}</span>
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={onComplete}
-                className="w-full max-w-xs py-2.5 px-5 rounded border-2 border-neon-green text-neon-green bg-green-950/20 hover:bg-green-950/40 text-glow-green font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-[0_0_15px_rgba(0,255,102,0.25)] animate-pulse animate-neon-pulse"
-              >
-                <span>{t('continueToStandings') || 'VIEW STANDINGS / リザルト確認 →'}</span>
-              </button>
-            )}
-          </div>
-
         </div>
 
-        {/* Right Col: Opponent State */}
-        <div className="font-mono flex flex-col gap-3 self-start order-3">
-          <MemorySlots
-            liveSlots={opponentLiveMemSlots}
-            slots={opponentMemSlots}
-            label={t('npcMemoryLabel', { opponent })}
-            side="right"
-            accent="magenta"
-          />
-          <DiscardPile
-            cards={opponentDiscard}
-            label={t('opponentDiscard', { opponent })}
-            side="right"
-            accent="magenta"
-          />
-          <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 text-right flex justify-between items-center">
-            <Layers size={18} className="text-neon-magenta/50" />
-            <div>
-              <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
-              <div className="text-sm font-bold text-neon-magenta">{opponentDeckCount} {t('units') || 'Units'}</div>
+        {/* ===== PLAYER ZONE (BOTTOM) ===== */}
+        <div className={`relative border rounded-xl p-3 transition-all ${
+          flagIsMine ? 'border-neon-cyan/60 shadow-[0_0_20px_rgba(0,240,255,0.15)] bg-neon-cyan/5' :
+          challengerOwnerIsMe ? 'border-neon-cyan/40 bg-neon-cyan/5' :
+          'border-cyber-border/30 bg-cyber-surface/20'
+        }`}>
+          <div className="flex items-center gap-2 mb-2 font-mono">
+            <User size={14} className="text-neon-cyan" />
+            <span className="text-neon-cyan font-bold text-xs uppercase tracking-widest">{playerName}</span>
+            {flagIsMine && (
+              <span className="ml-auto flex items-center gap-1 text-[10px] text-neon-cyan font-bold bg-neon-cyan/15 border border-neon-cyan/40 px-2 py-0.5 rounded">
+                <Flag size={10} className="animate-pulse" /> FLAG HOLDER / 支配中
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_140px_1fr] gap-3 items-start">
+            {/* Player bench (memory) */}
+            <div className="order-2 md:order-1">
+              <MemorySlots
+                liveSlots={myLiveMemSlots}
+                slots={myMemSlots}
+                label={t('yourMemory')}
+                side="left"
+                accent="cyan"
+              />
+            </div>
+
+            {/* Player mini-stats + actions */}
+            <div className="order-1 md:order-2 flex md:flex-col gap-2 justify-center">
+              <div className="border border-neon-cyan/30 rounded p-2 bg-cyber-surface/30 text-center flex-1 md:flex-none">
+                <div className="text-[8px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK'}</div>
+                <div className="text-sm font-bold text-neon-cyan">{myDeckCount}</div>
+              </div>
+              <div className="border border-cyber-border/30 rounded p-2 bg-cyber-surface/30 text-center flex-1 md:flex-none">
+                <div className="text-[8px] text-cyber-text-dim uppercase tracking-wider">DISCARD</div>
+                <div className="text-sm font-bold text-cyber-text-dim">{myDiscard.length}</div>
+              </div>
+              <button
+                onClick={() => setShowDeckModal(true)}
+                className="flex items-center justify-center gap-1 border border-neon-cyan/45 hover:border-neon-cyan rounded p-1.5 bg-cyber-surface/30 text-neon-cyan font-bold hover:bg-neon-cyan/10 transition-all text-[9px] cursor-pointer uppercase tracking-wider font-mono"
+              >
+                <Layers size={12} className="text-neon-cyan" />
+                {t('viewDeckBtn')}
+              </button>
+            </div>
+
+            {/* Player discard */}
+            <div className="order-3">
+              <DiscardPile
+                cards={myDiscard}
+                label={t('yourDiscard') || 'YOUR DISCARD / 除外エリア'}
+                side="left"
+                accent="cyan"
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. Replay / Speed / Auto Controllers */}
-      <div className="relative z-10 max-w-3xl mx-auto w-full border border-cyber-border/30 rounded-lg p-3 bg-cyber-darker/90 backdrop-blur-md mb-3 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
-        
-        {/* Play/Pause controls */}
+      {/* ================= 3. DRAW BUTTON ================= */}
+      <div className="relative z-10 max-w-3xl mx-auto w-full flex flex-col items-center gap-2 mb-2">
+        {!isReplayFinished ? (
+          <button
+            disabled={isLiveMode && (battleSession.requiredAction !== 'DRAW' || (battleSession.turnOwner === opponent && !opponentIsNPC))}
+            onClick={() => {
+              playSE('click');
+              if (isLiveMode) {
+                onStep();
+              } else {
+                setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
+              }
+            }}
+            className={`w-full max-w-xs py-2.5 px-5 rounded border-2 font-mono font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-md flex items-center justify-center gap-2 ${
+              isMyDrawTurn ? 'border-neon-cyan text-neon-cyan bg-cyan-950/20 hover:bg-cyan-950/40 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)] animate-pulse' :
+              isOpponentDrawTurn ? 'border-neon-magenta text-neon-magenta bg-purple-950/20 hover:bg-purple-950/40 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.2)]' :
+              'border-cyber-border text-cyber-text bg-cyber-surface/30 hover:bg-cyber-surface/50 font-medium disabled:opacity-40 disabled:cursor-not-allowed'
+            }`}
+          >
+            <Play size={14} className={isMyDrawTurn ? 'animate-bounce' : ''} />
+            {isMyDrawTurn ? (t('drawNextCard') || 'カードをめくる') :
+             isOpponentDrawTurn ? (t('opponentDrawNext') || '相手のカードをめくる') :
+             (t('nextStep') || '次へ')}
+          </button>
+        ) : (
+          <button
+            onClick={onComplete}
+            className="w-full max-w-xs py-2.5 px-5 rounded border-2 border-neon-green text-neon-green bg-green-950/20 hover:bg-green-950/40 text-glow-green font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-[0_0_15px_rgba(0,255,102,0.25)] animate-pulse"
+          >
+            {t('continueToStandings') || 'リザルト確認 →'}
+          </button>
+        )}
+      </div>
+
+      {/* ================= 4. REPLAY / SPEED CONTROLS ================= */}
+      <div className="relative z-10 max-w-3xl mx-auto w-full border border-cyber-border/30 rounded-lg p-2.5 bg-cyber-darker/90 backdrop-blur-md mb-2 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsAutoPlay(!isAutoPlay)}
@@ -838,37 +918,26 @@ function BattleArena({
             className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer border transition-all ${
               isReplayFinished || (isLiveMode && battleSession.requiredAction !== 'DRAW')
                 ? 'border-cyber-border/35 text-cyber-text-dim cursor-not-allowed opacity-50'
-                : isAutoPlay
-                ? 'border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10 shadow-[0_0_8px_rgba(255,0,255,0.1)] animate-pulse'
-                : 'border-neon-green text-neon-green hover:bg-neon-green/10 shadow-[0_0_8px_rgba(0,255,0,0.1)]'
+                : isAutoPlay ? 'border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10 shadow-[0_0_8px_rgba(255,0,255,0.1)] animate-pulse' :
+                'border-neon-green text-neon-green hover:bg-neon-green/10 shadow-[0_0_8px_rgba(0,255,0,0.1)]'
             }`}
           >
             {isAutoPlay ? <Pause size={12} /> : <Play size={12} />}
-            {isAutoPlay ? 'PAUSE / 一時停止' : 'AUTO / オート'}
+            {isAutoPlay ? 'PAUSE / 停止' : 'AUTO / オート'}
           </button>
 
           {!isLiveMode && (
             <>
               <button
-                onClick={() => {
-                  playSE('click');
-                  setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
-                  setIsAutoPlay(false);
-                }}
+                onClick={() => { playSE('click'); setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1)); setIsAutoPlay(false); }}
                 disabled={isReplayFinished}
                 className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer border border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10 transition-all"
               >
                 <Play size={12} />
                 {t('nextStepBtnTitle') || 'DRAW / めくる'}
               </button>
-
               <button
-                onClick={() => {
-                  playSE('shuffle');
-                  setCurrentLogIndex(0);
-                  setIsAutoPlay(false);
-                  lastPlayedIndexRef.current = -1;
-                }}
+                onClick={() => { playSE('shuffle'); setCurrentLogIndex(0); setIsAutoPlay(false); lastPlayedIndexRef.current = -1; }}
                 className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded text-[10px] border border-cyber-border/50 text-cyber-text-dim hover:text-white hover:border-cyber-border transition-all cursor-pointer"
               >
                 <RotateCcw size={12} />
@@ -878,74 +947,59 @@ function BattleArena({
           )}
         </div>
 
-        {/* Playback Speed selector */}
         <div className="flex items-center gap-1.5 text-[10px]">
-          <span className="text-cyber-text-dim">SPEED / 速度:</span>
-          {speedOptions.map((speedOpt) => (
+          <span className="text-cyber-text-dim">SPEED:</span>
+          {speedOptions.map((s) => (
             <button
-              key={speedOpt.label}
-              onClick={() => {
-                playSE('click');
-                setPlaySpeed(speedOpt.value);
-              }}
+              key={s.label}
+              onClick={() => { playSE('click'); setPlaySpeed(s.value); }}
               className={`px-1.5 py-0.5 border rounded cursor-pointer transition-all ${
-                playSpeed === speedOpt.value
-                  ? 'border-neon-cyan text-neon-cyan bg-neon-cyan/5 font-bold shadow-[0_0_6px_rgba(0,240,255,0.15)]'
-                  : 'border-cyber-border/30 text-cyber-text-dim hover:text-white'
+                playSpeed === s.value ? 'border-neon-cyan text-neon-cyan bg-neon-cyan/5 font-bold shadow-[0_0_6px_rgba(0,240,255,0.15)]' : 'border-cyber-border/30 text-cyber-text-dim hover:text-white'
               }`}
             >
-              {speedOpt.label}
+              {s.label}
             </button>
           ))}
         </div>
 
-        {/* Proceed to standings button */}
         <div>
           {isReplayFinished ? (
             <button
               onClick={onComplete}
-              className="px-6 py-2 rounded border-2 border-neon-green text-neon-green text-glow-green font-bold text-[10px] uppercase tracking-widest hover:bg-neon-green/10 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,255,102,0.2)] animate-pulse"
+              className="px-5 py-2 rounded border-2 border-neon-green text-neon-green text-glow-green font-bold text-[10px] uppercase tracking-widest hover:bg-neon-green/10 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,255,102,0.2)] animate-pulse"
             >
-              {t('continueBtn') || 'STANDINGS / リザルト確認 →'}
+              {t('continueBtn') || 'STANDINGS →'}
             </button>
           ) : !isLiveMode ? (
             <button
-              onClick={() => {
-                playSE('click');
-                setCurrentLogIndex(battleLog.length - 1);
-                setIsAutoPlay(false);
-              }}
+              onClick={() => { playSE('click'); setCurrentLogIndex(battleLog.length - 1); setIsAutoPlay(false); }}
               className="px-4 py-2 rounded border border-cyber-border/40 text-cyber-text-dim text-[10px] uppercase tracking-wider hover:text-white hover:border-cyber-border transition-all cursor-pointer"
             >
-              {t('skipSim') || 'SKIP / 結末へスキップ'}
+              {t('skipSim') || 'SKIP / 結末へ'}
             </button>
           ) : null}
         </div>
       </div>
 
-      {/* 4. Bottom Event Log feed */}
-      <div className="relative z-10 max-w-4xl mx-auto w-full border border-cyber-border/30 rounded-lg p-3 bg-cyber-surface/50 max-h-32 overflow-y-auto font-mono text-[10px] shadow-inner">
-        <div className="flex items-center gap-2 mb-2 border-b border-cyber-border/20 pb-1">
+      {/* ================= 5. EVENT LOG ================= */}
+      <div className="relative z-10 max-w-4xl mx-auto w-full border border-cyber-border/30 rounded-lg p-2.5 bg-cyber-surface/50 max-h-28 overflow-y-auto font-mono text-[10px] shadow-inner">
+        <div className="flex items-center gap-2 mb-1.5 border-b border-cyber-border/20 pb-1">
           <Activity size={12} className="text-neon-green" />
           <span className="text-[9px] text-neon-green uppercase tracking-widest font-bold">
             {t('combatLogHeader')} / 実況ログ
           </span>
-          <span className="text-[9px] text-cyber-text-dim ml-auto">
-            {activeLog.length} events
-          </span>
+          <span className="text-[9px] text-cyber-text-dim ml-auto">{activeLog.length} events</span>
         </div>
-        
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5">
           {activeLog.map((log, i) => {
             const displayLogAction = translateBattleDetail(log.details || log.action);
             const displayLogEffect = log.effectTriggered ? translateBattleDetail(log.effectTriggered) : '';
             const isPlayer = log.player === playerName;
             const isSystem = !log.player || log.player === 'SYSTEM';
-
             return (
               <div
                 key={i}
-                className={`flex items-start gap-2 py-1 px-1.5 rounded transition-all duration-300 ${
+                className={`flex items-start gap-2 py-0.5 px-1.5 rounded transition-all duration-300 ${
                   i === activeLog.length - 1 ? 'bg-cyber-surface/40 border border-cyber-border/10 animate-slide-in' : ''
                 }`}
               >
@@ -965,9 +1019,7 @@ function BattleArena({
                     </span>
                   )}
                 </div>
-                <span className="text-[9px] text-cyber-text-dim/40 whitespace-nowrap">
-                  Step {log.step}
-                </span>
+                <span className="text-[9px] text-cyber-text-dim/40 whitespace-nowrap">Step {log.step}</span>
               </div>
             );
           })}

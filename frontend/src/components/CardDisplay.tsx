@@ -11,7 +11,71 @@ interface CardDisplayProps {
   disabled?: boolean;
   compact?: boolean;
   basePower?: number;
-}const attributeConfig = {
+}
+
+// Canonical art mapping for every card in the pool.
+// Images only exist for 4 buckets (ai_/hw_/nr_/virus_, 20 each = 80 files).
+// Non-bucket attributes are routed to a thematically close bucket and
+// distributed across the 20 slots so each card gets a distinct image.
+const CARD_IMAGE_MAP: Record<string, string> = {
+  // --- Starter (6) ---
+  starter_scout_1a: 'virus_001',
+  starter_scout_1b: 'virus_002',
+  starter_scout_1c: 'virus_003',
+  starter_scout_2a: 'hw_001',
+  starter_scout_2b: 'hw_002',
+  starter_mascot: 'ai_001',
+
+  // --- Deck A (28) ---
+  // Mainframe -> hw bucket
+  a_jester: 'hw_003', a_hermit: 'hw_004', a_stable_boy: 'hw_005', a_pig: 'hw_006',
+  // Sector -> ai bucket
+  a_talent: 'ai_002', a_reporter: 'ai_003',
+  // Orbit -> ai bucket
+  a_rescue_pod: 'ai_004', a_ai: 'ai_005', a_shapeshifter: 'ai_006', a_cow: 'ai_007',
+  // HoloMedia -> hw bucket
+  a_makeup_artist: 'hw_007', a_gangster: 'hw_008', a_moviestar: 'hw_009', a_cat: 'hw_010',
+  // DeepWeb -> virus bucket
+  a_merman: 'virus_004', a_treasure: 'virus_005', a_sailor: 'virus_006', a_parrot: 'virus_007',
+  // Daemon -> nr bucket
+  a_butler: 'nr_001', a_skeleton: 'nr_002', a_spider: 'nr_003',
+  // Matrix -> virus bucket
+  a_clown: 'virus_008', a_juggler: 'virus_009', a_vendor: 'virus_010', a_pony: 'virus_011',
+
+  // --- Deck B (28) ---
+  // Mainframe -> hw bucket
+  b_knight: 'hw_011', b_blacksmith: 'hw_012', b_magician: 'hw_013', b_horse: 'hw_014',
+  // Sector -> ai bucket
+  b_mascot: 'ai_008', b_dog: 'ai_009',
+  // Orbit -> ai bucket
+  b_ufo: 'ai_010', b_band: 'ai_011', b_clone: 'ai_012', b_alien: 'ai_013',
+  // HoloMedia -> hw bucket
+  b_cowboy: 'hw_015', b_comic: 'hw_016', b_director: 'hw_017', b_lion: 'hw_018',
+  // DeepWeb -> virus bucket
+  b_cook: 'virus_012', b_navigator: 'virus_013', b_lifeguard: 'virus_014', b_shark: 'virus_015',
+  // Daemon -> nr bucket
+  b_ghost: 'nr_004', b_teenager: 'nr_005', b_necromancer: 'nr_006', b_bat: 'nr_007',
+  // Matrix -> virus bucket
+  b_mime: 'virus_016', b_pyrotechnist: 'virus_017', b_fortune_teller: 'virus_018', b_duck: 'virus_019',
+
+  // --- Deck C (15) ---
+  // Mainframe -> hw bucket
+  c_bard: 'hw_019', c_prince: 'hw_020', c_dragon: 'hw_001',
+  // Sector -> ai bucket
+  c_champion: 'ai_014', c_fanbus: 'ai_015',
+  // Orbit -> ai bucket
+  c_hologram: 'ai_016', c_geek: 'ai_017', c_slime: 'ai_018',
+  // HoloMedia -> hw bucket
+  c_hero: 'hw_002', c_trex: 'hw_003', c_villain: 'hw_004',
+  // DeepWeb -> virus bucket
+  c_siren: 'virus_020', c_kraken: 'virus_001', c_submarine: 'virus_002',
+  // Daemon -> nr bucket
+  c_vampire: 'nr_008', c_pumpkin: 'nr_009', c_werewolf: 'nr_010',
+  // Matrix -> virus bucket
+  c_illusionist: 'virus_003', c_bumper_car: 'virus_004', c_teddybear: 'virus_005',
+};
+
+const attributeConfig = {
   Virus: { color: 'text-red-400', bg: 'bg-red-900/30', border: 'border-red-500/50', glow: '#ff0040', icon: Bug },
   AI: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Cpu },
   Hardware: { color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-500/50', glow: '#ffbf00', icon: HardDrive },
@@ -36,23 +100,11 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
   const displayCard = useMemo(() => translateCard(card), [card, translateCard]);
 
   const cardImagePath = useMemo(() => {
-    const id = card.id;
-    if (id.startsWith('starter_')) {
-      const mapping: Record<string, string> = {
-        starter_virus_1: 'virus_001',
-        starter_virus_2: 'virus_002',
-        starter_ai_1: 'ai_001',
-        starter_ai_2: 'ai_002',
-        starter_hw_1: 'hw_001',
-        starter_hw_2: 'hw_002',
-        starter_nr_1: 'nr_001',
-        starter_nr_2: 'nr_002',
-        starter_net_1: 'nr_003',
-        starter_ai_3: 'ai_003',
-      };
-      return `/images/cards/${mapping[id] || 'default'}.png`;
-    }
-    return `/images/cards/${id}.png`;
+    // Card IDs from the backend carry an instance suffix (e.g. "a_jester_0").
+    // Strip the trailing "_<n>" to look up the canonical art for the card.
+    const baseId = card.id.replace(/_\d+$/, '');
+    const file = CARD_IMAGE_MAP[baseId] || CARD_IMAGE_MAP[card.id] || 'default';
+    return `/images/cards/${file}.png`;
   }, [card.id]);
 
   // Use original English values for style lookups

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { HardDrive, X } from 'lucide-react';
 import type { Card, LiveMemorySlot } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
@@ -265,16 +266,18 @@ function MemorySlots({ liveSlots, slots, maxSlots = 6, label, side, accent = 'cy
         })}
       </div>
 
-      {/* Pinned card detail popover — shows the full effect text of the benched card. */}
+      {/* Pinned card detail popover — rendered via portal so it always sits
+          above the battle arena's stacking contexts and isn't clipped by
+          transformed ancestors. */}
       {pinned !== null && (() => {
         const slot = normalizedSlots[pinned];
         if (!slot || !slot.card) return null;
         const dc = translateCard(slot.card);
-        return (
-          <div className="fixed inset-0 z-[120]" onClick={() => setPinned(null)}>
-            <div className="absolute inset-0 bg-cyber-dark/60 backdrop-blur-sm animate-fade-in" />
+        return createPortal(
+          <div className="fixed inset-0 z-[200]" onClick={() => setPinned(null)}>
+            <div className="absolute inset-0 bg-cyber-dark/70 backdrop-blur-sm animate-fade-in" />
             <div
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] max-w-[90vw] bg-cyber-darker border-2 ${accentCfg.border} rounded-lg p-4 shadow-[0_0_25px_rgba(0,0,0,0.6)] animate-slide-in`}
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] max-w-[90vw] bg-cyber-darker border-2 ${accentCfg.border} rounded-lg p-4 shadow-[0_0_30px_rgba(0,0,0,0.8)] animate-slide-in`}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between mb-2">
@@ -310,7 +313,8 @@ function MemorySlots({ liveSlots, slots, maxSlots = 6, label, side, accent = 'cy
                 </p>
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
     </div>
