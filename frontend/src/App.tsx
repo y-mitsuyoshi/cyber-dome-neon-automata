@@ -7,6 +7,7 @@ import Shop from './components/Shop';
 import BattleArena from './components/BattleArena';
 import Standings from './components/Standings';
 import GameOver from './components/GameOver';
+import SpectatorBattleScreen from './components/SpectatorBattleScreen';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useTranslation } from './context/TranslationContext';
 import { useAudio } from './context/AudioContext';
@@ -35,6 +36,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>('title');
   const [playerName, setPlayerName] = useState<string>('PLAYER_ONE');
   const [lobbyCode, setLobbyCode] = useState<string | null>(null);
+  const [isSpectator, setIsSpectator] = useState<boolean>(false);
   
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -98,6 +100,7 @@ function App() {
     if (kicked) {
       setScreen('title');
       setLobbyCode(null);
+      setIsSpectator(false);
       setGameState(null);
       setError(t('disconnectedMainframe'));
       resetKicked();
@@ -162,7 +165,7 @@ function App() {
     if (battleTrigger && gameState) {
       const syncBattleState = async () => {
         try {
-          const state = await getGameState(gameState.gameId, gameState.player.name);
+          const state = await getGameState(gameState.gameId, gameState.player.name || playerName);
           setGameState(state);
         } catch (_err) {
           // Silent fallback on battle sync
@@ -172,7 +175,7 @@ function App() {
       };
       syncBattleState();
     }
-  }, [battleTrigger, gameState, resetBattleTrigger]);
+  }, [battleTrigger, gameState, resetBattleTrigger, playerName]);
 
   // 3. Auto-resync game state on WebSocket reconnection
   const gameStateRef = useRef(gameState);
@@ -242,14 +245,15 @@ function App() {
   };
 
   // MULTIPLAYER JOIN
-  const handleJoinLobby = async (code: string, name: string) => {
+  const handleJoinLobby = async (code: string, name: string, spectator: boolean = false) => {
     playSE('click');
     setLoading(true);
     setError(null);
     try {
-      await joinLobby(code, name);
+      const res = await joinLobby(code, name, spectator);
       setPlayerName(name);
       setLobbyCode(code);
+      setIsSpectator(!!res.spectator || !!spectator);
       setScreen('lobby');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Key refused by core gateway.';
@@ -446,6 +450,7 @@ function App() {
     playSE('click');
     setScreen('title');
     setLobbyCode(null);
+    setIsSpectator(false);
     setGameState(null);
     setError(null);
     setWaitingForBattle(false);
@@ -523,6 +528,7 @@ function App() {
         <LobbyScreen
           lobbyState={lobbyState}
           playerName={playerName}
+          isSpectator={isSpectator}
           chatMessages={chatMessages}
           connected={connected}
           onSendChat={sendChatMessage}
@@ -535,6 +541,45 @@ function App() {
 
       {screen === 'game' && gameState && (
         <>
+          {/* Spectator branch: render read-only views, no interactive controls */}
+          {isSpectator ? (
+            gameState.currentRound > gameState.maxRounds && gameState.phase === 'results' ? (
+              <GameOver standings={gameState.standings} onRestart={handleRestart} />
+            ) : gameState.phase === 'battle' ? (
+              <SpectatorBattleScreen
+                gameId={gameState.gameId}
+                combatants={gameState.combatants || []}
+                battleSessions={gameState.battleSessions || []}
+                matchups={gameState.matchups || []}
+                battleLogs={gameState.battleLogs || {}}
+                standings={gameState.standings}
+                currentRound={gameState.currentRound}
+                maxRounds={gameState.maxRounds}
+                phase={gameState.phase}
+                onRefresh={async () => {
+                  try {
+                    const state = await getGameState(gameState.gameId, playerName);
+                    setGameState(state);
+                  } catch (_err) { /* silent */ }
+                }}
+              />
+            ) : (
+              <Standings
+                standings={gameState.standings}
+                round={gameState.currentRound}
+                maxRounds={gameState.maxRounds}
+                battleResult={t('spectating') || 'SPECTATING / 観戦中 — ホストの進行を待機しています'}
+                onNext={async () => {
+                  try {
+                    const state = await getGameState(gameState.gameId, playerName);
+                    setGameState(state);
+                  } catch (_err) { /* silent */ }
+                }}
+                loading={loading}
+              />
+            )
+          ) : (
+            <>
           {gameState.currentRound > gameState.maxRounds && gameState.phase === 'results' ? (
             <GameOver standings={gameState.standings} onRestart={handleRestart} />
           ) : gameState.phase === 'shop' ? (
@@ -573,6 +618,8 @@ function App() {
               onNext={handleNextRound}
               loading={loading}
             />
+          )}
+            </>
           )}
         </>
       )}

@@ -55,22 +55,27 @@ func HandleJoinLobby(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code       string `json:"code"`
 		PlayerName string `json:"playerName"`
+		Spectator  bool   `json:"spectator"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Code == "" || req.PlayerName == "" {
 		lobbyWriteError(w, http.StatusBadRequest, "Code and PlayerName required")
 		return
 	}
 
-	lob, err := lobby.GlobalLobbyManager.JoinLobby(req.Code, req.PlayerName)
+	lob, err := lobby.GlobalLobbyManager.JoinLobbyAsSpectator(req.Code, req.PlayerName, req.Spectator)
 	if err != nil {
 		lobbyWriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
+	// Broadcast the updated roster (so existing clients see the new spectator)
+	lobby.GlobalHub.BroadcastLobbyState(req.Code)
+
 	lobbyWriteJSON(w, http.StatusOK, map[string]interface{}{
-		"code":    lob.Code,
-		"players": lob.Players,
-		"host":    lob.Host,
+		"code":       lob.Code,
+		"players":    lob.Players,
+		"host":       lob.Host,
+		"spectator":  req.Spectator,
 	})
 }
 
@@ -183,14 +188,30 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Count only combatants (exclude spectators) for the min-3 check
+	combatantCount := 0
+	for _, p := range lob.Players {
+		if !p.IsSpectator {
+			combatantCount++
+		}
+	}
+	if combatantCount < 3 {
+		lobbyWriteError(w, http.StatusBadRequest, "Minimum 3 combatants required to start tournament")
+		return
+	}
+
 	lob.Status = "playing"
 	gameID := generateID()
 	lob.GameID = gameID
 
-	// Create symmetric Player objects for the tournament
-	players := make([]models.Player, len(lob.Players))
+	// Create symmetric Player objects for the tournament — spectators are excluded
+	// from the tournament roster entirely.
+	combatants := make([]models.Player, 0, combatantCount)
 
-	for i, lp := range lob.Players {
+	for _, lp := range lob.Players {
+		if lp.IsSpectator {
+			continue
+		}
 		var p models.Player
 		if lp.IsNPC {
 			// Choose a strategy: Aggro, Combo, or Control
@@ -208,8 +229,9 @@ func HandleStartGame(w http.ResponseWriter, r *http.Request) {
 				IsNPC:   false,
 			}
 		}
-		players[i] = p
+		combatants = append(combatants, p)
 	}
+	players := combatants
 
 	// Generate dynamic rounds size based on T players
 	maxRounds := len(players)

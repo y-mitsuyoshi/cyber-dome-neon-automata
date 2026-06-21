@@ -154,6 +154,15 @@ func HandleBattleStep(w http.ResponseWriter, r *http.Request) {
 		if gs.LobbyCode != "" {
 			lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player1Name, map[string]interface{}{"type": "battle_step_advanced"})
 			lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player2Name, map[string]interface{}{"type": "battle_step_advanced"})
+			// Spectators also receive a step-advanced ping so they can re-fetch state.
+			lobby.GlobalHub.BroadcastToSpectators(gs.LobbyCode, map[string]interface{}{
+				"type": "spectator_battle_update",
+				"data": map[string]interface{}{
+					"session":      session.SessionID,
+					"player1Name":  session.Player1Name,
+					"player2Name":  session.Player2Name,
+				},
+			})
 		}
 	}
 
@@ -233,6 +242,14 @@ func HandleBattleAction(w http.ResponseWriter, r *http.Request) {
 	if gs.LobbyCode != "" {
 		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player1Name, map[string]interface{}{"type": "battle_step_advanced"})
 		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player2Name, map[string]interface{}{"type": "battle_step_advanced"})
+		lobby.GlobalHub.BroadcastToSpectators(gs.LobbyCode, map[string]interface{}{
+			"type": "spectator_battle_update",
+			"data": map[string]interface{}{
+				"session":     session.SessionID,
+				"player1Name": session.Player1Name,
+				"player2Name": session.Player2Name,
+			},
+		})
 	}
 
 	// If session is finished after submitting choice, finalize it
@@ -359,6 +376,15 @@ func finalizeBattleSession(gs *models.GameState, session *models.BattleSession) 
 	if gs.LobbyCode != "" {
 		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player1Name, map[string]interface{}{"type": "battle_complete"})
 		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player2Name, map[string]interface{}{"type": "battle_complete"})
+		lobby.GlobalHub.BroadcastToSpectators(gs.LobbyCode, map[string]interface{}{
+			"type": "spectator_battle_update",
+			"data": map[string]interface{}{
+				"session":     session.SessionID,
+				"player1Name": session.Player1Name,
+				"player2Name": session.Player2Name,
+				"finished":    true,
+			},
+		})
 	}
 
 	// Symmetrical: Evaluate round resolution advancement

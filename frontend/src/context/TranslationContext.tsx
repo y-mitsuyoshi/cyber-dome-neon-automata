@@ -215,7 +215,41 @@ const uiDict: Record<Locale, Record<string, string>> = {
     Matrix: "Matrix",
     None: "None",
     units: "Units",
-    initializingArenaLink: "INITIALIZING INTERACTIVE ARENA LINK..."
+    initializingArenaLink: "INITIALIZING INTERACTIVE ARENA LINK...",
+
+    // Battle Arena — perspective / discard / effect UI
+    yourDiscard: "YOUR DISCARD / 除外エリア",
+    opponentDiscard: "{opponent} DISCARD / 除外エリア",
+    defendingYou: "DEFENDING / あなたが支配中",
+    defendingOpponent: "DEFENDING / {opponent} が支配中",
+    flagUnclaimed: "FLAG UNCLAIMED / フラグなし",
+    noDefender: "NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません",
+    challengerZone: "ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード",
+    totalPower: "計",
+    playedByYou: "▶ あなたのプレイ",
+    playedByOpponent: "▶ {opponent} のプレイ",
+    awaitingDraw: "AWAITING DECK DRAW INTRUSION / ドローされるのを待っています",
+    effectTriggered: "EFFECT TRIGGERED / 効果発動",
+    memEffectBadge: "EFFECT",
+    memDetailTitle: "BENCH MODULE",
+    memNoEffect: "No effect.",
+    discardEmpty: "EMPTY / なし",
+    discardDetailTitle: "DISCARD MODULE",
+
+    // Spectator mode
+    spectateMode: "SPECTATE / 観戦モード",
+    spectatorBadge: "YOU (SPECTATOR)",
+    spectatorTag: "SPECTATOR",
+    specTitle: "SPECTATOR MODE / 観戦モード",
+    specRefresh: "REFRESH",
+    specNoBattles: "NO ACTIVE BATTLES / 進行中のバトルはありません",
+    specCompleted: "COMPLETED BATTLES / 終了済み",
+    specMatchups: "MATCHUPS",
+    specFinished: "FINISHED",
+    specStep: "STEP",
+    specRound: "TURN",
+    specView: "VIEW",
+    spectating: "SPECTATING / 観戦中 — ホストの進行を待機しています",
   },
   ja: {
     // Title Screen
@@ -409,7 +443,41 @@ const uiDict: Record<Locale, Record<string, string>> = {
     Matrix: "マトリクス",
     None: "なし",
     units: "枚",
-    initializingArenaLink: "電脳アリーナ回線を初期化中..."
+    initializingArenaLink: "電脳アリーナ回線を初期化中...",
+
+    // Battle Arena — perspective / discard / effect UI
+    yourDiscard: "あなたの除外エリア",
+    opponentDiscard: "{opponent} の除外エリア",
+    defendingYou: "DEFENDING / あなたが支配中",
+    defendingOpponent: "DEFENDING / {opponent} が支配中",
+    flagUnclaimed: "FLAG UNCLAIMED / フラグなし",
+    noDefender: "NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません",
+    challengerZone: "ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード",
+    totalPower: "計",
+    playedByYou: "▶ あなたのプレイ",
+    playedByOpponent: "▶ {opponent} のプレイ",
+    awaitingDraw: "AWAITING DECK DRAW INTRUSION / ドローされるのを待っています",
+    effectTriggered: "EFFECT TRIGGERED / 効果発動",
+    memEffectBadge: "効果",
+    memDetailTitle: "ベンチモジュール",
+    memNoEffect: "効果なし。",
+    discardEmpty: "空 / なし",
+    discardDetailTitle: "除外モジュール",
+
+    // Spectator mode
+    spectateMode: "SPECTATE / 観戦モード",
+    spectatorBadge: "あなた (観戦者)",
+    spectatorTag: "観戦者",
+    specTitle: "SPECTATOR MODE / 観戦モード",
+    specRefresh: "更新",
+    specNoBattles: "進行中のバトルはありません",
+    specCompleted: "終了済みバトル",
+    specMatchups: "マッチアップ",
+    specFinished: "終了",
+    specStep: "ステップ",
+    specRound: "ターン",
+    specView: "表示切替",
+    spectating: "観戦中 — ホストの進行を待機しています",
   }
 };
 

@@ -7,6 +7,7 @@ import type { LobbyState, ChatMessage } from '../hooks/useWebSocket';
 interface LobbyScreenProps {
   lobbyState: LobbyState | null;
   playerName: string;
+  isSpectator?: boolean;
   chatMessages: ChatMessage[];
   connected: boolean;
   onSendChat: (text: string) => void;
@@ -19,6 +20,7 @@ interface LobbyScreenProps {
 function LobbyScreen({
   lobbyState,
   playerName,
+  isSpectator = false,
   chatMessages,
   connected,
   onSendChat,
@@ -69,9 +71,10 @@ function LobbyScreen({
     setChatInput('');
   };
 
-  const isHost = lobbyState.host === playerName;
+  const isHost = lobbyState.host === playerName && !isSpectator;
+  const combatantCount = lobbyState.players.filter((p) => !p.isSpectator).length;
   const totalPlayers = lobbyState.players.length;
-  const canStart = totalPlayers >= 3 && totalPlayers <= 8;
+  const canStart = combatantCount >= 3 && combatantCount <= 8;
 
   return (
     <div className="min-h-screen bg-cyber-dark cyber-grid relative overflow-hidden flex items-center justify-center p-4">
@@ -132,7 +135,10 @@ function LobbyScreen({
           <div className="flex items-center justify-between mb-3 font-mono">
             <h3 className="text-xs uppercase tracking-widest text-cyber-text-dim font-bold flex items-center gap-1.5">
               <Terminal size={14} className="text-neon-cyan" />
-              {t('combatantRoster', { count: totalPlayers })}
+              {t('combatantRoster', { count: combatantCount })}
+              {totalPlayers > combatantCount && (
+                <span className="text-neon-amber/70 text-[9px]">+{totalPlayers - combatantCount} 👁</span>
+              )}
             </h3>
             <span className="text-[10px] text-neon-cyan/80 uppercase tracking-widest border border-neon-cyan/20 px-2 py-0.5 rounded">
               {t('min3Required')}
@@ -168,9 +174,21 @@ function LobbyScreen({
                       {p.name}
                     </span>
 
-                    {isMe && (
+                    {isMe && !isSpectator && (
                       <span className="text-[9px] font-mono uppercase tracking-wider bg-neon-cyan/25 border border-neon-cyan/40 px-1.5 py-0.1 rounded text-neon-cyan">
                         {t('youBadge')}
+                      </span>
+                    )}
+
+                    {isMe && isSpectator && (
+                      <span className="text-[9px] font-mono uppercase tracking-wider bg-neon-amber/25 border border-neon-amber/40 px-1.5 py-0.1 rounded text-neon-amber">
+                        {t('spectatorBadge') || 'YOU (SPECTATOR)'}
+                      </span>
+                    )}
+
+                    {p.isSpectator && !isMe && (
+                      <span className="text-[9px] font-mono uppercase tracking-wider bg-amber-900/25 border border-neon-amber/30 px-1.5 py-0.1 rounded text-neon-amber/70">
+                        {t('spectatorTag') || 'SPECTATOR'}
                       </span>
                     )}
 
@@ -196,7 +214,7 @@ function LobbyScreen({
             })}
 
             {/* Empty slots placeholders */}
-            {Array.from({ length: 8 - totalPlayers }).map((_, i) => (
+            {Array.from({ length: Math.max(0, 8 - combatantCount) }).map((_, i) => (
               <div
                 key={`empty-${i}`}
                 className="border border-dashed border-cyber-border/20 p-2.5 rounded flex items-center justify-center text-xs text-cyber-text-dim/40 font-mono tracking-widest"
@@ -207,7 +225,7 @@ function LobbyScreen({
           </div>
 
           {/* Add NPC Panel for Host */}
-          {isHost && totalPlayers < 8 && (
+          {isHost && combatantCount < 8 && (
             <button
               onClick={() => { playSE('click'); onAddNPC(); }}
               onMouseEnter={() => playSE('hover')}

@@ -187,6 +187,48 @@ func (h *Hub) BroadcastLobbyState(lobbyCode string) {
 	h.Broadcast(lobbyCode, msg)
 }
 
+// BroadcastToSpectators sends a message only to the registered spectators of
+// the given lobby. Spectators are identified via the LobbyManager roster.
+func (h *Hub) BroadcastToSpectators(lobbyCode string, msg interface{}) {
+	lob := GlobalLobbyManager.GetLobby(lobbyCode)
+	if lob == nil {
+		return
+	}
+	h.RLock()
+	clients, ok := h.LobbyCodeToClients[lobbyCode]
+	if !ok {
+		h.RUnlock()
+		return
+	}
+	clientList := make([]*Client, 0)
+	for _, p := range lob.Players {
+		if !p.IsSpectator {
+			continue
+		}
+		if c, ok := clients[p.Name]; ok {
+			clientList = append(clientList, c)
+		}
+	}
+	h.RUnlock()
+
+	if len(clientList) == 0 {
+		return
+	}
+
+	payload, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("Error marshalling spectator broadcast: %v", err)
+		return
+	}
+	for _, c := range clientList {
+		select {
+		case c.Send <- payload:
+		default:
+			log.Printf("Spectator send buffer full for %s", c.PlayerName)
+		}
+	}
+}
+
 // readPump pumps messages from the WebSocket connection to the hub.
 func (c *Client) readPump() {
 	defer func() {

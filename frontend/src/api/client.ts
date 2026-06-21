@@ -1,4 +1,4 @@
-import type { GameState, Card, BattleSession, Standing, BattleLogEntry, NPC, BattleResult } from '../types/game';
+import type { GameState, Card, BattleSession, Standing, BattleLogEntry, NPC, BattleResult, SpectatorCombatant } from '../types/game';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -42,6 +42,13 @@ interface RawGameState {
   deckAPool?: Card[];
   deckBPool?: Card[];
   deckCPool?: Card[];
+  // Spectator fields
+  isSpectator?: boolean;
+  combatants?: SpectatorCombatant[];
+  battleSessions?: BattleSession[];
+  matchups?: { p1: string; p2: string }[];
+  battleLogs?: Record<string, BattleLogEntry[]>;
+  lastResults?: Record<string, RawBattleResult | null>;
 }
 
 function mapGameState(raw: RawGameState): GameState {
@@ -78,6 +85,19 @@ function mapGameState(raw: RawGameState): GameState {
     deckAPool: raw.deckAPool || [],
     deckBPool: raw.deckBPool || [],
     deckCPool: raw.deckCPool || [],
+    isSpectator: raw.isSpectator || false,
+    combatants: raw.combatants || [],
+    battleSessions: raw.battleSessions || [],
+    matchups: raw.matchups || [],
+    battleLogs: raw.battleLogs || {},
+    lastResults: raw.lastResults
+      ? Object.fromEntries(
+          Object.entries(raw.lastResults).map(([k, v]) => [
+            k,
+            v ? ({ ...v, log: (v.log || []) as BattleLogEntry[] } as BattleResult) : null,
+          ])
+        )
+      : {},
   };
 }
 
@@ -196,10 +216,10 @@ export async function createLobby(playerName: string): Promise<{ code: string; h
   });
 }
 
-export async function joinLobby(code: string, playerName: string): Promise<RawLobbyState> {
-  return apiFetch<RawLobbyState>('/api/lobby/join', {
+export async function joinLobby(code: string, playerName: string, spectator: boolean = false): Promise<RawLobbyState & { spectator?: boolean }> {
+  return apiFetch<RawLobbyState & { spectator?: boolean }>('/api/lobby/join', {
     method: 'POST',
-    body: JSON.stringify({ code, playerName }),
+    body: JSON.stringify({ code, playerName, spectator }),
   });
 }
 

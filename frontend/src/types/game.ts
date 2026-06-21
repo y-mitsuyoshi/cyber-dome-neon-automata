@@ -59,14 +59,22 @@ export interface MemorySlot {
   count: number;
 }
 
+// MemorySlot represented over the wire from the Go backend.
+// `cards` is included when sent live from the BattleSession.
+export interface LiveMemorySlot {
+  cardName: string;
+  cards: Card[];
+  count: number;
+}
+
 export interface BattleSession {
   sessionId: string;
   player1Name: string;
   player2Name: string;
   player1Deck: Card[];
   player2Deck: Card[];
-  player1Mem: MemorySlot[];
-  player2Mem: MemorySlot[];
+  player1Mem: LiveMemorySlot[];
+  player2Mem: LiveMemorySlot[];
   player1Discard: Card[];
   player2Discard: Card[];
   flagHolder: string;
@@ -130,4 +138,23 @@ export interface GameState {
   deckAPool: Card[];
   deckBPool: Card[];
   deckCPool: Card[];
+  // Spectator-only fields (populated when isSpectator is true)
+  isSpectator?: boolean;
+  combatants?: SpectatorCombatant[];
+  battleSessions?: BattleSession[];
+  matchups?: { p1: string; p2: string }[];
+  battleLogs?: Record<string, BattleLogEntry[]>;
+  lastResults?: Record<string, BattleResult | null>;
+}
+
+export interface SpectatorCombatant {
+  name: string;
+  credits: number;
+  deck: Card[];
+  deckSize: number;
+  wins: number;
+  fans: number;
+  isNpc: boolean;
+  strategy?: string;
+  ready?: boolean;
 }

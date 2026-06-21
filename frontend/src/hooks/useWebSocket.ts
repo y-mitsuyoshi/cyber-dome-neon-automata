@@ -17,6 +17,7 @@ const getWsUrl = (code: string, name: string) => {
 export interface LobbyPlayer {
   name: string;
   isNpc: boolean;
+  isSpectator?: boolean;
 }
 
 export interface LobbyState {
@@ -85,6 +86,9 @@ export const useWebSocket = (code: string | null, name: string | null) => {
             case 'opponent_action_committed':
             case 'battle_complete':
               setBattleTrigger({ type: msg.type, data: msg.data });
+              break;
+            case 'spectator_battle_update':
+              setBattleTrigger({ type: 'spectator_battle_update', data: msg.data });
               break;
             case 'player_kicked':
               setKicked(true);

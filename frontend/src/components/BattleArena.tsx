@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Flag, User, Cpu, Play, Pause, RotateCcw, Layers, Shield, Activity } from 'lucide-react';
-import type { BattleLogEntry, BattleSession, Card, BattleLogCard } from '../types/game';
+import { Flag, User, Cpu, Play, Pause, RotateCcw, Layers, Shield, Activity, Zap } from 'lucide-react';
+import type { BattleLogEntry, BattleSession, Card, BattleLogCard, LiveMemorySlot } from '../types/game';
 import MemorySlots from './MemorySlots';
+import DiscardPile from './DiscardPile';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
 import DeckViewerModal from './DeckViewerModal';
@@ -162,8 +163,8 @@ function BattleArena({
     }
   }, [currentLogIndex, activeLog, playerName, opponent, playSE, hasLog, isLiveMode, battleSession?.isFinished, battleLog.length]);
 
-  // Helper to parse live slots
-  const mapLiveMemSlots = (slots: { count: number; cardName: string }[]): string[][] => {
+  // Helper to parse live slots into full card-name arrays (used for fallback display)
+  const mapLiveMemSlots = (slots: LiveMemorySlot[] | { count: number; cardName: string }[]): string[][] => {
     if (!slots) return [];
     return slots.map(slot => Array(slot.count).fill(slot.cardName));
   };
@@ -190,23 +191,42 @@ function BattleArena({
     return p1 === cur;
   }, [isLiveMode, battleSession, playerName]);
 
+  // Live memory slots carry the full Card payload; historical mode only has names.
+  const myLiveMemSlots: LiveMemorySlot[] | undefined = useMemo(() => {
+    if (!isLiveMode || !battleSession) return undefined;
+    return isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem;
+  }, [isLiveMode, battleSession, isPlayer1]);
+
+  const opponentLiveMemSlots: LiveMemorySlot[] | undefined = useMemo(() => {
+    if (!isLiveMode || !battleSession) return undefined;
+    return isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem;
+  }, [isLiveMode, battleSession, isPlayer1]);
+
+  // String-based slots for historical replay mode
   const myMemSlots = useMemo(() => {
-    if (isLiveMode) {
-      return mapLiveMemSlots(isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem);
-    }
+    if (isLiveMode) return mapLiveMemSlots(isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem);
     const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
     return parseMemSlots(currentEntry.playerMemSlots);
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
 
   const opponentMemSlots = useMemo(() => {
-    if (isLiveMode) {
-      return mapLiveMemSlots(isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem);
-    }
+    if (isLiveMode) return mapLiveMemSlots(isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem);
     const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
     return parseMemSlots(currentEntry.cpuMemSlots);
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
+
+  // Discard (banish) piles — live mode only carries full card data.
+  const myDiscard: Card[] = useMemo(() => {
+    if (!isLiveMode || !battleSession) return [];
+    return isPlayer1 ? battleSession.player1Discard : battleSession.player2Discard;
+  }, [isLiveMode, battleSession, isPlayer1]);
+
+  const opponentDiscard: Card[] = useMemo(() => {
+    if (!isLiveMode || !battleSession) return [];
+    return isPlayer1 ? battleSession.player2Discard : battleSession.player1Discard;
+  }, [isLiveMode, battleSession, isPlayer1]);
 
   const myDeckCount = useMemo(() => {
     if (isLiveMode) {
@@ -288,6 +308,18 @@ function BattleArena({
   const flagHolderName = isLiveMode ? battleSession.flagHolder : (hasLog ? activeLog[currentLogIndex].flagHolder : 'None');
   const flagPowerValue = isLiveMode ? battleSession.flagPower : (hasLog ? activeLog[currentLogIndex].currentPower : 0);
   const challengerPower = isLiveMode ? battleSession.challengerPower : 0;
+
+  // Latest log entry — used to surface the most recent played card & effect to the player.
+  const latestEntry = useMemo(() => {
+    if (!hasLog || activeLog.length === 0) return null;
+    return activeLog[activeLog.length - 1];
+  }, [hasLog, activeLog]);
+
+  // Determine who played the latest card and whether it was "me" or the opponent.
+  const latestPlayerIsMe = (latestEntry?.player || '') === playerName;
+  const latestPlayerIsOpponent = !!latestEntry?.player && latestEntry.player === opponent;
+  const latestHasEffect = !!(latestEntry?.effectTriggered && latestEntry.effectTriggered !== 'None' && latestEntry.effectTriggered !== '');
+  const latestEffectText = latestHasEffect ? translateBattleDetail(latestEntry!.effectTriggered) : '';
 
   // Active Choice Config
   const showChoiceUI = isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer === playerName && !battleSession.isFinished;
@@ -456,7 +488,19 @@ function BattleArena({
         
         {/* Left Col: Local Player State */}
         <div className="font-mono flex flex-col gap-3 self-start order-2 lg:order-1">
-          <MemorySlots slots={myMemSlots} label={t('yourMemory')} side="left" />
+          <MemorySlots
+            liveSlots={myLiveMemSlots}
+            slots={myMemSlots}
+            label={t('yourMemory')}
+            side="left"
+            accent="cyan"
+          />
+          <DiscardPile
+            cards={myDiscard}
+            label={t('yourDiscard') || 'YOUR DISCARD / 除外エリア'}
+            side="left"
+            accent="cyan"
+          />
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 flex justify-between items-center">
             <div>
               <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
@@ -578,7 +622,13 @@ function BattleArena({
           {/* Core Arena Display */}
           <div className="flex-1 w-full flex flex-col justify-center gap-4 my-2 z-10">
             {/* DEFENDER ZONE */}
-            <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+            <div className={`flex flex-col items-center p-3 border rounded-lg bg-cyber-surface/5 transition-all ${
+              flagHolderName === playerName
+                ? 'border-neon-cyan/40 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                : flagHolderName === opponent
+                ? 'border-neon-magenta/40 shadow-[0_0_12px_rgba(255,0,255,0.1)]'
+                : 'border-cyber-border/20'
+            }`}>
               <div
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all ${
                   flagHolderName === playerName
@@ -591,10 +641,10 @@ function BattleArena({
                 <Flag size={12} className={flagHolderName === playerName ? 'animate-pulse text-neon-cyan animate-neon-pulse' : flagHolderName === opponent ? 'text-neon-magenta animate-pulse' : ''} />
                 <span className="uppercase">
                   {flagHolderName === playerName
-                    ? 'DEFENDING / あなたが支配中'
+                    ? t('defendingYou') || 'DEFENDING / あなたが支配中'
                     : flagHolderName === opponent
-                    ? `DEFENDING / ${opponent} が支配中`
-                    : 'FLAG UNCLAIMED / フラグなし'}
+                    ? t('defendingOpponent') || `DEFENDING / ${opponent} が支配中`
+                    : t('flagUnclaimed') || 'FLAG UNCLAIMED / フラグなし'}
                 </span>
                 {flagPowerValue > 0 && <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">{flagPowerValue} POW</span>}
               </div>
@@ -607,47 +657,92 @@ function BattleArena({
                   </div>
                 ) : (
                   <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
-                    NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません
+                    {t('noDefender') || 'NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません'}
                   </div>
                 )}
               </div>
             </div>
 
             {/* CHALLENGER / ATTACKER ZONE */}
-            <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
-              <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
-                <span>ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード</span>
+            <div className={`flex flex-col items-center p-3 border rounded-lg bg-cyber-surface/5 transition-all ${
+              currentClashCards.length > 0 && latestPlayerIsMe
+                ? 'border-neon-cyan/40 shadow-[0_0_12px_rgba(0,240,255,0.1)]'
+                : currentClashCards.length > 0 && latestPlayerIsOpponent
+                ? 'border-neon-magenta/40 shadow-[0_0_12px_rgba(255,0,255,0.1)]'
+                : 'border-cyber-border/20'
+            }`}>
+              <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2 flex-wrap justify-center">
+                <span>{t('challengerZone') || 'ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード'}</span>
                 {challengerPower > 0 && (
                   <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
-                    計 {challengerPower} POW
+                    {t('totalPower') || '計'} {challengerPower} POW
+                  </span>
+                )}
+                {currentClashCards.length > 0 && (latestPlayerIsMe || latestPlayerIsOpponent) && (
+                  <span className={`px-1.5 py-0.5 rounded border text-[9px] font-bold ${
+                    latestPlayerIsMe
+                      ? 'border-neon-cyan/40 text-neon-cyan bg-cyan-950/20'
+                      : 'border-neon-magenta/40 text-neon-magenta bg-purple-950/20'
+                  }`}>
+                    {latestPlayerIsMe ? (t('playedByYou') || '▶ あなたのプレイ') : (t('playedByOpponent', { opponent }) || `▶ ${opponent} のプレイ`)}
                   </span>
                 )}
               </div>
 
-              {/* Stacked drawn challenger cards */}
-              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
+              {/* Stacked drawn challenger cards — visualized as an overlapping stack so
+                  observers can see at a glance how many cards have been chained together. */}
+              <div className="flex items-center justify-center min-h-[160px] w-full px-2 relative">
                 {currentClashCards.length > 0 ? (
-                  currentClashCards.map((cCard, idx) => {
-                    const isLatest = idx === currentClashCards.length - 1;
-                    return (
-                      <div
-                        key={cCard.id + '_' + idx}
-                        className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
-                          isLatest
-                            ? 'animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80'
-                            : 'opacity-70 scale-75'
-                        }`}
-                      >
-                        <CardDisplay card={cCard} disabled />
-                      </div>
-                    );
-                  })
+                  <div className="relative flex items-center justify-center" style={{ minHeight: 160 }}>
+                    {currentClashCards.map((cCard, idx) => {
+                      const isLatest = idx === currentClashCards.length - 1;
+                      const offset = idx * 28; // px overlap offset
+                      return (
+                        <div
+                          key={cCard.id + '_' + idx}
+                          className="absolute transition-all duration-300"
+                          style={{
+                            left: `calc(50% - 96px + ${offset}px)`,
+                            transform: `scale(${isLatest ? 0.85 : 0.7})`,
+                            zIndex: isLatest ? 10 : idx + 1,
+                            opacity: isLatest ? 1 : 0.75,
+                          }}
+                        >
+                          {isLatest && (
+                            <div className="absolute inset-0 rounded-lg animate-card-reveal shadow-[0_0_18px_rgba(0,240,255,0.35)] pointer-events-none" />
+                          )}
+                          <CardDisplay card={cCard} disabled />
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
-                    AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
+                    {t('awaitingDraw') || 'AWAITING DECK DRAW INTRUSION / ドローされるのを待っています'}
                   </div>
                 )}
               </div>
+
+              {/* Latest played card effect banner — surfaces what the opponent just played. */}
+              {latestHasEffect && (
+                <div className={`mt-3 w-full max-w-md mx-auto px-3 py-2 rounded border text-[10px] font-mono leading-relaxed animate-fade-in ${
+                  latestPlayerIsMe
+                    ? 'border-neon-cyan/40 bg-cyan-950/15 text-neon-cyan text-glow-cyan'
+                    : 'border-neon-magenta/40 bg-purple-950/15 text-neon-magenta text-glow-magenta'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    <Zap size={12} className="mt-0.5 flex-shrink-0 animate-pulse" />
+                    <div>
+                      <div className="uppercase tracking-widest text-[9px] font-bold mb-0.5 opacity-80">
+                        {t('effectTriggered') || 'EFFECT TRIGGERED / 効果発動'}
+                      </div>
+                      <div className="text-cyber-text font-semibold">
+                        {latestEffectText}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -709,7 +804,19 @@ function BattleArena({
 
         {/* Right Col: Opponent State */}
         <div className="font-mono flex flex-col gap-3 self-start order-3">
-          <MemorySlots slots={opponentMemSlots} label={t('npcMemoryLabel', { opponent })} side="right" />
+          <MemorySlots
+            liveSlots={opponentLiveMemSlots}
+            slots={opponentMemSlots}
+            label={t('npcMemoryLabel', { opponent })}
+            side="right"
+            accent="magenta"
+          />
+          <DiscardPile
+            cards={opponentDiscard}
+            label={t('opponentDiscard', { opponent })}
+            side="right"
+            accent="magenta"
+          />
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 text-right flex justify-between items-center">
             <Layers size={18} className="text-neon-magenta/50" />
             <div>

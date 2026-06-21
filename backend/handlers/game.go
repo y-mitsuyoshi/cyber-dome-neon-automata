@@ -104,23 +104,30 @@ func getGame(gameID string) (*models.GameState, bool) {
 }
 
 // WritePlayerGameState returns the sliced game state tailored to a specific player's view.
+// If playerName refers to a spectator (not in gs.Players), a read-only spectator
+// view is returned instead, exposing both combatants' decks and battle sessions.
 func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerName string) {
 	standings := buildStandings(gs, playerName)
 
-	// Find the player
+	// Determine if this player is a spectator (not found in the roster)
+	isSpectator := true
 	var player models.Player
 	found := false
 	for _, p := range gs.Players {
 		if p.Name == playerName {
 			player = p
 			found = true
+			isSpectator = false
 			break
 		}
 	}
 
 	if !found {
-		writeError(w, http.StatusNotFound, "Player not found in game state")
-		return
+		if !isSpectatorFromLobby(gs, playerName) {
+			writeError(w, http.StatusNotFound, "Player not found in game state")
+			return
+		}
+		// Fall through to spectator view below
 	}
 
 	// Extract shop
@@ -202,6 +209,14 @@ func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerNam
 				"ready":      gs.ReadyPlayers[p.Name],
 			})
 		}
+	}
+
+	// ===== Spectator branch =====
+	// Spectators get a panoramic view: all combatants, all active battle sessions,
+	// and every matchup, with no redactions. They never receive a personal shop/hand.
+	if isSpectator {
+		writeSpectatorGameState(w, gs)
+		return
 	}
 
 	var battleSession *models.BattleSession = nil
@@ -759,4 +774,89 @@ func advanceRound(gs *models.GameState) {
 
 	// Broadcast new round state update to all players
 	go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
+}
+
+// isSpectatorFromLobby reports whether the given name belongs to a registered
+// spectator in the lobby tied to this game state. Used to gate spectator views.
+func isSpectatorFromLobby(gs *models.GameState, playerName string) bool {
+	if gs.LobbyCode == "" {
+		return false
+	}
+	lob := lobby.GlobalLobbyManager.GetLobby(gs.LobbyCode)
+	if lob == nil {
+		return false
+	}
+	for _, p := range lob.Players {
+		if p.Name == playerName && p.IsSpectator {
+			return true
+		}
+	}
+	return false
+}
+
+// writeSpectatorGameState returns a panoramic, read-only view of the game state
+// for spectators. It exposes all combatants' decks, all active battle sessions,
+// and every matchup without redaction.
+func writeSpectatorGameState(w http.ResponseWriter, gs *models.GameState) {
+	standings := buildStandings(gs, "")
+
+	// Serialize all combatants (no shop/hand redaction needed for spectators).
+	combatants := make([]map[string]interface{}, 0, len(gs.Players))
+	for _, p := range gs.Players {
+		combatants = append(combatants, map[string]interface{}{
+			"name":       p.Name,
+			"credits":    p.Credits,
+			"deck":       p.Deck,
+			"deckSize":   len(p.Deck),
+			"wins":       p.Wins,
+			"fans":       p.GetTotalFans(),
+			"isNpc":      p.IsNPC,
+			"strategy":   p.AIStrategy,
+			"ready":      gs.ReadyPlayers[p.Name],
+		})
+	}
+
+	// Collect all unique active battle sessions (deduplicated by session ID).
+	sessions := make([]*models.BattleSession, 0)
+	seen := make(map[string]bool)
+	for _, s := range gs.BattleSessions {
+		if s == nil || seen[s.SessionID] {
+			continue
+		}
+		seen[s.SessionID] = true
+		sessions = append(sessions, s)
+	}
+
+	// Resolve matchup name pairs for spectator display.
+	matchupNames := make([]map[string]string, 0, len(gs.Matchups))
+	for _, pair := range gs.Matchups {
+		p1Name, p2Name := "BYE", "BYE"
+		if pair[0] >= 0 && pair[0] < len(gs.Players) {
+			p1Name = gs.Players[pair[0]].Name
+		}
+		if pair[1] >= 0 && pair[1] < len(gs.Players) {
+			p2Name = gs.Players[pair[1]].Name
+		}
+		matchupNames = append(matchupNames, map[string]string{"p1": p1Name, "p2": p2Name})
+	}
+
+	// Latest battle logs per combatant (for finished battles).
+	battleLogs := make(map[string][]models.BattleLogEntry)
+	for name, log := range gs.BattleLogs {
+		battleLogs[name] = log
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"gameId":         gs.GameID,
+		"currentRound":   gs.CurrentRound,
+		"maxRounds":      gs.MaxRounds,
+		"phase":          gs.Phase,
+		"isSpectator":    true,
+		"combatants":     combatants,
+		"standings":      standings,
+		"battleSessions": sessions,
+		"matchups":       matchupNames,
+		"battleLogs":     battleLogs,
+		"lastResults":    gs.LastResults,
+	})
 }

@@ -7,7 +7,7 @@ import ManualModal from './ManualModal';
 interface TitleScreenProps {
   onStartSolo: (name: string) => void;
   onCreateLobby: (name: string) => void;
-  onJoinLobby: (code: string, name: string) => void;
+  onJoinLobby: (code: string, name: string, spectator: boolean) => void;
   loading: boolean;
 }
 
@@ -15,6 +15,7 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
   const { playSE } = useAudio();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [spectate, setSpectate] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [hoveredSolo, setHoveredSolo] = useState(false);
@@ -30,7 +31,7 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
     e.preventDefault();
     if (!code.trim()) return;
     playSE('click');
-    onJoinLobby(code.toUpperCase().trim(), getActiveName());
+    onJoinLobby(code.toUpperCase().trim(), getActiveName(), spectate);
   };
 
   return (
@@ -236,9 +237,25 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase().substring(0, 6))}
               placeholder="CYB-X9"
-              className="w-full bg-cyber-dark border border-neon-cyan/30 rounded px-3 py-2 text-center text-xl font-bold tracking-[0.3em] text-neon-cyan text-glow-cyan focus:outline-none focus:border-neon-cyan font-mono uppercase mb-4"
+              className="w-full bg-cyber-dark border border-neon-cyan/30 rounded px-3 py-2 text-center text-xl font-bold tracking-[0.3em] text-neon-cyan text-glow-cyan focus:outline-none focus:border-neon-cyan font-mono uppercase mb-3"
               autoFocus
             />
+
+            {/* Spectator toggle */}
+            <label className="flex items-center gap-2 mb-4 cursor-pointer select-none group">
+              <input
+                type="checkbox"
+                checked={spectate}
+                onChange={(e) => { playSE('click'); setSpectate(e.target.checked); }}
+                className="sr-only"
+              />
+              <span className={`relative inline-block w-9 h-5 rounded-full border transition-all ${spectate ? 'bg-neon-magenta/30 border-neon-magenta' : 'bg-cyber-dark border-cyber-border/40'}`}>
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${spectate ? 'left-4 bg-neon-magenta shadow-[0_0_8px_rgba(255,0,255,0.6)]' : 'left-0.5 bg-cyber-text-dim'}`} />
+              </span>
+              <span className={`text-[10px] font-mono uppercase tracking-wider ${spectate ? 'text-neon-magenta text-glow-magenta' : 'text-cyber-text-dim'}`}>
+                {t('spectateMode') || 'SPECTATE / 観戦モード'}
+              </span>
+            </label>
 
             <div className="flex gap-3 justify-end">
               <button

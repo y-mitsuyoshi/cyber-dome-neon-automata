@@ -9,9 +9,14 @@ import (
 
 // LobbyPlayer represents a player inside a lobby.
 type LobbyPlayer struct {
-	Name  string `json:"name"`
-	IsNPC bool   `json:"isNpc"`
+	Name         string `json:"name"`
+	IsNPC        bool   `json:"isNpc"`
+	IsSpectator  bool   `json:"isSpectator"`
 }
+
+// IsCombatant reports whether this lobby member actually participates in the
+// tournament (true for human players and NPCs, false for spectators).
+func (p LobbyPlayer) IsCombatant() bool { return !p.IsSpectator }
 
 // Lobby represents a game room.
 type Lobby struct {
@@ -72,6 +77,12 @@ func (lm *LobbyManager) CreateLobby(hostName string) *Lobby {
 
 // JoinLobby joins an existing lobby.
 func (lm *LobbyManager) JoinLobby(code string, playerName string) (*Lobby, error) {
+	return lm.JoinLobbyAsSpectator(code, playerName, false)
+}
+
+// JoinLobbyAsSpectator joins an existing lobby, optionally as a spectator.
+// Spectators do not count toward the 8-player cap and are excluded from matchups.
+func (lm *LobbyManager) JoinLobbyAsSpectator(code string, playerName string, spectator bool) (*Lobby, error) {
 	lm.Lock()
 	defer lm.Unlock()
 
@@ -84,10 +95,6 @@ func (lm *LobbyManager) JoinLobby(code string, playerName string) (*Lobby, error
 		return nil, errors.New("game has already started")
 	}
 
-	if len(lobby.Players) >= 8 {
-		return nil, errors.New("lobby is full (max 8 players)")
-	}
-
 	// Check for duplicate player names
 	for _, p := range lobby.Players {
 		if p.Name == playerName {
@@ -95,7 +102,24 @@ func (lm *LobbyManager) JoinLobby(code string, playerName string) (*Lobby, error
 		}
 	}
 
-	lobby.Players = append(lobby.Players, LobbyPlayer{Name: playerName, IsNPC: false})
+	if spectator {
+		// Spectators don't count toward the 8-combatant cap.
+		lobby.Players = append(lobby.Players, LobbyPlayer{Name: playerName, IsNPC: false, IsSpectator: true})
+		return lobby, nil
+	}
+
+	// Non-spectator: enforce the combatant cap.
+	combatantCount := 0
+	for _, p := range lobby.Players {
+		if !p.IsSpectator {
+			combatantCount++
+		}
+	}
+	if combatantCount >= 8 {
+		return nil, errors.New("lobby is full (max 8 combatants)")
+	}
+
+	lobby.Players = append(lobby.Players, LobbyPlayer{Name: playerName, IsNPC: false, IsSpectator: false})
 	return lobby, nil
 }
 
@@ -109,10 +133,18 @@ func (lm *LobbyManager) LeaveLobby(code string, playerName string) (*Lobby, erro
 		return nil, errors.New("lobby not found")
 	}
 
-	// If game is in progress, do not remove player from roster on WS disconnect,
-	// just remove their client connection reference.
+	// If game is in progress, do not remove combatant roster entries on WS
+	// disconnect, just remove the client connection reference. Spectators,
+	// however, can leave freely since they aren't part of the tournament.
 	if lobby.Status == "playing" {
 		delete(lobby.Clients, playerName)
+		// Remove spectators even mid-game
+		for i, p := range lobby.Players {
+			if p.Name == playerName && p.IsSpectator {
+				lobby.Players = append(lobby.Players[:i], lobby.Players[i+1:]...)
+				break
+			}
+		}
 		return lobby, nil
 	}
 
@@ -166,7 +198,13 @@ func (lm *LobbyManager) AddNPC(code string, npcName string) (*Lobby, error) {
 		return nil, errors.New("game already started")
 	}
 
-	if len(lobby.Players) >= 8 {
+	combatantCount := 0
+	for _, p := range lobby.Players {
+		if !p.IsSpectator {
+			combatantCount++
+		}
+	}
+	if combatantCount >= 8 {
 		return nil, errors.New("lobby is full")
 	}
 
