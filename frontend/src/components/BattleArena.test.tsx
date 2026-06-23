@@ -1,82 +1,45 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import BattleArena from './BattleArena';
-import type { BattleLogEntry, Card } from '../types/game';
+import { BattleState } from '../types/game';
 
-vi.mock('../context/AudioContext', () => ({
-  useAudio: () => ({ playSE: vi.fn() }),
-}));
-
-vi.mock('../context/TranslationContext', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-    translateCardName: (name: string) => name,
-    translateBattleDetail: (detail: string) => detail,
-    translateCard: (card: Card) => card,
-  }),
-}));
-
-const mockDeck: Card[] = [];
-
-const mockLog: BattleLogEntry[] = [
-  {
-    step: 1,
-    action: 'reveal',
-    player: 'PLAYER_ONE',
-    card: { name: 'Firewall', power: 5, attribute: 'Hardware', basePower: 5 },
-    p1Card: null,
-    p2Card: null,
-    p1Action: '',
-    p2Action: '',
-    currentPower: 5,
-    effectTriggered: '',
-    playerMemSlots: ['Firewall(x1)'],
-    cpuMemSlots: [],
-    playerDeckCount: 10,
-    cpuDeckCount: 10,
-    playerHandCount: 0,
-    cpuHandCount: 0,
-    flagHolder: 'PLAYER_ONE',
-    details: 'PLAYER_ONE claims the flag',
-  },
-];
+const mockBattleState: BattleState = {
+  playerField: [
+    { id: 'p1', name: 'Virus A', power: 5, imageUrl: '/test.png' },
+  ],
+  opponentField: [
+    { id: 'o1', name: 'Shield B', power: 3, imageUrl: '/test.png' },
+  ],
+  playerHand: [
+    { id: 'p2', name: 'AI Core', power: 2 },
+  ],
+  opponentHand: [
+    { id: 'o2', name: 'Netrunner X', power: 4 },
+  ],
+  playerMemory: [],
+  opponentMemory: [],
+};
 
 describe('BattleArena', () => {
-  it('renders with empty log', () => {
-    const { container } = render(
-      <BattleArena
-        gameId="test"
-        playerName="PLAYER_ONE"
-        battleSession={null}
-        battleLog={[]}
-        opponent="CPU"
-        onComplete={() => {}}
-        deck={mockDeck}
-        onStep={async () => {}}
-        onSubmitAction={async (_actionType, _cardIds) => {}}
-        loading={false}
-        opponentIsNPC={true}
-      />
-    );
-    expect(container).toBeDefined();
+  it('renders player and opponent areas', () => {
+    render(<BattleArena battleState={mockBattleState} playerId="player1" />);
+
+    // Check headings
+    expect(screen.getByText('Your Field')).toBeDefined();
+    expect(screen.getByText('Opponent Field')).toBeDefined();
+    expect(screen.getByText('Hand')).toBeDefined();
+
+    // Check player field card
+    expect(screen.getByText('Virus A')).toBeDefined();
+    // Opponent field card
+    expect(screen.getByText('Shield B')).toBeDefined();
+
+    // Opponent hand should be face down (show '?')
+    expect(screen.getAllByText('?')).toHaveLength(1); // only opponent hand is faceDown
   });
 
-  it('renders with actual log data', () => {
-    const { container } = render(
-      <BattleArena
-        gameId="test"
-        playerName="PLAYER_ONE"
-        battleSession={null}
-        battleLog={mockLog}
-        opponent="CPU"
-        onComplete={() => {}}
-        deck={mockDeck}
-        onStep={async () => {}}
-        onSubmitAction={async (_actionType, _cardIds) => {}}
-        loading={false}
-        opponentIsNPC={true}
-      />
-    );
-    expect(container).toBeDefined();
+  it('shows waiting message when no battle state', () => {
+    render(<BattleArena battleState={null} playerId="player1" />);
+    expect(screen.getByText('Waiting for battle...')).toBeDefined();
   });
 });

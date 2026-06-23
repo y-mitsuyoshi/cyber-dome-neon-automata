@@ -1,126 +1,110 @@
 package engine
 
 import (
-	"backend/models"
+	"context"
+	"log"
 	"math/rand"
+	"time"
+
+	"backend/brainclient"
+	"backend/models"
 )
 
-// GenerateShop creates a shop with 5 cards from the shared pool based on the current round.
-func GenerateShop(gs *models.GameState, round int) models.ShopState {
-	var pool *[]models.Card
-	if round <= 2 {
-		pool = &gs.DeckAPool
-	} else if round <= 4 {
-		pool = &gs.DeckBPool
-	} else {
-		pool = &gs.DeckCPool
-	}
+// decisionClient is the global decision client (can be nil for fallback).
+var decisionClient brainclient.DecisionClient
 
-	cards := make([]models.Card, 5)
-	for i := 0; i < 5; i++ {
-		cards[i] = popCardFromPool(pool, round)
-	}
-
-	return models.ShopState{
-		Cards:   cards,
-		Credits: 0,
-	}
+// SetDecisionClient sets the global decision client.
+func SetDecisionClient(c brainclient.DecisionClient) {
+	decisionClient = c
 }
 
-func popCardFromPool(pool *[]models.Card, round int) models.Card {
-	if len(*pool) == 0 {
-		// Fallback: generate a random card belonging to the correct deck category
-		all := AllCards()
-		var targetDeck string
-		if round <= 2 {
-			targetDeck = "A"
-		} else if round <= 4 {
-			targetDeck = "B"
+// NPCPurchase makes a purchase decision for an NPC.
+func NPCPurchase(npc *models.NPCState, shopCards []models.Card) (action string, targetIndex int) {
+	if decisionClient != nil {
+		req := buildShopRequest(npc, shopCards)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		resp, err := decisionClient.GetShopDecision(ctx, req)
+		if err != nil {
+			log.Printf("brain client error: %v, falling back to template AI", err)
 		} else {
-			targetDeck = "C"
-		}
-		
-		var matchingCards []models.Card
-		for _, c := range all {
-			if c.Deck == targetDeck {
-				matchingCards = append(matchingCards, c)
+			log.Printf("brain decision: %s (index %v, reason: %s)", resp.Action, resp.CardIndex, resp.Reason)
+			switch resp.Action {
+			case "buy":
+				if resp.CardIndex != nil {
+					for i := range shopCards {
+						if i == *resp.CardIndex {
+							return "buy", i
+						}
+					}
+				}
+			case "reroll":
+				return "reroll", 0
+			case "skip":
+				return "skip", 0
+			case "delete":
+				if resp.CardIndex != nil {
+					return "delete", *resp.CardIndex
+				}
 			}
 		}
-		if len(matchingCards) > 0 {
-			return matchingCards[rand.Intn(len(matchingCards))].Clone()
-		}
-		return all[rand.Intn(len(all))].Clone()
 	}
-	
-	idx := rand.Intn(len(*pool))
-	card := (*pool)[idx]
-	*pool = append((*pool)[:idx], (*pool)[idx+1:]...)
-	return card
+	// Fallback to template AI
+	return templateNPCPurchase(npc, shopCards)
 }
 
-// ReturnCardsToPool returns cards back to their respective shared deck pools.
-func ReturnCardsToPool(gs *models.GameState, cards []models.Card) {
-	for _, c := range cards {
-		if c.Deck == "A" {
-			gs.DeckAPool = append(gs.DeckAPool, c)
-		} else if c.Deck == "B" {
-			gs.DeckBPool = append(gs.DeckBPool, c)
-		} else if c.Deck == "C" {
-			gs.DeckCPool = append(gs.DeckCPool, c)
+func buildShopRequest(npc *models.NPCState, shopCards []models.Card) *brainclient.ShopRequest {
+	offers := make([]brainclient.ShopOffer, len(shopCards))
+	for i, card := range shopCards {
+		offers[i] = brainclient.ShopOffer{
+			ShopIndex: i,
+			CardID:    card.ID,
+			Cost:      card.Cost,
 		}
 	}
+	owned := []brainclient.OwnedCard{}
+	for i, card := range npc.Hand {
+		owned = append(owned, brainclient.OwnedCard{
+			OwnedIndex: i,
+			CardID:     card.ID,
+			Location:   "hand",
+		})
+	}
+	for i, card := range npc.Deck {
+		owned = append(owned, brainclient.OwnedCard{
+			OwnedIndex: len(npc.Hand) + i,
+			CardID:     card.ID,
+			Location:   "deck",
+		})
+	}
+	memSlots := []brainclient.MemorySlot{}
+	for _, slot := range npc.Memory {
+		memSlots = append(memSlots, brainclient.MemorySlot{
+			BaseCardID: slot.BaseCardID,
+			Count:      slot.Count,
+		})
+	}
+	return &brainclient.ShopRequest{
+		PlayerID:    npc.ID,
+		Credits:     npc.Credits,
+		Archetype:   npc.Archetype,
+		WinCount:    npc.WinCount,
+		FanCount:    npc.FanCount,
+		ShopOffers:  offers,
+		OwnedCards:  owned,
+		MemorySlots: memSlots,
+	}
 }
 
-// BuyCard attempts to buy a card from the shop at the given index.
-// Returns the updated shop, remaining credits, the purchased card, and an error message.
-func BuyCard(shop *models.ShopState, deck *[]models.Card, credits int, cardIndex int) (int, *models.Card, string) {
-	if cardIndex < 0 || cardIndex >= len(shop.Cards) {
-		return credits, nil, "Invalid card index"
+// templateNPCPurchase is the original template AI logic.
+func templateNPCPurchase(npc *models.NPCState, shopCards []models.Card) (action string, targetIndex int) {
+	for i, card := range shopCards {
+		if npc.Credits >= card.Cost {
+			return "buy", i
+		}
 	}
-
-	card := shop.Cards[cardIndex]
-	cost := card.RarityCost()
-
-	if credits < cost {
-		return credits, nil, "Not enough credits"
+	if len(shopCards) > 0 && rand.Intn(2) == 0 {
+		return "reroll", 0
 	}
-
-	credits -= cost
-	*deck = append(*deck, card.Clone())
-
-	// Remove the card from shop
-	shop.Cards = append(shop.Cards[:cardIndex], shop.Cards[cardIndex+1:]...)
-	shop.Credits = credits
-
-	return credits, &card, ""
-}
-
-// DeleteCard removes a card from the player's deck at the given index. Costs 0 credits (Free).
-func DeleteCard(deck *[]models.Card, credits int, cardIndex int) (int, *models.Card, string) {
-	if cardIndex < 0 || cardIndex >= len(*deck) {
-		return credits, nil, "Invalid card index"
-	}
-
-	deleted := (*deck)[cardIndex]
-	*deck = append((*deck)[:cardIndex], (*deck)[cardIndex+1:]...)
-
-	return credits, &deleted, ""
-}
-
-// RerollShop spends 1 credit, returns old shop cards to the pool, and draws 5 new cards.
-func RerollShop(gs *models.GameState, shop *models.ShopState, credits int, round int) (int, string) {
-	if credits < 1 {
-		return credits, "Not enough credits to reroll"
-	}
-	credits -= 1
-
-	// Return current shop cards to the shared pool
-	ReturnCardsToPool(gs, shop.Cards)
-
-	// Generate a new shop
-	newShop := GenerateShop(gs, round)
-	shop.Cards = newShop.Cards
-	shop.Credits = credits
-
-	return credits, ""
+	return "skip", 0
 }

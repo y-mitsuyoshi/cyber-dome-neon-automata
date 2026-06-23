@@ -2,15 +2,32 @@ version: '3.8'
 services:
   backend:
     build: ./backend
-    ports: ["8080:8080"]
-    volumes: ["./backend:/app"]
-    environment: ["ENV=development", "PORT=8080"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENV=development
+      - PORT=8080
+      - BRAIN_SERVER_URL=http://brain:8000
+      - BRAIN_ENABLED=true
+      - BRAIN_API_KEY=dev-secret-key
+      - BRAIN_TIMEOUT=2s
+    depends_on:
+      - brain
     command: go run main.go
+  brain:
+    build: ./brain/c0211734-372f-4478-9399-a8eda1f0e7ac
+    ports:
+      - "8000:8000"
+    environment:
+      - BRAIN_API_KEY=dev-secret-key
   frontend:
     build: ./frontend
-    ports: ["5173:5173"]
-    volumes: ["./frontend:/app", "/app/node_modules"]
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:8080
-      - VITE_PROXY_TARGET=http://backend:8080
-    depends_on: ["backend"]
