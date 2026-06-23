@@ -1,82 +1,62 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import BattleArena from './BattleArena';
-import type { BattleLogEntry, Card } from '../types/game';
 
-vi.mock('../context/AudioContext', () => ({
-  useAudio: () => ({ playSE: vi.fn() }),
+vi.mock('../hooks/useWebSocket', () => ({
+  useWebSocket: vi.fn(),
 }));
 
-vi.mock('../context/TranslationContext', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-    translateCardName: (name: string) => name,
-    translateBattleDetail: (detail: string) => detail,
-    translateCard: (card: Card) => card,
-  }),
-}));
+import { useWebSocket } from '../hooks/useWebSocket';
 
-const mockDeck: Card[] = [];
-
-const mockLog: BattleLogEntry[] = [
-  {
-    step: 1,
-    action: 'reveal',
-    player: 'PLAYER_ONE',
-    card: { name: 'Firewall', power: 5, attribute: 'Hardware', basePower: 5 },
-    p1Card: null,
-    p2Card: null,
-    p1Action: '',
-    p2Action: '',
-    currentPower: 5,
-    effectTriggered: '',
-    playerMemSlots: ['Firewall(x1)'],
-    cpuMemSlots: [],
-    playerDeckCount: 10,
-    cpuDeckCount: 10,
-    playerHandCount: 0,
-    cpuHandCount: 0,
-    flagHolder: 'PLAYER_ONE',
-    details: 'PLAYER_ONE claims the flag',
-  },
-];
+const mockBattleState = {
+  playerHand: [
+    { id: 'p1', name: 'AI Core', power: 5, image: '/images/cards/ai_001.png' },
+  ],
+  playerField: [
+    { id: 'p2', name: 'Virus Spike', power: 3, image: '/images/cards/virus_001.png' },
+  ],
+  playerMemorySlots: [],
+  opponentHand: [
+    { id: 'o1', name: 'Shield Wall', power: 2, image: '/images/cards/hw_001.png' },
+  ],
+  opponentField: [
+    { id: 'o2', name: 'Firewall', power: 4, image: '/images/cards/nr_001.png' },
+  ],
+  opponentMemorySlots: [],
+};
 
 describe('BattleArena', () => {
-  it('renders with empty log', () => {
-    const { container } = render(
-      <BattleArena
-        gameId="test"
-        playerName="PLAYER_ONE"
-        battleSession={null}
-        battleLog={[]}
-        opponent="CPU"
-        onComplete={() => {}}
-        deck={mockDeck}
-        onStep={async () => {}}
-        onSubmitAction={async (_actionType, _cardIds) => {}}
-        loading={false}
-        opponentIsNPC={true}
-      />
-    );
-    expect(container).toBeDefined();
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('renders with actual log data', () => {
-    const { container } = render(
-      <BattleArena
-        gameId="test"
-        playerName="PLAYER_ONE"
-        battleSession={null}
-        battleLog={mockLog}
-        opponent="CPU"
-        onComplete={() => {}}
-        deck={mockDeck}
-        onStep={async () => {}}
-        onSubmitAction={async (_actionType, _cardIds) => {}}
-        loading={false}
-        opponentIsNPC={true}
-      />
-    );
-    expect(container).toBeDefined();
+  it('renders player and opponent areas when battleState is available', () => {
+    (useWebSocket as any).mockReturnValue({ battleState: mockBattleState });
+    render(<BattleArena />);
+
+    expect(screen.getByText('YOUR ARENA')).toBeDefined();
+    expect(screen.getByText('OPPONENT ARENA')).toBeDefined();
+
+    // Player cards appear
+    expect(screen.getByText('AI Core')).toBeDefined();
+    expect(screen.getByText('Virus Spike')).toBeDefined();
+
+    // Opponent cards appear
+    expect(screen.getByText('Shield Wall')).toBeDefined();
+    expect(screen.getByText('Firewall')).toBeDefined();
+  });
+
+  it('shows waiting message when battleState is null', () => {
+    (useWebSocket as any).mockReturnValue({ battleState: null });
+    render(<BattleArena />);
+    expect(screen.getByText('Waiting for battle...')).toBeDefined();
+  });
+
+  it('renders both hand and field sections for each player', () => {
+    (useWebSocket as any).mockReturnValue({ battleState: mockBattleState });
+    render(<BattleArena />);
+
+    const headers = screen.getAllByRole('heading', { level: 3 });
+    expect(headers.length).toBe(4);
   });
 });

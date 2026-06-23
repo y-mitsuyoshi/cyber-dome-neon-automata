@@ -1,77 +1,78 @@
 package main
 
 import (
-	"backend/handlers"
-	"backend/lobby"
-	"backend/middleware"
-	"fmt"
-	"math/rand"
+	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
+
+	"backend/brainclient"
+	"backend/engine"
+	"backend/handlers"
 )
 
 func main() {
-	// Seed random generator
-	rand.Seed(time.Now().UnixNano())
+	// Initialize brain client if enabled
+	brainEnabled, _ := strconv.ParseBool(getEnv("BRAIN_ENABLED", "true"))
+	brainServerURL := getEnv("BRAIN_SERVER_URL", "")
+	brainAPIKey := getEnv("BRAIN_API_KEY", "")
+	timeoutStr := getEnv("BRAIN_TIMEOUT", "2s")
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		timeout = 2 * time.Second
+	}
 
-	// Initialize and run the WebSocket Hub & Lobby GC sweeper
-	go lobby.GlobalHub.Run()
-	go lobby.StartLobbyGC(lobby.GlobalLobbyManager)
+	var decisionClient brainclient.DecisionClient
+	if brainEnabled && brainServerURL != "" {
+		decisionClient = brainclient.NewBrainClient(brainServerURL, brainAPIKey, timeout)
+		log.Printf("Brain client initialized: endpoint=%s", brainServerURL)
+	} else {
+		log.Println("Brain client disabled or not configured; using template AI")
+	}
 
+	// Inject decision client into engine
+	engine.SetDecisionClient(decisionClient)
+
+	// Setup HTTP routes
 	mux := http.NewServeMux()
 
-	// Game endpoints
-	mux.HandleFunc("/api/game/new", handlers.HandleNewGame)
-	mux.HandleFunc("/api/game/state", handlers.HandleGameState)
-	mux.HandleFunc("/api/game/kick", handlers.HandleKickPlayer)
+	// WebSocket handler
+	wsHandler := handlers.NewWSHandler()
+	mux.HandleFunc("/ws", wsHandler.ServeWS)
 
-	// Shop endpoints
-	mux.HandleFunc("/api/shop", handlers.HandleGetShop)
-	mux.HandleFunc("/api/shop/buy", handlers.HandleBuyCard)
-	mux.HandleFunc("/api/shop/reroll", handlers.HandleRerollShop)
-	mux.HandleFunc("/api/shop/delete", handlers.HandleDeleteCard)
+	// API handlers
+	gameHandler := handlers.NewGameHandler()
+	mux.HandleFunc("/api/game", gameHandler.Handle)
 
-	// Tournament endpoints
-	mux.HandleFunc("/api/tournament/battle", handlers.HandleBattle)
-	mux.HandleFunc("/api/tournament/next-round", handlers.HandleNextRound)
-	mux.HandleFunc("/api/battle/step", handlers.HandleBattleStep)
-	mux.HandleFunc("/api/battle/action", handlers.HandleBattleAction)
-	mux.HandleFunc("/api/battle/complete", handlers.HandleBattleComplete)
+	lobbyHandler := handlers.NewLobbyHandler()
+	mux.HandleFunc("/api/lobby", lobbyHandler.Handle)
 
-	// Lobby REST endpoints
-	mux.HandleFunc("/api/lobby/create", handlers.HandleCreateLobby)
-	mux.HandleFunc("/api/lobby/join", handlers.HandleJoinLobby)
-	mux.HandleFunc("/api/lobby/add-npc", handlers.HandleAddNPC)
-	mux.HandleFunc("/api/lobby/remove-npc", handlers.HandleRemoveNPC)
-	mux.HandleFunc("/api/lobby/start", handlers.HandleStartGame)
+	shopHandler := handlers.NewShopHandler()
+	mux.HandleFunc("/api/shop", shopHandler.Handle)
 
-	// WebSocket Endpoint
-	mux.HandleFunc("/api/ws", handlers.HandleWS)
+	// Battle handler
+	battleHandler := handlers.NewBattleHandler()
+	mux.HandleFunc("/api/battle", battleHandler.Handle)
 
-	// Wrap with CORS middleware
-	handler := middleware.CORS(mux)
+	// Apply CORS middleware
+	handler := handlers.CORSMiddleware(mux)
 
-	port := ":8080"
-	fmt.Printf("CYBER-DOME: Neon Automata backend starting on %s\n", port)
-	fmt.Println("Endpoints:")
-	fmt.Println("  POST /api/game/new")
-	fmt.Println("  GET  /api/game/state")
-	fmt.Println("  GET  /api/shop")
-	fmt.Println("  POST /api/shop/buy")
-	fmt.Println("  POST /api/shop/reroll")
-	fmt.Println("  POST /api/shop/delete")
-	fmt.Println("  POST /api/tournament/battle")
-	fmt.Println("  POST /api/tournament/next-round")
-	fmt.Println("  POST /api/battle/action")
-	fmt.Println("  POST /api/battle/complete")
-	fmt.Println("  POST /api/lobby/create")
-	fmt.Println("  POST /api/lobby/join")
-	fmt.Println("  POST /api/lobby/add-npc")
-	fmt.Println("  POST /api/lobby/remove-npc")
-	fmt.Println("  POST /api/lobby/start")
-	fmt.Println("  GET  /api/ws")
-
-	if err := http.ListenAndServe(port, handler); err != nil {
-		fmt.Printf("Server failed: %v\n", err)
+	port := getEnv("PORT", "8080")
+	log.Printf("Server starting on :%s", port)
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
+		log.Fatalf("Server failed: %v", err)
 	}
+
+	// Cleanup
+	if decisionClient != nil {
+		decisionClient.Close()
+	}
+}
+
+func getEnv(key, defaultVal string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultVal
 }

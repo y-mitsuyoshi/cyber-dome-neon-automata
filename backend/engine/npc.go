@@ -1,124 +1,89 @@
 package engine
 
 import (
-	"backend/models"
+	"context"
+	"log"
+
+	"backend/brainclient"
 )
 
-// NPCNames is a list of NPC names for the tournament.
-var NPCNames = []string{
-	"ZERO_COOL",
-	"ACID_BURN",
-	"CRASH_OVERRIDE",
-	"PHANTOM_PHREAK",
-	"CEREAL_KILLER",
-	"LORD_NIKON",
-	"THE_PLAGUE",
-	"NIGHT_WAV",
-	"CYBER_PUNK",
-	"GRID_SHADOW",
+// NPCSessionState holds the data needed for NPC AI decision making.
+type NPCSessionState struct {
+	PlayerID    string
+	Credits     int
+	Archetype   string
+	WinCount    int
+	FanCount    int
+	ShopOffers  []brainclient.ShopOffer
+	OwnedCards  []brainclient.OwnedCard
+	MemorySlots []brainclient.MemorySlot
 }
 
-// NPCStrategies assigns AI strategies.
-var NPCStrategies = []string{
-	"Aggro",
-	"Combo",
-	"Control",
+// NPCNames is a list of NPC names available for the tournament.
+var NPCNames = []string{"Neo", "Trinity", "Morpheus", "Cypher", "Agent Smith"}
+
+// NPCStrategies maps NPC names to their archetype strategies.
+var NPCStrategies = map[string]string{
+	"Neo":        "aggressive",
+	"Trinity":    "combo",
+	"Morpheus":   "control",
+	"Cypher":     "aggressive",
+	"Agent Smith": "control",
 }
 
-// CreateNPC generates an NPC player with a starting deck and strategy.
-func CreateNPC(name string, strategy string) models.Player {
-	deck := StarterDeck()
-	deckClone := make([]models.Card, len(deck))
-	for i, c := range deck {
-		deckClone[i] = c.Clone()
-	}
-
-	return models.Player{
-		Name:       name,
-		Credits:    10, // Symmetrical starting credits
-		Deck:       deckClone,
-		Wins:       0,
-		Fans:       0,
-		IsNPC:      true,
-		AIStrategy: strategy,
-	}
+// NPCConfig holds the configuration for an NPC player.
+type NPCConfig struct {
+	Name      string
+	Archetype string
 }
 
-// NPCShopPhase simulates a symmetrical shop phase for an NPC player.
-func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
-	strategy := npc.AIStrategy
-	
-	// Max 3 purchase/reroll iterations to prevent infinite loops and simulate human speed
-	for iter := 0; iter < 3; iter++ {
-		// Generate standard shop of 5 cards using the shared pool
-		shop := GenerateShop(gs, round)
-		boughtAny := false
+// CreateNPC creates an NPC configuration with the given name.
+func CreateNPC(name string) *NPCConfig {
+	strategy, ok := NPCStrategies[name]
+	if !ok {
+		strategy = "control"
+	}
+	return &NPCConfig{Name: name, Archetype: strategy}
+}
 
-		// 1. Evaluate and buy matching cards
-		remainingCards := make([]models.Card, 0, len(shop.Cards))
-		for _, card := range shop.Cards {
-			isPreferred := false
-			// Adapt to new attributes: Mainframe, Sector, Orbit, HoloMedia, DeepWeb, Daemon, Matrix
-			// Aggro: HoloMedia, Daemon
-			// Combo: Orbit, Matrix
-			// Control: Mainframe, Sector, DeepWeb
-			switch strategy {
-			case "Aggro":
-				isPreferred = (card.Attribute == "HoloMedia" || card.Attribute == "Daemon")
-			case "Combo":
-				isPreferred = (card.Attribute == "Orbit" || card.Attribute == "Matrix")
-			case "Control":
-				isPreferred = (card.Attribute == "Mainframe" || card.Attribute == "Sector" || card.Attribute == "DeepWeb")
-			}
-
-			cost := card.RarityCost()
-			if isPreferred && npc.Credits >= cost {
-				// Buy the card!
-				npc.Credits -= cost
-				npc.Deck = append(npc.Deck, card.Clone())
-				boughtAny = true
-			} else {
-				remainingCards = append(remainingCards, card)
-			}
+// GetNPCAction returns an action ("buy", "reroll", "delete", "skip") and an optional card index.
+// It tries to use the provided DecisionClient first; if nil or an error occurs, it falls back to the template AI.
+func GetNPCAction(ctx context.Context, npcState NPCSessionState, client brainclient.DecisionClient) (string, *int) {
+	if client != nil {
+		req := &brainclient.ShopRequest{
+			PlayerID:    npcState.PlayerID,
+			Credits:     npcState.Credits,
+			Archetype:   npcState.Archetype,
+			WinCount:    npcState.WinCount,
+			FanCount:    npcState.FanCount,
+			ShopOffers:  npcState.ShopOffers,
+			OwnedCards:  npcState.OwnedCards,
+			MemorySlots: npcState.MemorySlots,
 		}
-		
-		// Return unbought cards to the pool
-		ReturnCardsToPool(gs, remainingCards)
-
-		// 2. Reroll decision: If didn't buy anything, has >= 3 credits, and has iteration left, spend 1 credit to reroll
-		if !boughtAny && npc.Credits >= 3 && iter < 2 {
-			npc.Credits-- // Spend 1 credit to reroll
-			// Loop continues to generate a new shop next iteration
-		} else {
-			// Done buying for this round
-			break
+		resp, err := client.GetShopDecision(ctx, req)
+		if err == nil && resp != nil {
+			switch resp.Action {
+			case "buy", "reroll", "delete", "skip":
+				return resp.Action, resp.CardIndex
+			default:
+				log.Printf("NPC: unknown action from brain: %s, falling back", resp.Action)
+			}
+		} else if err != nil {
+			log.Printf("NPC: brain client error: %v, falling back", err)
 		}
 	}
+	return templateNPCAction(npcState)
+}
 
-	// 3. Compact deck: If deck is getting bloated (> 10 cards)
-	// delete a card that does NOT match their strategy archetype. Deletion is free.
-	if len(npc.Deck) > 10 {
-		deleteIdx := -1
-		for i, card := range npc.Deck {
-			isNonMatching := false
-			switch strategy {
-			case "Aggro":
-				isNonMatching = (card.Attribute != "HoloMedia" && card.Attribute != "Daemon")
-			case "Combo":
-				isNonMatching = (card.Attribute != "Orbit" && card.Attribute != "Matrix")
-			case "Control":
-				isNonMatching = (card.Attribute != "Mainframe" && card.Attribute != "Sector" && card.Attribute != "DeepWeb")
-			}
-
-			if isNonMatching {
-				deleteIdx = i
-				break
-			}
-		}
-
-		if deleteIdx != -1 {
-			// Delete card for free
-			npc.Deck = append(npc.Deck[:deleteIdx], npc.Deck[deleteIdx+1:]...)
+// templateNPCAction is the fallback AI logic (template).
+func templateNPCAction(npcState NPCSessionState) (string, *int) {
+	// Simple heuristic: buy the first affordable card.
+	for _, offer := range npcState.ShopOffers {
+		if npcState.Credits >= offer.Cost {
+			idx := offer.ShopIndex
+			return "buy", &idx
 		}
 	}
+	// If nothing affordable or no offers, reroll.
+	return "reroll", nil
 }
