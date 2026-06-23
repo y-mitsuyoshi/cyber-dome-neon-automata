@@ -1,124 +1,109 @@
 package engine
 
 import (
-	"backend/models"
+	"context"
+	"log"
+	"time"
+
+	"backend/brainclient"
 )
 
-// NPCNames is a list of NPC names for the tournament.
-var NPCNames = []string{
-	"ZERO_COOL",
-	"ACID_BURN",
-	"CRASH_OVERRIDE",
-	"PHANTOM_PHREAK",
-	"CEREAL_KILLER",
-	"LORD_NIKON",
-	"THE_PLAGUE",
-	"NIGHT_WAV",
-	"CYBER_PUNK",
-	"GRID_SHADOW",
+// NPCSessionState holds state for the NPC decision process.
+type NPCSessionState struct {
+	ID          string
+	Credits     int
+	Archetype   string
+	WinCount    int
+	FanCount    int
+	ShopOffers  []brainclient.ShopOffer
+	OwnedCards  []brainclient.OwnedCard
+	MemorySlots []brainclient.MemorySlot
 }
 
-// NPCStrategies assigns AI strategies.
-var NPCStrategies = []string{
-	"Aggro",
-	"Combo",
-	"Control",
+// NPCStrategy defines an NPC archetype/strategy.
+type NPCStrategy struct {
+	Name string
 }
 
-// CreateNPC generates an NPC player with a starting deck and strategy.
-func CreateNPC(name string, strategy string) models.Player {
-	deck := StarterDeck()
-	deckClone := make([]models.Card, len(deck))
-	for i, c := range deck {
-		deckClone[i] = c.Clone()
-	}
+// NPCStrategies returns the available NPC strategies.
+var NPCStrategies = []NPCStrategy{
+	{Name: "aggressive"},
+	{Name: "combo"},
+	{Name: "control"},
+}
 
-	return models.Player{
-		Name:       name,
-		Credits:    10, // Symmetrical starting credits
-		Deck:       deckClone,
-		Wins:       0,
-		Fans:       0,
-		IsNPC:      true,
-		AIStrategy: strategy,
+// CreateNPC creates a new NPCSessionState with the given parameters.
+func CreateNPC(id, archetype string) *NPCSessionState {
+	return &NPCSessionState{
+		ID:        id,
+		Credits:   10,
+		Archetype: archetype,
 	}
 }
 
-// NPCShopPhase simulates a symmetrical shop phase for an NPC player.
-func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
-	strategy := npc.AIStrategy
-	
-	// Max 3 purchase/reroll iterations to prevent infinite loops and simulate human speed
-	for iter := 0; iter < 3; iter++ {
-		// Generate standard shop of 5 cards using the shared pool
-		shop := GenerateShop(gs, round)
-		boughtAny := false
+// NPCShopPhase processes an NPC's shop turn and returns the action and optional card index.
+func NPCShopPhase(npc *NPCSessionState) (string, *int) {
+	return GetNPCAction(*npc)
+}
 
-		// 1. Evaluate and buy matching cards
-		remainingCards := make([]models.Card, 0, len(shop.Cards))
-		for _, card := range shop.Cards {
-			isPreferred := false
-			// Adapt to new attributes: Mainframe, Sector, Orbit, HoloMedia, DeepWeb, Daemon, Matrix
-			// Aggro: HoloMedia, Daemon
-			// Combo: Orbit, Matrix
-			// Control: Mainframe, Sector, DeepWeb
-			switch strategy {
-			case "Aggro":
-				isPreferred = (card.Attribute == "HoloMedia" || card.Attribute == "Daemon")
-			case "Combo":
-				isPreferred = (card.Attribute == "Orbit" || card.Attribute == "Matrix")
-			case "Control":
-				isPreferred = (card.Attribute == "Mainframe" || card.Attribute == "Sector" || card.Attribute == "DeepWeb")
-			}
-
-			cost := card.RarityCost()
-			if isPreferred && npc.Credits >= cost {
-				// Buy the card!
-				npc.Credits -= cost
-				npc.Deck = append(npc.Deck, card.Clone())
-				boughtAny = true
-			} else {
-				remainingCards = append(remainingCards, card)
-			}
-		}
-		
-		// Return unbought cards to the pool
-		ReturnCardsToPool(gs, remainingCards)
-
-		// 2. Reroll decision: If didn't buy anything, has >= 3 credits, and has iteration left, spend 1 credit to reroll
-		if !boughtAny && npc.Credits >= 3 && iter < 2 {
-			npc.Credits-- // Spend 1 credit to reroll
-			// Loop continues to generate a new shop next iteration
-		} else {
-			// Done buying for this round
-			break
+// GenerateShop generates a slice of shop offers for a player.
+func GenerateShop(playerID string, count int) []brainclient.ShopOffer {
+	offers := make([]brainclient.ShopOffer, count)
+	cardIDs := []string{"virus_001", "ai_001", "hw_001", "nr_001", "virus_002"}
+	for i := 0; i < count && i < len(cardIDs); i++ {
+		offers[i] = brainclient.ShopOffer{
+			ShopIndex: i,
+			CardID:    cardIDs[i],
+			Cost:      3,
 		}
 	}
+	return offers
+}
 
-	// 3. Compact deck: If deck is getting bloated (> 10 cards)
-	// delete a card that does NOT match their strategy archetype. Deletion is free.
-	if len(npc.Deck) > 10 {
-		deleteIdx := -1
-		for i, card := range npc.Deck {
-			isNonMatching := false
-			switch strategy {
-			case "Aggro":
-				isNonMatching = (card.Attribute != "HoloMedia" && card.Attribute != "Daemon")
-			case "Combo":
-				isNonMatching = (card.Attribute != "Orbit" && card.Attribute != "Matrix")
-			case "Control":
-				isNonMatching = (card.Attribute != "Mainframe" && card.Attribute != "Sector" && card.Attribute != "DeepWeb")
-			}
-
-			if isNonMatching {
-				deleteIdx = i
-				break
-			}
+// GetNPCAction determines the NPC's shop action.
+// It uses the global Brain Client if available, otherwise falls back to template AI.
+func GetNPCAction(state NPCSessionState) (action string, cardIndex *int) {
+	client := GetBrainClient()
+	if client != nil {
+		req := buildShopRequest(state)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		resp, err := client.GetShopDecision(ctx, req)
+		if err == nil {
+			return resp.Action, resp.CardIndex
 		}
+		log.Printf("Brain client error: %v; falling back to template AI", err)
+	}
+	return fallbackNPCAction(state)
+}
 
-		if deleteIdx != -1 {
-			// Delete card for free
-			npc.Deck = append(npc.Deck[:deleteIdx], npc.Deck[deleteIdx+1:]...)
+// buildShopRequest converts NPCSessionState to ShopRequest.
+func buildShopRequest(state NPCSessionState) *brainclient.ShopRequest {
+	return &brainclient.ShopRequest{
+		Version:     brainclient.DefaultVersion,
+		PlayerID:    state.ID,
+		Credits:     state.Credits,
+		Archetype:   state.Archetype,
+		WinCount:    state.WinCount,
+		FanCount:    state.FanCount,
+		ShopOffers:  state.ShopOffers,
+		OwnedCards:  state.OwnedCards,
+		MemorySlots: state.MemorySlots,
+	}
+}
+
+// fallbackNPCAction implements a simple rule-based decision.
+func fallbackNPCAction(state NPCSessionState) (string, *int) {
+	if state.Credits >= 3 {
+		for i, offer := range state.ShopOffers {
+			if offer.Cost <= state.Credits {
+				idx := i
+				return "buy", &idx
+			}
 		}
 	}
+	if state.Credits >= 1 && len(state.ShopOffers) < 5 {
+		return "reroll", nil
+	}
+	return "skip", nil
 }
