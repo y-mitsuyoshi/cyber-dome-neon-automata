@@ -11,7 +11,9 @@ interface CardDisplayProps {
   disabled?: boolean;
   compact?: boolean;
   basePower?: number;
-}const attributeConfig = {
+  side?: 'player' | 'opponent';
+}
+const attributeConfig = {
   Virus: { color: 'text-red-400', bg: 'bg-red-900/30', border: 'border-red-500/50', glow: '#ff0040', icon: Bug },
   AI: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Cpu },
   Hardware: { color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-500/50', glow: '#ffbf00', icon: HardDrive },
@@ -27,7 +29,7 @@ interface CardDisplayProps {
   None: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User },
   Starter: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User }
 };
-function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower }: CardDisplayProps) {
+function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower, side }: CardDisplayProps) {
   const { translateCard, t } = useTranslation();
   const { playSE } = useAudio();
   const hoverGuard = useRef<number>(0);
@@ -119,6 +121,7 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         transition-all duration-300 ease-out
         ${!disabled ? 'cursor-pointer hover:scale-105 hover:-translate-y-1' : 'opacity-60 cursor-not-allowed'}
         ${compact ? 'p-2' : 'p-4 w-48'}
+        ${side === 'opponent' ? 'opacity-90 border-purple-500/30' : ''}
       `}
       style={{ boxShadow: rarityStyle.shadow }}
     >
@@ -215,4 +218,3 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
 }
 
 export default CardDisplay;
-

@@ -1,0 +1,6 @@
+battleLog (or battleSession.log)
+  → 各 entry から player 名を手がかりに reveal カードを抽出
+  → playerName → selfRevealCards, opponent → opponentRevealCards
+  → currentFlagCard (フラグホルダーのカード) と結合
+  → selfActiveCards = (flagHolder === playerName ? [currentFlagCard, ...selfRevealCards] : selfRevealCards)
+  → opponentActiveCards = (flagHolder === opponent ? [currentFlagCard, ...opponentRevealCards] : opponentRevealCards)
