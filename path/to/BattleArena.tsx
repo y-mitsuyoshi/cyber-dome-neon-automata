@@ -658,10 +658,7 @@ function BattleArena({
       {/* 3. Main Dual Columns (left: player / right: opponent) */}
       <div className="relative z-10 max-w-7xl mx-auto w-full flex gap-6 items-start my-4 flex-1">
         {/* Left Col: Player State */}
-        <div className="flex-1 min-w-[180px] font-mono flex flex-col gap-3 md:border-r border-cyber-border/30 md:pr-6">
-          <h3 className="text-neon-cyan font-bold text-xs uppercase tracking-wider mb-2">
-            {t('yourCardsLabel')}
-          </h3>
+        <div className="flex-1 min-w-[180px] font-mono flex flex-col gap-3">
           {/* Self Active Cards */}
           <div className="flex flex-col items-center gap-2 w-full">
             {selfActiveCards.length > 0 ? (
@@ -693,10 +690,7 @@ function BattleArena({
         </div>
 
         {/* Right Col: Opponent State */}
-        <div className="flex-1 min-w-[180px] font-mono flex flex-col gap-3 md:border-l border-cyber-border/30 md:pl-6">
-          <h3 className="text-neon-magenta font-bold text-xs uppercase tracking-wider mb-2">
-            {t('opponentCardsLabel')}
-          </h3>
+        <div className="flex-1 min-w-[180px] min-h-[200px] font-mono flex flex-col gap-3">
           {/* Opponent Active Cards */}
           <div className="flex flex-col items-center gap-2 w-full">
             {opponentActiveCards.length > 0 ? (
