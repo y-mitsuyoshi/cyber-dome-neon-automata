@@ -1,0 +1,3 @@
+backend/main.go:4:2: package backend/handlers is not in std (/usr/local/go/src/backend/handlers)
+backend/main.go:5:2: package backend/lobby is not in std (/usr/local/go/src/backend/lobby)
+backend/main.go:6:2: package backend/middleware is not in std (/usr/local/go/src/backend/middleware)

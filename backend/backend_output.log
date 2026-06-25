@@ -1,0 +1,18 @@
+CYBER-DOME: Neon Automata backend starting on :8080
+Endpoints:
+  POST /api/game/new
+  GET  /api/game/state
+  GET  /api/shop
+  POST /api/shop/buy
+  POST /api/shop/reroll
+  POST /api/shop/delete
+  POST /api/tournament/battle
+  POST /api/tournament/next-round
+  POST /api/battle/action
+  POST /api/battle/complete
+  POST /api/lobby/create
+  POST /api/lobby/join
+  POST /api/lobby/add-npc
+  POST /api/lobby/remove-npc
+  POST /api/lobby/start
+  GET  /api/ws
