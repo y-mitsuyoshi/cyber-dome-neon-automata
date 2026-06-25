@@ -1,15 +1,19 @@
 import { useMemo } from 'react';
 import { HardDrive } from 'lucide-react';
 import { useTranslation } from '../context/TranslationContext';
+import CardDisplay from './CardDisplay';
+import type { Card } from '../types/game';
 
 interface MemorySlotsProps {
   slots: string[][];
+  cards?: Card[][];
+  onCardClick?: (card: Card) => void;
   maxSlots?: number;
   label: string;
   side: 'left' | 'right';
 }
 
-function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
+function MemorySlots({ slots, cards, onCardClick, maxSlots = 6, label, side }: MemorySlotsProps) {
   const { t, translateCardName } = useTranslation();
   const filledCount = slots.filter(s => s.length > 0).length;
   const fillRatio = filledCount / maxSlots;
@@ -63,11 +67,14 @@ function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
       </div>
 
       {/* Slot grid */}
-      <div className={`grid grid-cols-2 gap-1.5 ${side === 'right' ? 'direction-rtl' : ''}`}>
+      <div className={`grid ${cards && cards.length > 0 ? 'grid-cols-1' : 'grid-cols-2'} gap-1.5 ${side === 'right' ? 'direction-rtl' : ''}`}>
         {slotArray.map((slot, i) => {
           const isEmpty = slot.length === 0;
           const slotName = slot.length > 0 ? slot[0] : null;
           const stackCount = slot.length;
+
+          const hasCardObj = cards && cards[i] && cards[i].length > 0;
+          const cardObj = hasCardObj ? cards[i][0] : null;
 
           return (
             <div key={i} className="relative">
@@ -88,47 +95,63 @@ function MemorySlots({ slots, maxSlots = 6, label, side }: MemorySlotsProps) {
                   )}
                 </>
               )}
-              <div
-                className={`
-                  relative rounded border px-2 py-1.5 text-left
-                  transition-all duration-300
-                  ${isEmpty
-                    ? 'border-cyber-border/30 bg-cyber-darker/50'
-                    : isDanger
-                    ? `border-neon-red/60 bg-red-900/20 animate-warning-pulse`
-                    : isWarning
-                    ? `border-neon-amber/50 bg-amber-900/20`
-                    : `border-neon-cyan/30 bg-cyan-900/10`
-                  }
-                `}
-                style={
-                  !isEmpty
-                    ? {
-                        boxShadow: isDanger
-                          ? '0 0 8px rgba(255,0,64,0.2)'
-                          : '0 0 5px rgba(0,240,255,0.1)',
-                      }
-                    : undefined
-                }
-              >
-                {isEmpty ? (
-                  <div className="text-[9px] text-cyber-border uppercase tracking-wider font-mono">
-                    {t('emptySlotLabel')}
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-[10px] text-cyber-text truncate font-mono leading-tight">
-                      {translateCardName(slotName || '')}
+              {hasCardObj ? (
+                <>
+                  <CardDisplay
+                    card={cardObj!}
+                    disabled={side === 'right'}
+                    onClick={onCardClick && side !== 'right' ? () => onCardClick(cardObj!) : undefined}
+                  />
+                  {stackCount > 1 && (
+                    <div className="absolute -top-1.5 -right-1.5 z-20 min-w-[16px] h-4 px-1 rounded-full bg-neon-magenta text-[8px] font-black text-white flex items-center justify-center border border-white/20 animate-pulse"
+                      style={{ boxShadow: '0 0 8px rgba(255,0,255,0.6)' }}>
+                      x{stackCount}
                     </div>
-                    {stackCount > 1 && (
-                      <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-neon-magenta text-[8px] font-black text-white flex items-center justify-center border border-white/20 animate-pulse"
-                        style={{ boxShadow: '0 0 8px rgba(255,0,255,0.6)' }}>
-                        x{stackCount}
+                  )}
+                </>
+              ) : (
+                <div
+                  className={`
+                    relative rounded border px-2 py-1.5 text-left
+                    transition-all duration-300
+                    ${isEmpty
+                      ? 'border-cyber-border/30 bg-cyber-darker/50'
+                      : isDanger
+                      ? `border-neon-red/60 bg-red-900/20 animate-warning-pulse`
+                      : isWarning
+                      ? `border-neon-amber/50 bg-amber-900/20`
+                      : `border-neon-cyan/30 bg-cyan-900/10`
+                    }
+                  `}
+                  style={
+                    !isEmpty
+                      ? {
+                          boxShadow: isDanger
+                            ? '0 0 8px rgba(255,0,64,0.2)'
+                            : '0 0 5px rgba(0,240,255,0.1)',
+                        }
+                      : undefined
+                  }
+                >
+                  {isEmpty ? (
+                    <div className="text-[9px] text-cyber-border uppercase tracking-wider font-mono">
+                      {t('emptySlotLabel')}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-[10px] text-cyber-text truncate font-mono leading-tight">
+                        {translateCardName(slotName || '')}
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
+                      {stackCount > 1 && (
+                        <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-neon-magenta text-[8px] font-black text-white flex items-center justify-center border border-white/20 animate-pulse"
+                          style={{ boxShadow: '0 0 8px rgba(255,0,255,0.6)' }}>
+                          x{stackCount}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

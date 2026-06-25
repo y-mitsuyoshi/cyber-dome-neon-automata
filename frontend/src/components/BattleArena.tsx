@@ -208,6 +208,18 @@ function BattleArena({
     return parseMemSlots(currentEntry.cpuMemSlots);
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
 
+  const mySlotCards = useMemo(() => {
+    if (!isLiveMode || !battleSession) return undefined;
+    const mem = isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem;
+    return mem.map(slot => slot.cards);
+  }, [isLiveMode, battleSession, isPlayer1]);
+
+  const opponentSlotCards = useMemo(() => {
+    if (!isLiveMode || !battleSession) return undefined;
+    const mem = isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem;
+    return mem.map(slot => slot.cards);
+  }, [isLiveMode, battleSession, isPlayer1]);
+
   const myDeckCount = useMemo(() => {
     if (isLiveMode) {
       return isPlayer1 ? battleSession.player1Deck.length : battleSession.player2Deck.length;
@@ -452,11 +464,17 @@ function BattleArena({
       </div>
 
       {/* 2. Main Dual Board Area */}
-      <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[220px_1fr_220px] gap-6 items-center my-4 flex-1">
+      <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-6 items-center my-4 flex-1">
         
         {/* Left Col: Local Player State */}
         <div className="font-mono flex flex-col gap-3 self-start order-2 lg:order-1">
-          <MemorySlots slots={myMemSlots} label={t('yourMemory')} side="left" />
+          <MemorySlots
+            slots={myMemSlots}
+            cards={mySlotCards}
+            label={t('yourMemory')}
+            side="left"
+            onCardClick={showChoiceUI ? (card) => handleSelectCard(card.id) : undefined}
+          />
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 flex justify-between items-center">
             <div>
               <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
@@ -709,7 +727,12 @@ function BattleArena({
 
         {/* Right Col: Opponent State */}
         <div className="font-mono flex flex-col gap-3 self-start order-3">
-          <MemorySlots slots={opponentMemSlots} label={t('npcMemoryLabel', { opponent })} side="right" />
+          <MemorySlots
+            slots={opponentMemSlots}
+            cards={opponentSlotCards}
+            label={t('npcMemoryLabel', { opponent })}
+            side="right"
+          />
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 text-right flex justify-between items-center">
             <Layers size={18} className="text-neon-magenta/50" />
             <div>
