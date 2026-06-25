@@ -577,78 +577,80 @@ function BattleArena({
 
           {/* Core Arena Display */}
           <div className="flex-1 w-full flex flex-col justify-center gap-4 my-2 z-10">
-            {/* DEFENDER ZONE */}
-            <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
-              <div
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all ${
-                  flagHolderName === playerName
-                    ? 'border-neon-cyan text-neon-cyan bg-cyan-950/10 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.15)]'
-                    : flagHolderName === opponent
-                    ? 'border-neon-magenta text-neon-magenta bg-purple-950/10 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.15)]'
-                    : 'border-cyber-border text-cyber-text-dim bg-cyber-dark/50'
-                }`}
-              >
-                <Flag size={12} className={flagHolderName === playerName ? 'animate-pulse text-neon-cyan animate-neon-pulse' : flagHolderName === opponent ? 'text-neon-magenta animate-pulse' : ''} />
-                <span className="uppercase">
-                  {flagHolderName === playerName
-                    ? 'DEFENDING / あなたが支配中'
-                    : flagHolderName === opponent
-                    ? `DEFENDING / ${opponent} が支配中`
-                    : 'FLAG UNCLAIMED / フラグなし'}
-                </span>
-                {flagPowerValue > 0 && <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">{flagPowerValue} POW</span>}
-              </div>
-
-              {/* Defender Card Visual */}
-              <div className="mt-3 flex items-center justify-center min-h-[140px]">
-                {currentFlagCard ? (
-                  <div key={currentFlagCard.id + '_' + currentFlagCard.power} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
-                    <CardDisplay card={currentFlagCard} disabled />
-                  </div>
-                ) : (
-                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
-                    NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* CHALLENGER / ATTACKER ZONE */}
-            <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
-              <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
-                <span>ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード</span>
-                {challengerPower > 0 && (
-                  <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
-                    計 {challengerPower} POW
+            {flagHolderName !== opponent ? (
+              /* DEFENDER ZONE */
+              <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+                <div
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all ${
+                    flagHolderName === playerName
+                      ? 'border-neon-cyan text-neon-cyan bg-cyan-950/10 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.15)]'
+                      : flagHolderName === opponent
+                      ? 'border-neon-magenta text-neon-magenta bg-purple-950/10 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.15)]'
+                      : 'border-cyber-border text-cyber-text-dim bg-cyber-dark/50'
+                  }`}
+                >
+                  <Flag size={12} className={flagHolderName === playerName ? 'animate-pulse text-neon-cyan animate-neon-pulse' : flagHolderName === opponent ? 'text-neon-magenta animate-pulse' : ''} />
+                  <span className="uppercase">
+                    {flagHolderName === playerName
+                      ? 'DEFENDING / あなたが支配中'
+                      : flagHolderName === opponent
+                      ? `DEFENDING / ${opponent} が支配中`
+                      : 'FLAG UNCLAIMED / フラグなし'}
                   </span>
-                )}
-              </div>
+                  {flagPowerValue > 0 && <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">{flagPowerValue} POW</span>}
+                </div>
 
-              {/* Stacked drawn challenger cards */}
-              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
-                {currentClashCards.length > 0 ? (
-                  currentClashCards.map((cCard, idx) => {
-                    const isLatest = idx === currentClashCards.length - 1;
-                    return (
-                      <div
-                        key={cCard.id + '_' + idx}
-                        className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
-                          isLatest
-                            ? 'animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80'
-                            : 'opacity-70 scale-75'
-                        }`}
-                      >
-                        <CardDisplay card={cCard} disabled />
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
-                    AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
-                  </div>
-                )}
+                {/* Defender Card Visual */}
+                <div className="mt-3 flex items-center justify-center min-h-[140px]">
+                  {currentFlagCard ? (
+                    <div key={currentFlagCard.id + '_' + currentFlagCard.power} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
+                      <CardDisplay card={currentFlagCard} disabled />
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
+                      NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              /* CHALLENGER / ATTACKER ZONE */
+              <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+                <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <span>ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード</span>
+                  {challengerPower > 0 && (
+                    <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
+                      計 {challengerPower} POW
+                    </span>
+                  )}
+                </div>
+
+                {/* Stacked drawn challenger cards */}
+                <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
+                  {currentClashCards.length > 0 ? (
+                    currentClashCards.map((cCard, idx) => {
+                      const isLatest = idx === currentClashCards.length - 1;
+                      return (
+                        <div
+                          key={cCard.id + '_' + idx}
+                          className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
+                            isLatest
+                              ? 'animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80'
+                              : 'opacity-70 scale-75'
+                          }`}
+                        >
+                          <CardDisplay card={cCard} disabled />
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
+                      AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Resolution status details */}
@@ -716,6 +718,84 @@ function BattleArena({
               <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
               <div className="text-sm font-bold text-neon-magenta">{opponentDeckCount} {t('units') || 'Units'}</div>
             </div>
+          </div>
+
+          {/* Opponent Card Area */}
+          <div className="flex-1 w-full flex flex-col justify-center gap-4 my-2 z-10">
+            {flagHolderName === opponent ? (
+              /* DEFENDER ZONE (Opponent) */
+              <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+                <div
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all ${
+                  flagHolderName === playerName
+                    ? 'border-neon-cyan text-neon-cyan bg-cyan-950/10 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.15)]'
+                    : flagHolderName === opponent
+                    ? 'border-neon-magenta text-neon-magenta bg-purple-950/10 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.15)]'
+                    : 'border-cyber-border text-cyber-text-dim bg-cyber-dark/50'
+                }`}
+              >
+                <Flag size={12} className={flagHolderName === playerName ? 'animate-pulse text-neon-cyan animate-neon-pulse' : flagHolderName === opponent ? 'text-neon-magenta animate-pulse' : ''} />
+                <span className="uppercase">
+                  {flagHolderName === playerName
+                    ? 'DEFENDING / あなたが支配中'
+                    : flagHolderName === opponent
+                    ? `DEFENDING / ${opponent} が支配中`
+                    : 'FLAG UNCLAIMED / フラグなし'}
+                </span>
+                {flagPowerValue > 0 && <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">{flagPowerValue} POW</span>}
+              </div>
+
+              {/* Defender Card Visual */}
+              <div className="mt-3 flex items-center justify-center min-h-[140px]">
+                {currentFlagCard ? (
+                  <div key={currentFlagCard.id + '_' + currentFlagCard.power} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
+                    <CardDisplay card={currentFlagCard} disabled />
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
+                    NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません
+                  </div>
+                )}
+                </div>
+              </div>
+            ) : (
+              /* CHALLENGER / ATTACKER ZONE (Opponent) */
+              <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+                <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <span>ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード</span>
+                {challengerPower > 0 && (
+                  <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
+                    計 {challengerPower} POW
+                  </span>
+                )}
+              </div>
+
+              {/* Stacked drawn challenger cards */}
+              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
+                {currentClashCards.length > 0 ? (
+                  currentClashCards.map((cCard, idx) => {
+                    const isLatest = idx === currentClashCards.length - 1;
+                    return (
+                      <div
+                        key={cCard.id + '_' + idx}
+                        className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
+                          isLatest
+                            ? 'animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80'
+                            : 'opacity-70 scale-75'
+                        }`}
+                      >
+                        <CardDisplay card={cCard} disabled />
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
+                    AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
+                  </div>
+                )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
