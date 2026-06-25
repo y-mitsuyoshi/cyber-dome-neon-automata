@@ -1,36 +1,53 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { Flag, User, Cpu, Play, Pause, RotateCcw, Layers, Shield, Activity } from 'lucide-react';
-import type { BattleLogEntry, BattleSession, Card, BattleLogCard } from '../types/game';
-import MemorySlots from './MemorySlots';
-import CardDisplay from './CardDisplay';
-import { useTranslation } from '../context/TranslationContext';
-import DeckViewerModal from './DeckViewerModal';
-import { useAudio } from '../context/AudioContext';
+import { useState, useMemo, useEffect, useRef } from "react";
+import {
+  Flag,
+  User,
+  Cpu,
+  Play,
+  Pause,
+  RotateCcw,
+  Layers,
+  Shield,
+  Activity,
+} from "lucide-react";
+import type {
+  BattleLogEntry,
+  BattleSession,
+  Card,
+  BattleLogCard,
+} from "../types/game";
+import MemorySlots from "./MemorySlots";
+import CardDisplay from "./CardDisplay";
+import { useTranslation } from "../context/TranslationContext";
+import DeckViewerModal from "./DeckViewerModal";
+import { useAudio } from "../context/AudioContext";
 
-const convertToFullCard = (logCard: BattleLogCard | Card | null | undefined): Card => {
+const convertToFullCard = (
+  logCard: BattleLogCard | Card | null | undefined,
+): Card => {
   if (!logCard) {
     return {
-      id: 'default',
-      name: 'UNKNOWN',
-      attribute: 'None',
-      archetype: 'Control',
+      id: "default",
+      name: "UNKNOWN",
+      attribute: "None",
+      archetype: "Control",
       power: 0,
-      rarity: 'Common',
-      effect: '',
-      effectType: '',
+      rarity: "Common",
+      effect: "",
+      effectType: "",
       cost: 0,
     };
   }
 
   return {
-    id: logCard.id || 'default',
+    id: logCard.id || "default",
     name: logCard.name,
-    attribute: logCard.attribute || 'None',
-    archetype: 'Control',
+    attribute: logCard.attribute || "None",
+    archetype: "Control",
     power: logCard.power,
-    rarity: 'Common',
-    effect: 'effect' in logCard ? logCard.effect : '',
-    effectType: logCard.effectType || '',
+    rarity: "Common",
+    effect: "effect" in logCard ? logCard.effect : "",
+    effectType: logCard.effectType || "",
     cost: 0,
   };
 };
@@ -71,7 +88,7 @@ function BattleArena({
   const [currentLogIndex, setCurrentLogIndex] = useState<number>(0);
   const [isAutoPlay, setIsAutoPlay] = useState<boolean>(false);
   const [playSpeed, setPlaySpeed] = useState<number>(1000); // ms per step
-  const [flashState, setFlashState] = useState<'cyan' | 'magenta' | null>(null);
+  const [flashState, setFlashState] = useState<"cyan" | "magenta" | null>(null);
 
   // Interactive selection state
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
@@ -79,7 +96,9 @@ function BattleArena({
   const latestLogEndRef = useRef<HTMLDivElement | null>(null);
 
   const isLiveMode = battleSession !== null;
-  const hasLog = isLiveMode ? (battleSession.log.length > 0) : (battleLog && battleLog.length > 0);
+  const hasLog = isLiveMode
+    ? battleSession.log.length > 0
+    : battleLog && battleLog.length > 0;
 
   // Set log index to end when battle completes and transitions to replay mode
   useEffect(() => {
@@ -90,8 +109,11 @@ function BattleArena({
 
   // Auto-scroll log
   useEffect(() => {
-    if (latestLogEndRef.current && typeof latestLogEndRef.current.scrollIntoView === 'function') {
-      latestLogEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (
+      latestLogEndRef.current &&
+      typeof latestLogEndRef.current.scrollIntoView === "function"
+    ) {
+      latestLogEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [currentLogIndex, battleSession?.log.length]);
 
@@ -105,7 +127,7 @@ function BattleArena({
     if (!isAutoPlay) return;
 
     if (isLiveMode && battleSession) {
-      if (battleSession.isFinished || battleSession.requiredAction !== 'DRAW') {
+      if (battleSession.isFinished || battleSession.requiredAction !== "DRAW") {
         setIsAutoPlay(false);
         return;
       }
@@ -123,7 +145,15 @@ function BattleArena({
       }, playSpeed);
       return () => clearTimeout(timer);
     }
-  }, [isAutoPlay, isLiveMode, battleSession, currentLogIndex, battleLog, playSpeed, onStep]);
+  }, [
+    isAutoPlay,
+    isLiveMode,
+    battleSession,
+    currentLogIndex,
+    battleLog,
+    playSpeed,
+    onStep,
+  ]);
 
   // Audio/Visual feedback cues
   const lastPlayedIndexRef = useRef<number>(-1);
@@ -138,34 +168,54 @@ function BattleArena({
     const entry = activeLog[targetIdx];
     if (!entry) return;
 
-    if (entry.action === 'reveal') {
-      playSE('clash');
-    } else if (entry.action === 'flag_change') {
-      playSE('roll');
+    if (entry.action === "reveal") {
+      playSE("clash");
+    } else if (entry.action === "flag_change") {
+      playSE("roll");
       if (entry.flagHolder === playerName) {
-        setFlashState('cyan');
+        setFlashState("cyan");
       } else if (entry.flagHolder === opponent) {
-        setFlashState('magenta');
+        setFlashState("magenta");
       }
       setTimeout(() => setFlashState(null), 400);
-    } else if (entry.action === 'memory_overflow' || entry.action === 'deck_empty') {
-      playSE('discard');
+    } else if (
+      entry.action === "memory_overflow" ||
+      entry.action === "deck_empty"
+    ) {
+      playSE("discard");
     }
 
-    if (targetIdx === activeLog.length - 1 && (isLiveMode ? battleSession.isFinished : currentLogIndex === battleLog.length - 1)) {
+    if (
+      targetIdx === activeLog.length - 1 &&
+      (isLiveMode
+        ? battleSession.isFinished
+        : currentLogIndex === battleLog.length - 1)
+    ) {
       const winner = entry.flagHolder;
       if (winner === playerName) {
-        playSE('victory');
+        playSE("victory");
       } else if (winner === opponent) {
-        playSE('defeat');
+        playSE("defeat");
       }
     }
-  }, [currentLogIndex, activeLog, playerName, opponent, playSE, hasLog, isLiveMode, battleSession?.isFinished, battleLog.length]);
+  }, [
+    currentLogIndex,
+    activeLog,
+    playerName,
+    opponent,
+    playSE,
+    hasLog,
+    isLiveMode,
+    battleSession?.isFinished,
+    battleLog.length,
+  ]);
 
   // Helper to parse live slots
-  const mapLiveMemSlots = (slots: { count: number; cardName: string }[]): string[][] => {
+  const mapLiveMemSlots = (
+    slots: { count: number; cardName: string }[],
+  ): string[][] => {
     if (!slots) return [];
-    return slots.map(slot => Array(slot.count).fill(slot.cardName));
+    return slots.map((slot) => Array(slot.count).fill(slot.cardName));
   };
 
   // Helper to parse historical string slots
@@ -185,62 +235,112 @@ function BattleArena({
   // Dual Board bindings (Dynamic depending on live vs historical mode)
   const isPlayer1 = useMemo(() => {
     if (!isLiveMode || !battleSession) return true;
-    const p1 = (battleSession.player1Name || '').trim().toLowerCase();
-    const cur = (playerName || '').trim().toLowerCase();
+    const p1 = (battleSession.player1Name || "").trim().toLowerCase();
+    const cur = (playerName || "").trim().toLowerCase();
     return p1 === cur;
   }, [isLiveMode, battleSession, playerName]);
 
   const myMemSlots = useMemo(() => {
     if (isLiveMode) {
-      return mapLiveMemSlots(isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem);
+      return mapLiveMemSlots(
+        isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem,
+      );
     }
-    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    const currentEntry = hasLog
+      ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)]
+      : null;
     if (!currentEntry) return [];
     return parseMemSlots(currentEntry.playerMemSlots);
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
+  }, [
+    isLiveMode,
+    battleSession,
+    currentLogIndex,
+    battleLog,
+    isPlayer1,
+    hasLog,
+  ]);
 
   const opponentMemSlots = useMemo(() => {
     if (isLiveMode) {
-      return mapLiveMemSlots(isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem);
+      return mapLiveMemSlots(
+        isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem,
+      );
     }
-    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    const currentEntry = hasLog
+      ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)]
+      : null;
     if (!currentEntry) return [];
     return parseMemSlots(currentEntry.cpuMemSlots);
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
+  }, [
+    isLiveMode,
+    battleSession,
+    currentLogIndex,
+    battleLog,
+    isPlayer1,
+    hasLog,
+  ]);
 
   const myDeckCount = useMemo(() => {
     if (isLiveMode) {
-      return isPlayer1 ? battleSession.player1Deck.length : battleSession.player2Deck.length;
+      return isPlayer1
+        ? battleSession.player1Deck.length
+        : battleSession.player2Deck.length;
     }
-    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    const currentEntry = hasLog
+      ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)]
+      : null;
     if (!currentEntry) return 0;
-    const p1Name = battleLog.length > 0 ? battleLog[0].player : '';
-    const isP1 = p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
+    const p1Name = battleLog.length > 0 ? battleLog[0].player : "";
+    const isP1 =
+      p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
     return isP1 ? currentEntry.playerDeckCount : currentEntry.cpuDeckCount;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, hasLog, playerName, isPlayer1]);
+  }, [
+    isLiveMode,
+    battleSession,
+    currentLogIndex,
+    battleLog,
+    hasLog,
+    playerName,
+    isPlayer1,
+  ]);
 
   const opponentDeckCount = useMemo(() => {
     if (isLiveMode) {
-      return isPlayer1 ? battleSession.player2Deck.length : battleSession.player1Deck.length;
+      return isPlayer1
+        ? battleSession.player2Deck.length
+        : battleSession.player1Deck.length;
     }
-    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    const currentEntry = hasLog
+      ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)]
+      : null;
     if (!currentEntry) return 0;
-    const p1Name = battleLog.length > 0 ? battleLog[0].player : '';
-    const isP1 = p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
+    const p1Name = battleLog.length > 0 ? battleLog[0].player : "";
+    const isP1 =
+      p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
     return isP1 ? currentEntry.cpuDeckCount : currentEntry.playerDeckCount;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog, playerName]);
+  }, [
+    isLiveMode,
+    battleSession,
+    currentLogIndex,
+    battleLog,
+    isPlayer1,
+    hasLog,
+    playerName,
+  ]);
 
   // Card Visuals (Defender flag card & Challenger clash cards)
   const currentFlagCard = useMemo(() => {
     if (isLiveMode) {
-      return battleSession.flagHolder ? convertToFullCard(battleSession.activeCards[0]) : null;
+      return battleSession.flagHolder
+        ? convertToFullCard(battleSession.activeCards[0])
+        : null;
     }
     // Playback logic
     if (!hasLog || currentLogIndex < 0) return null;
     let foundCard: BattleLogCard | Card | null = null;
     for (let i = currentLogIndex; i >= 0; i--) {
       const entry = battleLog[i];
-      if (entry && entry.action === 'flag_change' && entry.card) {
+      if (entry && entry.action === "flag_change" && entry.card) {
         foundCard = entry.card;
         break;
       }
@@ -250,8 +350,10 @@ function BattleArena({
 
   const currentClashCards = useMemo(() => {
     if (isLiveMode) {
-      const list = battleSession.flagHolder ? battleSession.activeCards.slice(1) : battleSession.activeCards;
-      return list.map(c => convertToFullCard(c));
+      const list = battleSession.flagHolder
+        ? battleSession.activeCards.slice(1)
+        : battleSession.activeCards;
+      return list.map((c) => convertToFullCard(c));
     }
     // Playback logic
     if (!hasLog || currentLogIndex < 0) return [];
@@ -259,8 +361,12 @@ function BattleArena({
     for (let i = currentLogIndex; i >= 0; i--) {
       const entry = battleLog[i];
       if (!entry) continue;
-      if (entry.action === 'flag_change') break;
-      if (entry.action === 'reveal' && entry.player !== entry.flagHolder && entry.card) {
+      if (entry.action === "flag_change") break;
+      if (
+        entry.action === "reveal" &&
+        entry.player !== entry.flagHolder &&
+        entry.card
+      ) {
         cards.unshift(convertToFullCard(entry.card));
       }
     }
@@ -270,103 +376,152 @@ function BattleArena({
   // Draw turns status
   const isMyDrawTurn = useMemo(() => {
     if (isLiveMode) {
-      return battleSession.turnOwner === playerName && battleSession.requiredAction === 'DRAW' && !battleSession.isFinished;
+      return (
+        battleSession.turnOwner === playerName &&
+        battleSession.requiredAction === "DRAW" &&
+        !battleSession.isFinished
+      );
     }
     const currentEntry = hasLog ? battleLog[currentLogIndex] : null;
-    return currentEntry ? currentEntry.player === playerName && currentEntry.action === 'reveal' : false;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, playerName, hasLog]);
+    return currentEntry
+      ? currentEntry.player === playerName && currentEntry.action === "reveal"
+      : false;
+  }, [
+    isLiveMode,
+    battleSession,
+    currentLogIndex,
+    battleLog,
+    playerName,
+    hasLog,
+  ]);
 
   const isOpponentDrawTurn = useMemo(() => {
     if (isLiveMode) {
-      return battleSession.turnOwner !== playerName && battleSession.requiredAction === 'DRAW' && !battleSession.isFinished;
+      return (
+        battleSession.turnOwner !== playerName &&
+        battleSession.requiredAction === "DRAW" &&
+        !battleSession.isFinished
+      );
     }
     const currentEntry = hasLog ? battleLog[currentLogIndex] : null;
-    return currentEntry ? currentEntry.player === opponent && currentEntry.action === 'reveal' : false;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, opponent, hasLog, playerName]);
+    return currentEntry
+      ? currentEntry.player === opponent && currentEntry.action === "reveal"
+      : false;
+  }, [
+    isLiveMode,
+    battleSession,
+    currentLogIndex,
+    battleLog,
+    opponent,
+    hasLog,
+    playerName,
+  ]);
 
-  const isReplayFinished = isLiveMode ? battleSession.isFinished : (currentLogIndex >= battleLog.length - 1);
-  const flagHolderName = isLiveMode ? battleSession.flagHolder : (hasLog ? activeLog[currentLogIndex].flagHolder : 'None');
-  const flagPowerValue = isLiveMode ? battleSession.flagPower : (hasLog ? activeLog[currentLogIndex].currentPower : 0);
+  const isReplayFinished = isLiveMode
+    ? battleSession.isFinished
+    : currentLogIndex >= battleLog.length - 1;
+  const flagHolderName = isLiveMode
+    ? battleSession.flagHolder
+    : hasLog
+      ? activeLog[currentLogIndex].flagHolder
+      : "None";
+  const flagPowerValue = isLiveMode
+    ? battleSession.flagPower
+    : hasLog
+      ? activeLog[currentLogIndex].currentPower
+      : 0;
   const challengerPower = isLiveMode ? battleSession.challengerPower : 0;
 
   // Active Choice Config
-  const showChoiceUI = isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer === playerName && !battleSession.isFinished;
+  const showChoiceUI =
+    isLiveMode &&
+    battleSession.requiredAction !== "DRAW" &&
+    battleSession.pendingActionPlayer === playerName &&
+    !battleSession.isFinished;
 
   const choiceConfig = useMemo(() => {
     if (!showChoiceUI) return null;
     const action = battleSession.requiredAction;
     switch (action) {
-      case 'CHOOSE_REPORTER':
+      case "CHOOSE_REPORTER":
         return {
-          title: 'REPORTER DETECTED / リポーター効果発動',
-          instructions: '山札の上のカードを1枚選択してください。選択したカードが山札の一番上になり、もう1枚は山札の一番下に置かれます。',
+          title: "REPORTER DETECTED / リポーター効果発動",
+          instructions:
+            "山札の上のカードを1枚選択してください。選択したカードが山札の一番上になり、もう1枚は山札の一番下に置かれます。",
           maxSelect: 1,
           minSelect: 1,
           isOptional: false,
         };
-      case 'CHOOSE_JUGGLER':
-      case 'CHOOSE_BUMPER_CAR':
+      case "CHOOSE_JUGGLER":
+      case "CHOOSE_BUMPER_CAR":
         return {
-          title: 'JUGGLER / バンパーカー効果発動',
-          instructions: '山札の上のカードを並び替えたい順に選択してください。最初に選択したカードが山札の一番上になります。',
+          title: "JUGGLER / バンパーカー効果発動",
+          instructions:
+            "山札の上のカードを並び替えたい順に選択してください。最初に選択したカードが山札の一番上になります。",
           maxSelect: battleSession.actionOptions.length,
           minSelect: battleSession.actionOptions.length,
           isOptional: false,
         };
-      case 'CHOOSE_SAILOR':
-      case 'CHOOSE_PROPHET':
+      case "CHOOSE_SAILOR":
+      case "CHOOSE_PROPHET":
         return {
-          title: 'SAILOR / 船乗り・予知能力者効果発動',
-          instructions: '山札からカードを1枚選択し、山札の底（予知能力者の場合は山札のトップ）に移動します。',
+          title: "SAILOR / 船乗り・予知能力者効果発動",
+          instructions:
+            "山札からカードを1枚選択し、山札の底（予知能力者の場合は山札のトップ）に移動します。",
           maxSelect: 1,
           minSelect: 1,
           isOptional: false,
         };
-      case 'CHOOSE_BUTLER':
-      case 'CHOOSE_PUMPKIN':
+      case "CHOOSE_BUTLER":
+      case "CHOOSE_PUMPKIN":
         return {
-          title: 'BUTLER / 執事・パンプキン効果発動',
-          instructions: 'ベンチから除外するカードを最大2枚選択してください。（選択しなくても構いません）',
+          title: "BUTLER / 執事・パンプキン効果発動",
+          instructions:
+            "ベンチから除外するカードを最大2枚選択してください。（選択しなくても構いません）",
           maxSelect: 2,
           minSelect: 0,
           isOptional: true,
         };
-      case 'CHOOSE_MAGICIAN':
+      case "CHOOSE_MAGICIAN":
         return {
-          title: 'MAGICIAN / 魔術師効果発動',
-          instructions: 'ベンチからパワー3以下のカードを1枚選択して除外してください。',
+          title: "MAGICIAN / 魔術師効果発動",
+          instructions:
+            "ベンチからパワー3以下のカードを1枚選択して除外してください。",
           maxSelect: 1,
           minSelect: 0,
           isOptional: true,
         };
-      case 'CHOOSE_VAMPIRE':
+      case "CHOOSE_VAMPIRE":
         return {
-          title: 'VAMPIRE / バンパイア効果発動',
-          instructions: 'ベンチからBデッキのカードを1枚選択し、山札の一番上に戻します。',
+          title: "VAMPIRE / バンパイア効果発動",
+          instructions:
+            "ベンチからBデッキのカードを1枚選択し、山札の一番上に戻します。",
           maxSelect: 1,
           minSelect: 0,
           isOptional: true,
         };
-      case 'CHOOSE_MOVIESTAR':
+      case "CHOOSE_MOVIESTAR":
         return {
-          title: 'MOVIESTAR / ムービースター効果発動',
-          instructions: 'ベンチからパワー1または2の映画カードを最大2枚選択し、山札の上に戻します。',
+          title: "MOVIESTAR / ムービースター効果発動",
+          instructions:
+            "ベンチからパワー1または2の映画カードを最大2枚選択し、山札の上に戻します。",
           maxSelect: 2,
           minSelect: 0,
           isOptional: true,
         };
-      case 'CHOOSE_SIREN':
+      case "CHOOSE_SIREN":
         return {
-          title: 'SIREN / サイレン効果発動',
-          instructions: '相手のベンチからカードを1枚選択し、除外エリアに送ります。',
+          title: "SIREN / サイレン効果発動",
+          instructions:
+            "相手のベンチからカードを1枚選択し、除外エリアに送ります。",
           maxSelect: 1,
           minSelect: 0,
           isOptional: true,
         };
       default:
         return {
-          title: 'CARD EFFECT TRIGGERED / カード効果選択',
-          instructions: 'カードを選択してください。',
+          title: "CARD EFFECT TRIGGERED / カード効果選択",
+          instructions: "カードを選択してください。",
           maxSelect: 1,
           minSelect: 0,
           isOptional: true,
@@ -376,7 +531,7 @@ function BattleArena({
 
   const handleSelectCard = (id: string) => {
     if (!choiceConfig) return;
-    playSE('hover');
+    playSE("hover");
     if (choiceConfig.maxSelect === 1) {
       if (selectedCards.includes(id)) {
         setSelectedCards([]);
@@ -396,13 +551,13 @@ function BattleArena({
 
   const handleConfirmChoice = () => {
     if (!isLiveMode || !choiceConfig) return;
-    playSE('click');
+    playSE("click");
     onSubmitAction(battleSession.requiredAction, selectedCards);
   };
 
   const handleSkipChoice = () => {
     if (!isLiveMode) return;
-    playSE('click');
+    playSE("click");
     onSubmitAction(battleSession.requiredAction, []);
   };
 
@@ -415,10 +570,10 @@ function BattleArena({
   }, [selectedCards, choiceConfig]);
 
   const speedOptions = [
-    { label: '0.5x', value: 1600 },
-    { label: '1.0x', value: 1000 },
-    { label: '2.0x', value: 500 },
-    { label: '4.0x', value: 200 },
+    { label: "0.5x", value: 1600 },
+    { label: "1.0x", value: 1000 },
+    { label: "2.0x", value: 500 },
+    { label: "4.0x", value: 200 },
   ];
 
   return (
@@ -428,7 +583,7 @@ function BattleArena({
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 20%, rgba(0,240,255,0.03) 0%, transparent 60%), radial-gradient(ellipse at 50% 80%, rgba(255,0,255,0.03) 0%, transparent 60%)',
+            "radial-gradient(ellipse at 50% 20%, rgba(0,240,255,0.03) 0%, transparent 60%), radial-gradient(ellipse at 50% 80%, rgba(255,0,255,0.03) 0%, transparent 60%)",
         }}
       />
       <div className="absolute inset-0 cyber-grid pointer-events-none" />
@@ -436,7 +591,7 @@ function BattleArena({
       {/* 1. Header Layer */}
       <div className="relative z-10 max-w-7xl mx-auto w-full text-center">
         <h2 className="text-xl font-black tracking-[0.3em] uppercase text-neon-magenta text-glow-magenta font-mono animate-slide-in">
-          {t('battleArenaHeader')}
+          {t("battleArenaHeader")}
         </h2>
         <div className="flex items-center justify-center gap-6 mt-1 font-mono text-xs">
           <div className="flex items-center gap-1.5">
@@ -452,15 +607,90 @@ function BattleArena({
       </div>
 
       {/* 2. Main Dual Board Area */}
-      <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[220px_1fr_220px] gap-6 items-center my-4 flex-1">
-        
+      <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-4 items-start my-4 flex-1">
+        {/* Symmetrical Flash Overlays */}
+        {flashState === "cyan" && (
+          <div
+            className="absolute inset-0 bg-neon-cyan/20 border border-neon-cyan shadow-[inset_0_0_40px_rgba(0,240,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in"
+            style={{ animationDuration: "100ms" }}
+          />
+        )}
+        {flashState === "magenta" && (
+          <div
+            className="absolute inset-0 bg-neon-magenta/20 border border-neon-magenta shadow-[inset_0_0_40px_rgba(255,0,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in"
+            style={{ animationDuration: "100ms" }}
+          />
+        )}
+
+        {/* Interactive Choice Overlay Panel */}
+        {showChoiceUI && choiceConfig && (
+          <div className="absolute inset-0 z-40 bg-cyber-darker/95 backdrop-blur-md flex flex-col items-center justify-center p-6 border-2 border-neon-magenta/40 rounded-xl animate-fade-in">
+            <div className="text-neon-magenta text-glow-magenta font-black tracking-widest text-xs uppercase mb-1 animate-pulse">
+              ⚡ {choiceConfig.title} ⚡
+            </div>
+            <p className="text-[10px] text-cyber-text-dim uppercase tracking-wider mb-4 text-center max-w-sm">
+              {choiceConfig.instructions}
+            </p>
+
+            {/* Action Options Grid */}
+            <div className="flex gap-4 flex-wrap justify-center my-3 overflow-y-auto max-h-[220px] p-2">
+              {battleSession.actionOptions.map((optCard) => {
+                const fullCard = convertToFullCard(optCard);
+                const isSelected = selectedCards.includes(optCard.id);
+                const selectIdx = selectedCards.indexOf(optCard.id);
+                return (
+                  <div
+                    key={optCard.id}
+                    onClick={() => handleSelectCard(optCard.id)}
+                    className={`relative cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 ${
+                      isSelected
+                        ? "ring-2 ring-neon-magenta scale-102 opacity-100 z-10"
+                        : "opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <CardDisplay card={fullCard} disabled={false} />
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 bg-neon-magenta text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-white/20">
+                        {selectIdx + 1}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Controls */}
+            <div className="flex gap-4 mt-2">
+              <button
+                onClick={handleConfirmChoice}
+                disabled={!isSelectionValid}
+                className="px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-bold uppercase tracking-widest rounded bg-purple-950/20 hover:bg-purple-950/40 text-[10px] shadow-[0_0_10px_rgba(255,0,255,0.2)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {t("confirmChoice") || "CONFIRM / 確定"}
+              </button>
+              {choiceConfig.isOptional && (
+                <button
+                  onClick={handleSkipChoice}
+                  className="px-6 py-2 border border-cyber-border text-cyber-text-dim hover:text-white hover:border-white uppercase tracking-wider rounded bg-cyber-surface/10 hover:bg-cyber-surface/30 text-[10px] cursor-pointer"
+                >
+                  {t("skipChoice") || "SKIP / スキップ"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Left Col: Local Player State */}
-        <div className="font-mono flex flex-col gap-3 self-start order-2 lg:order-1">
-          <MemorySlots slots={myMemSlots} label={t('yourMemory')} side="left" />
+        <div className="font-mono flex flex-col gap-3 self-start order-1">
+          <MemorySlots slots={myMemSlots} label={t("yourMemory")} side="left" />
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 flex justify-between items-center">
             <div>
-              <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
-              <div className="text-sm font-bold text-neon-cyan">{myDeckCount} {t('units') || 'Units'}</div>
+              <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">
+                {t("deckLabel") || "DECK MODULES"}
+              </div>
+              <div className="text-sm font-bold text-neon-cyan">
+                {myDeckCount} {t("units") || "Units"}
+              </div>
             </div>
             <Layers size={18} className="text-neon-cyan/50" />
           </div>
@@ -470,80 +700,14 @@ function BattleArena({
             className="flex items-center justify-center gap-2 border border-neon-cyan/45 hover:border-neon-cyan rounded p-2 bg-cyber-surface/30 text-neon-cyan font-bold hover:bg-neon-cyan/10 transition-all text-xs cursor-pointer uppercase tracking-wider font-mono shadow-[0_0_8px_rgba(0,240,255,0.1)]"
           >
             <Layers size={14} className="text-neon-cyan" />
-            {t('viewDeckBtn')}
+            {t("viewDeckBtn")}
           </button>
-        </div>
-
-        {/* Center: Duel Arena */}
-        <div className="flex flex-col items-center justify-between min-h-[460px] border border-cyber-border/20 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-6 relative order-1 lg:order-2 overflow-hidden">
-          
-          {/* Symmetrical Flash Overlays */}
-          {flashState === 'cyan' && (
-            <div className="absolute inset-0 bg-neon-cyan/20 border border-neon-cyan shadow-[inset_0_0_40px_rgba(0,240,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
-          )}
-          {flashState === 'magenta' && (
-            <div className="absolute inset-0 bg-neon-magenta/20 border border-neon-magenta shadow-[inset_0_0_40px_rgba(255,0,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
-          )}
-
-          {/* Interactive Choice Overlay Panel */}
-          {showChoiceUI && choiceConfig && (
-            <div className="absolute inset-0 z-40 bg-cyber-darker/95 backdrop-blur-md flex flex-col items-center justify-center p-6 border-2 border-neon-magenta/40 rounded-xl animate-fade-in">
-              <div className="text-neon-magenta text-glow-magenta font-black tracking-widest text-xs uppercase mb-1 animate-pulse">
-                ⚡ {choiceConfig.title} ⚡
-              </div>
-              <p className="text-[10px] text-cyber-text-dim uppercase tracking-wider mb-4 text-center max-w-sm">
-                {choiceConfig.instructions}
-              </p>
-
-              {/* Action Options Grid */}
-              <div className="flex gap-4 flex-wrap justify-center my-3 overflow-y-auto max-h-[220px] p-2">
-                {battleSession.actionOptions.map((optCard) => {
-                  const fullCard = convertToFullCard(optCard);
-                  const isSelected = selectedCards.includes(optCard.id);
-                  const selectIdx = selectedCards.indexOf(optCard.id);
-                  return (
-                    <div
-                      key={optCard.id}
-                      onClick={() => handleSelectCard(optCard.id)}
-                      className={`relative cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 ${
-                        isSelected ? 'ring-2 ring-neon-magenta scale-102 opacity-100 z-10' : 'opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      <CardDisplay card={fullCard} disabled={false} />
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 bg-neon-magenta text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-white/20">
-                          {selectIdx + 1}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Controls */}
-              <div className="flex gap-4 mt-2">
-                <button
-                  onClick={handleConfirmChoice}
-                  disabled={!isSelectionValid}
-                  className="px-6 py-2 border-2 border-neon-magenta text-neon-magenta font-bold uppercase tracking-widest rounded bg-purple-950/20 hover:bg-purple-950/40 text-[10px] shadow-[0_0_10px_rgba(255,0,255,0.2)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  {t('confirmChoice') || 'CONFIRM / 確定'}
-                </button>
-                {choiceConfig.isOptional && (
-                  <button
-                    onClick={handleSkipChoice}
-                    className="px-6 py-2 border border-cyber-border text-cyber-text-dim hover:text-white hover:border-white uppercase tracking-wider rounded bg-cyber-surface/10 hover:bg-cyber-surface/30 text-[10px] cursor-pointer"
-                  >
-                    {t('skipChoice') || 'SKIP / スキップ'}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Top Step Counter */}
           <div className="text-[10px] text-cyber-text-dim uppercase tracking-widest font-mono z-10">
-            {t('battleStep')} / 進捗: {isLiveMode ? activeLog.length : currentLogIndex + 1} {isLiveMode ? '' : `/ ${battleLog.length}`}
+            {t("battleStep")} / 進捗:{" "}
+            {isLiveMode ? activeLog.length : currentLogIndex + 1}{" "}
+            {isLiveMode ? "" : `/ ${battleLog.length}`}
           </div>
 
           {/* Active Turn Indicator Banner */}
@@ -564,7 +728,9 @@ function BattleArena({
               <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/40 bg-purple-950/30 py-1.5 rounded animate-pulse">
                 ⚡ AWAITING YOUR CARD CHOICE / 効果選択待機中 ⚡
               </div>
-            ) : isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer !== playerName ? (
+            ) : isLiveMode &&
+              battleSession.requiredAction !== "DRAW" &&
+              battleSession.pendingActionPlayer !== playerName ? (
               <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/20 bg-purple-950/10 py-1.5 rounded animate-pulse">
                 AWAITING OPPONENT DECISION / 相手の効果選択中...
               </div>
@@ -575,79 +741,92 @@ function BattleArena({
             )}
           </div>
 
-          {/* Core Arena Display */}
-          <div className="flex-1 w-full flex flex-col justify-center gap-4 my-2 z-10">
-            {/* DEFENDER ZONE */}
-            <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
-              <div
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all ${
+          {/* DEFENDER ZONE */}
+          <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+            <div
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all ${
+                flagHolderName === playerName
+                  ? "border-neon-cyan text-neon-cyan bg-cyan-950/10 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.15)]"
+                  : flagHolderName === opponent
+                    ? "border-neon-magenta text-neon-magenta bg-purple-950/10 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.15)]"
+                    : "border-cyber-border text-cyber-text-dim bg-cyber-dark/50"
+              }`}
+            >
+              <Flag
+                size={12}
+                className={
                   flagHolderName === playerName
-                    ? 'border-neon-cyan text-neon-cyan bg-cyan-950/10 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.15)]'
+                    ? "animate-pulse text-neon-cyan animate-neon-pulse"
                     : flagHolderName === opponent
-                    ? 'border-neon-magenta text-neon-magenta bg-purple-950/10 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.15)]'
-                    : 'border-cyber-border text-cyber-text-dim bg-cyber-dark/50'
-                }`}
-              >
-                <Flag size={12} className={flagHolderName === playerName ? 'animate-pulse text-neon-cyan animate-neon-pulse' : flagHolderName === opponent ? 'text-neon-magenta animate-pulse' : ''} />
-                <span className="uppercase">
-                  {flagHolderName === playerName
-                    ? 'DEFENDING / あなたが支配中'
-                    : flagHolderName === opponent
+                      ? "text-neon-magenta animate-pulse"
+                      : ""
+                }
+              />
+              <span className="uppercase">
+                {flagHolderName === playerName
+                  ? "DEFENDING / あなたが支配中"
+                  : flagHolderName === opponent
                     ? `DEFENDING / ${opponent} が支配中`
-                    : 'FLAG UNCLAIMED / フラグなし'}
+                    : "FLAG UNCLAIMED / フラグなし"}
+              </span>
+              {flagPowerValue > 0 && (
+                <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">
+                  {flagPowerValue} POW
                 </span>
-                {flagPowerValue > 0 && <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">{flagPowerValue} POW</span>}
-              </div>
-
-              {/* Defender Card Visual */}
-              <div className="mt-3 flex items-center justify-center min-h-[140px]">
-                {currentFlagCard ? (
-                  <div key={currentFlagCard.id + '_' + currentFlagCard.power} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]">
-                    <CardDisplay card={currentFlagCard} disabled />
-                  </div>
-                ) : (
-                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
-                    NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
-            {/* CHALLENGER / ATTACKER ZONE */}
-            <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
-              <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
-                <span>ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード</span>
-                {challengerPower > 0 && (
-                  <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
-                    計 {challengerPower} POW
-                  </span>
-                )}
-              </div>
+            {/* Defender Card Visual */}
+            <div className="mt-3 flex items-center justify-center min-h-[140px]">
+              {flagHolderName === playerName && currentFlagCard ? (
+                <div
+                  key={currentFlagCard.id + "_" + currentFlagCard.power}
+                  className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]"
+                >
+                  <CardDisplay card={currentFlagCard} disabled />
+                </div>
+              ) : (
+                <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
+                  NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません
+                </div>
+              )}
+            </div>
+          </div>
 
-              {/* Stacked drawn challenger cards */}
-              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
-                {currentClashCards.length > 0 ? (
-                  currentClashCards.map((cCard, idx) => {
-                    const isLatest = idx === currentClashCards.length - 1;
-                    return (
-                      <div
-                        key={cCard.id + '_' + idx}
-                        className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
-                          isLatest
-                            ? 'animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80'
-                            : 'opacity-70 scale-75'
-                        }`}
-                      >
-                        <CardDisplay card={cCard} disabled />
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
-                    AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
-                  </div>
-                )}
-              </div>
+          {/* CHALLENGER / ATTACKER ZONE */}
+          <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+            <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <span>ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード</span>
+              {flagHolderName !== playerName && challengerPower > 0 && (
+                <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
+                  計 {challengerPower} POW
+                </span>
+              )}
+            </div>
+
+            {/* Stacked drawn challenger cards */}
+            <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
+              {flagHolderName !== playerName && currentClashCards.length > 0 ? (
+                currentClashCards.map((cCard, idx) => {
+                  const isLatest = idx === currentClashCards.length - 1;
+                  return (
+                    <div
+                      key={cCard.id + "_" + idx}
+                      className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
+                        isLatest
+                          ? "animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80"
+                          : "opacity-70 scale-75"
+                      }`}
+                    >
+                      <CardDisplay card={cCard} disabled />
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
+                  AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
+                </div>
+              )}
             </div>
           </div>
 
@@ -656,12 +835,19 @@ function BattleArena({
             <p className="text-[10px] font-mono text-cyber-text leading-relaxed">
               {activeLog.length > 0
                 ? translateBattleDetail(activeLog[activeLog.length - 1].details)
-                : t('initializingArenaLink') || 'INITIALIZING INTERACTIVE ARENA LINK...'}
-              {activeLog.length > 0 && activeLog[activeLog.length - 1].effectTriggered && activeLog[activeLog.length - 1].effectTriggered !== 'None' && activeLog[activeLog.length - 1].effectTriggered !== '' && (
-                <span className="text-neon-green block font-bold mt-1 text-[9px] animate-pulse">
-                  ⚡ {translateBattleDetail(activeLog[activeLog.length - 1].effectTriggered)}
-                </span>
-              )}
+                : t("initializingArenaLink") ||
+                  "INITIALIZING INTERACTIVE ARENA LINK..."}
+              {activeLog.length > 0 &&
+                activeLog[activeLog.length - 1].effectTriggered &&
+                activeLog[activeLog.length - 1].effectTriggered !== "None" &&
+                activeLog[activeLog.length - 1].effectTriggered !== "" && (
+                  <span className="text-neon-green block font-bold mt-1 text-[9px] animate-pulse">
+                    ⚡{" "}
+                    {translateBattleDetail(
+                      activeLog[activeLog.length - 1].effectTriggered,
+                    )}
+                  </span>
+                )}
             </p>
           </div>
 
@@ -669,30 +855,50 @@ function BattleArena({
           <div className="w-full mt-4 z-10 flex flex-col items-center gap-2">
             {!isReplayFinished ? (
               <button
-                disabled={isLiveMode && (battleSession.requiredAction !== 'DRAW' || (battleSession.turnOwner === opponent && !opponentIsNPC))}
+                disabled={
+                  isLiveMode &&
+                  (battleSession.requiredAction !== "DRAW" ||
+                    (battleSession.turnOwner === opponent && !opponentIsNPC))
+                }
                 onClick={() => {
-                  playSE('click');
+                  playSE("click");
                   if (isLiveMode) {
                     onStep();
                   } else {
-                    setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
+                    setCurrentLogIndex((prev) =>
+                      Math.min(prev + 1, battleLog.length - 1),
+                    );
                   }
                 }}
                 className={`w-full max-w-xs py-2.5 px-5 rounded border-2 font-mono font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-md flex items-center justify-center gap-2 ${
                   isMyDrawTurn
-                    ? 'border-neon-cyan text-neon-cyan bg-cyan-950/20 hover:bg-cyan-950/40 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)] animate-pulse'
+                    ? "border-neon-cyan text-neon-cyan bg-cyan-950/20 hover:bg-cyan-950/40 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)] animate-pulse"
                     : isOpponentDrawTurn
-                    ? 'border-neon-magenta text-neon-magenta bg-purple-950/20 hover:bg-purple-950/40 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.2)]'
-                    : 'border-cyber-border text-cyber-text bg-cyber-surface/30 hover:bg-cyber-surface/50 font-medium disabled:opacity-40 disabled:cursor-not-allowed'
+                      ? "border-neon-magenta text-neon-magenta bg-purple-950/20 hover:bg-purple-950/40 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.2)]"
+                      : "border-cyber-border text-cyber-text bg-cyber-surface/30 hover:bg-cyber-surface/50 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 }`}
               >
-                <Play size={14} className={isMyDrawTurn ? 'animate-bounce' : (isOpponentDrawTurn ? '' : '')} />
+                <Play
+                  size={14}
+                  className={
+                    isMyDrawTurn
+                      ? "animate-bounce"
+                      : isOpponentDrawTurn
+                        ? ""
+                        : ""
+                  }
+                />
                 {isMyDrawTurn ? (
-                  <span>{t('drawNextCard') || 'DRAW CARD / カードをめくる'}</span>
+                  <span>
+                    {t("drawNextCard") || "DRAW CARD / カードをめくる"}
+                  </span>
                 ) : isOpponentDrawTurn ? (
-                  <span>{t('opponentDrawNext') || 'DRAW OPPONENT / 相手のカードをめくる'}</span>
+                  <span>
+                    {t("opponentDrawNext") ||
+                      "DRAW OPPONENT / 相手のカードをめくる"}
+                  </span>
                 ) : (
-                  <span>{t('nextStep') || 'NEXT STEP / 進む'}</span>
+                  <span>{t("nextStep") || "NEXT STEP / 進む"}</span>
                 )}
               </button>
             ) : (
@@ -700,21 +906,120 @@ function BattleArena({
                 onClick={onComplete}
                 className="w-full max-w-xs py-2.5 px-5 rounded border-2 border-neon-green text-neon-green bg-green-950/20 hover:bg-green-950/40 text-glow-green font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-[0_0_15px_rgba(0,255,102,0.25)] animate-pulse animate-neon-pulse"
               >
-                <span>{t('continueToStandings') || 'VIEW STANDINGS / リザルト確認 →'}</span>
+                <span>
+                  {t("continueToStandings") ||
+                    "VIEW STANDINGS / リザルト確認 →"}
+                </span>
               </button>
             )}
           </div>
-
         </div>
 
         {/* Right Col: Opponent State */}
-        <div className="font-mono flex flex-col gap-3 self-start order-3">
-          <MemorySlots slots={opponentMemSlots} label={t('npcMemoryLabel', { opponent })} side="right" />
+        <div className="font-mono flex flex-col gap-3 self-start order-2">
+          <MemorySlots
+            slots={opponentMemSlots}
+            label={t("npcMemoryLabel", { opponent })}
+            side="right"
+          />
           <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 text-right flex justify-between items-center">
             <Layers size={18} className="text-neon-magenta/50" />
             <div>
-              <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
-              <div className="text-sm font-bold text-neon-magenta">{opponentDeckCount} {t('units') || 'Units'}</div>
+              <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">
+                {t("deckLabel") || "DECK MODULES"}
+              </div>
+              <div className="text-sm font-bold text-neon-magenta">
+                {opponentDeckCount} {t("units") || "Units"}
+              </div>
+            </div>
+          </div>
+
+          {/* DEFENDER ZONE */}
+          <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+            <div
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all ${
+                flagHolderName === playerName
+                  ? "border-neon-cyan text-neon-cyan bg-cyan-950/10 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.15)]"
+                  : flagHolderName === opponent
+                    ? "border-neon-magenta text-neon-magenta bg-purple-950/10 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.15)]"
+                    : "border-cyber-border text-cyber-text-dim bg-cyber-dark/50"
+              }`}
+            >
+              <Flag
+                size={12}
+                className={
+                  flagHolderName === playerName
+                    ? "animate-pulse text-neon-cyan animate-neon-pulse"
+                    : flagHolderName === opponent
+                      ? "text-neon-magenta animate-pulse"
+                      : ""
+                }
+              />
+              <span className="uppercase">
+                {flagHolderName === playerName
+                  ? "DEFENDING / あなたが支配中"
+                  : flagHolderName === opponent
+                    ? `DEFENDING / ${opponent} が支配中`
+                    : "FLAG UNCLAIMED / フラグなし"}
+              </span>
+              {flagPowerValue > 0 && (
+                <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">
+                  {flagPowerValue} POW
+                </span>
+              )}
+            </div>
+
+            {/* Defender Card Visual */}
+            <div className="mt-3 flex items-center justify-center min-h-[140px]">
+              {flagHolderName === opponent && currentFlagCard ? (
+                <div
+                  key={currentFlagCard.id + "_" + currentFlagCard.power}
+                  className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(0,240,255,0.25)]"
+                >
+                  <CardDisplay card={currentFlagCard} disabled />
+                </div>
+              ) : (
+                <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
+                  NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* CHALLENGER / ATTACKER ZONE */}
+          <div className="flex flex-col items-center p-3 border border-cyber-border/20 rounded-lg bg-cyber-surface/5">
+            <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <span>ACTIVE CHALLENGE AUGMENTATIONS / 挑戦者めくりカード</span>
+              {flagHolderName !== opponent && challengerPower > 0 && (
+                <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
+                  計 {challengerPower} POW
+                </span>
+              )}
+            </div>
+
+            {/* Stacked drawn challenger cards */}
+            <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
+              {flagHolderName !== opponent && currentClashCards.length > 0 ? (
+                currentClashCards.map((cCard, idx) => {
+                  const isLatest = idx === currentClashCards.length - 1;
+                  return (
+                    <div
+                      key={cCard.id + "_" + idx}
+                      className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
+                        isLatest
+                          ? "animate-card-reveal z-10 shadow-[0_0_15px_rgba(0,240,255,0.3)] scale-80"
+                          : "opacity-70 scale-75"
+                      }`}
+                    >
+                      <CardDisplay card={cCard} disabled />
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
+                  AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -722,42 +1027,47 @@ function BattleArena({
 
       {/* 3. Replay / Speed / Auto Controllers */}
       <div className="relative z-10 max-w-3xl mx-auto w-full border border-cyber-border/30 rounded-lg p-3 bg-cyber-darker/90 backdrop-blur-md mb-3 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
-        
         {/* Play/Pause controls */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsAutoPlay(!isAutoPlay)}
-            disabled={isReplayFinished || (isLiveMode && battleSession.requiredAction !== 'DRAW')}
+            disabled={
+              isReplayFinished ||
+              (isLiveMode && battleSession.requiredAction !== "DRAW")
+            }
             className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer border transition-all ${
-              isReplayFinished || (isLiveMode && battleSession.requiredAction !== 'DRAW')
-                ? 'border-cyber-border/35 text-cyber-text-dim cursor-not-allowed opacity-50'
+              isReplayFinished ||
+              (isLiveMode && battleSession.requiredAction !== "DRAW")
+                ? "border-cyber-border/35 text-cyber-text-dim cursor-not-allowed opacity-50"
                 : isAutoPlay
-                ? 'border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10 shadow-[0_0_8px_rgba(255,0,255,0.1)] animate-pulse'
-                : 'border-neon-green text-neon-green hover:bg-neon-green/10 shadow-[0_0_8px_rgba(0,255,0,0.1)]'
+                  ? "border-neon-magenta text-neon-magenta hover:bg-neon-magenta/10 shadow-[0_0_8px_rgba(255,0,255,0.1)] animate-pulse"
+                  : "border-neon-green text-neon-green hover:bg-neon-green/10 shadow-[0_0_8px_rgba(0,255,0,0.1)]"
             }`}
           >
             {isAutoPlay ? <Pause size={12} /> : <Play size={12} />}
-            {isAutoPlay ? 'PAUSE / 一時停止' : 'AUTO / オート'}
+            {isAutoPlay ? "PAUSE / 一時停止" : "AUTO / オート"}
           </button>
 
           {!isLiveMode && (
             <>
               <button
                 onClick={() => {
-                  playSE('click');
-                  setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
+                  playSE("click");
+                  setCurrentLogIndex((prev) =>
+                    Math.min(prev + 1, battleLog.length - 1),
+                  );
                   setIsAutoPlay(false);
                 }}
                 disabled={isReplayFinished}
                 className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer border border-neon-cyan text-neon-cyan hover:bg-neon-cyan/10 transition-all"
               >
                 <Play size={12} />
-                {t('nextStepBtnTitle') || 'DRAW / めくる'}
+                {t("nextStepBtnTitle") || "DRAW / めくる"}
               </button>
 
               <button
                 onClick={() => {
-                  playSE('shuffle');
+                  playSE("shuffle");
                   setCurrentLogIndex(0);
                   setIsAutoPlay(false);
                   lastPlayedIndexRef.current = -1;
@@ -765,7 +1075,7 @@ function BattleArena({
                 className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded text-[10px] border border-cyber-border/50 text-cyber-text-dim hover:text-white hover:border-cyber-border transition-all cursor-pointer"
               >
                 <RotateCcw size={12} />
-                {t('resetBtnTitle') || 'RESTART / 最初から'}
+                {t("resetBtnTitle") || "RESTART / 最初から"}
               </button>
             </>
           )}
@@ -778,13 +1088,13 @@ function BattleArena({
             <button
               key={speedOpt.label}
               onClick={() => {
-                playSE('click');
+                playSE("click");
                 setPlaySpeed(speedOpt.value);
               }}
               className={`px-1.5 py-0.5 border rounded cursor-pointer transition-all ${
                 playSpeed === speedOpt.value
-                  ? 'border-neon-cyan text-neon-cyan bg-neon-cyan/5 font-bold shadow-[0_0_6px_rgba(0,240,255,0.15)]'
-                  : 'border-cyber-border/30 text-cyber-text-dim hover:text-white'
+                  ? "border-neon-cyan text-neon-cyan bg-neon-cyan/5 font-bold shadow-[0_0_6px_rgba(0,240,255,0.15)]"
+                  : "border-cyber-border/30 text-cyber-text-dim hover:text-white"
               }`}
             >
               {speedOpt.label}
@@ -799,18 +1109,18 @@ function BattleArena({
               onClick={onComplete}
               className="px-6 py-2 rounded border-2 border-neon-green text-neon-green text-glow-green font-bold text-[10px] uppercase tracking-widest hover:bg-neon-green/10 transition-all cursor-pointer shadow-[0_0_12px_rgba(0,255,102,0.2)] animate-pulse"
             >
-              {t('continueBtn') || 'STANDINGS / リザルト確認 →'}
+              {t("continueBtn") || "STANDINGS / リザルト確認 →"}
             </button>
           ) : !isLiveMode ? (
             <button
               onClick={() => {
-                playSE('click');
+                playSE("click");
                 setCurrentLogIndex(battleLog.length - 1);
                 setIsAutoPlay(false);
               }}
               className="px-4 py-2 rounded border border-cyber-border/40 text-cyber-text-dim text-[10px] uppercase tracking-wider hover:text-white hover:border-cyber-border transition-all cursor-pointer"
             >
-              {t('skipSim') || 'SKIP / 結末へスキップ'}
+              {t("skipSim") || "SKIP / 結末へスキップ"}
             </button>
           ) : null}
         </div>
@@ -821,42 +1131,60 @@ function BattleArena({
         <div className="flex items-center gap-2 mb-2 border-b border-cyber-border/20 pb-1">
           <Activity size={12} className="text-neon-green" />
           <span className="text-[9px] text-neon-green uppercase tracking-widest font-bold">
-            {t('combatLogHeader')} / 実況ログ
+            {t("combatLogHeader")} / 実況ログ
           </span>
           <span className="text-[9px] text-cyber-text-dim ml-auto">
             {activeLog.length} events
           </span>
         </div>
-        
+
         <div className="flex flex-col gap-1">
           {activeLog.map((log, i) => {
-            const displayLogAction = translateBattleDetail(log.details || log.action);
-            const displayLogEffect = log.effectTriggered ? translateBattleDetail(log.effectTriggered) : '';
+            const displayLogAction = translateBattleDetail(
+              log.details || log.action,
+            );
+            const displayLogEffect = log.effectTriggered
+              ? translateBattleDetail(log.effectTriggered)
+              : "";
             const isPlayer = log.player === playerName;
-            const isSystem = !log.player || log.player === 'SYSTEM';
+            const isSystem = !log.player || log.player === "SYSTEM";
 
             return (
               <div
                 key={i}
                 className={`flex items-start gap-2 py-1 px-1.5 rounded transition-all duration-300 ${
-                  i === activeLog.length - 1 ? 'bg-cyber-surface/40 border border-cyber-border/10 animate-slide-in' : ''
+                  i === activeLog.length - 1
+                    ? "bg-cyber-surface/40 border border-cyber-border/10 animate-slide-in"
+                    : ""
                 }`}
               >
-                <div className={`mt-0.5 min-w-[14px] ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
+                <div
+                  className={`mt-0.5 min-w-[14px] ${isSystem ? "text-neon-green" : isPlayer ? "text-neon-cyan" : "text-neon-magenta"}`}
+                >
                   {isSystem ? <Shield size={10} /> : <User size={10} />}
                 </div>
                 <div className="flex-1">
-                  <span className={`font-bold ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
-                    {isSystem ? '[SYS]' : `[${log.player}]`}
-                  </span>{' '}
-                  <span className={i === activeLog.length - 1 ? 'text-cyber-text font-semibold' : 'text-cyber-text-dim/70'}>
+                  <span
+                    className={`font-bold ${isSystem ? "text-neon-green" : isPlayer ? "text-neon-cyan" : "text-neon-magenta"}`}
+                  >
+                    {isSystem ? "[SYS]" : `[${log.player}]`}
+                  </span>{" "}
+                  <span
+                    className={
+                      i === activeLog.length - 1
+                        ? "text-cyber-text font-semibold"
+                        : "text-cyber-text-dim/70"
+                    }
+                  >
                     {displayLogAction}
                   </span>
-                  {log.effectTriggered && log.effectTriggered !== 'None' && log.effectTriggered !== '' && (
-                    <span className="text-neon-green ml-1.5 inline-flex items-center gap-1 font-bold animate-pulse">
-                      ⚡ {displayLogEffect}
-                    </span>
-                  )}
+                  {log.effectTriggered &&
+                    log.effectTriggered !== "None" &&
+                    log.effectTriggered !== "" && (
+                      <span className="text-neon-green ml-1.5 inline-flex items-center gap-1 font-bold animate-pulse">
+                        ⚡ {displayLogEffect}
+                      </span>
+                    )}
                 </div>
                 <span className="text-[9px] text-cyber-text-dim/40 whitespace-nowrap">
                   Step {log.step}
