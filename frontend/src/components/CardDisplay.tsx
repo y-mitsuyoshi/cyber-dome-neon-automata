@@ -11,6 +11,7 @@ interface CardDisplayProps {
   disabled?: boolean;
   compact?: boolean;
   basePower?: number;
+  faceDown?: boolean;
 }const attributeConfig = {
   Virus: { color: 'text-red-400', bg: 'bg-red-900/30', border: 'border-red-500/50', glow: '#ff0040', icon: Bug },
   AI: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Cpu },
@@ -27,7 +28,7 @@ interface CardDisplayProps {
   None: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User },
   Starter: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User }
 };
-function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower }: CardDisplayProps) {
+function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower, faceDown = false }: CardDisplayProps) {
   const { translateCard, t } = useTranslation();
   const { playSE } = useAudio();
   const hoverGuard = useRef<number>(0);
@@ -84,20 +85,28 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
     }
   }, [card.rarity]);
 
+  const imageSrc = faceDown ? '/images/cards/back.png' : cardImagePath;
+
   if (compact) {
     const isBuffed = basePower !== undefined && basePower !== displayCard.power;
     return (
-      <div className={`flex items-center gap-2 px-2 py-1 rounded border ${attr.border} ${attr.bg} text-xs`}>
-        <AttrIcon size={12} className={attr.color} />
-        <span className="text-cyber-text truncate flex-1">{displayCard.name}</span>
-        <span className={`font-bold flex items-center gap-1 ${attr.color}`}>
-          {displayCard.power}
-          {isBuffed && (
-            <span className={`text-[8px] font-bold ${displayCard.power > basePower ? 'text-emerald-400' : 'text-rose-400'}`}>
-              ({displayCard.power > basePower ? `+${displayCard.power - basePower}` : `${displayCard.power - basePower}`})
+      <div className={`flex items-center gap-2 px-2 py-1 rounded border ${attr.border} ${attr.bg} text-xs ${faceDown ? 'opacity-60' : ''}`}>
+        {!faceDown ? (
+          <>
+            <AttrIcon size={12} className={attr.color} />
+            <span className="text-cyber-text truncate flex-1">{displayCard.name}</span>
+            <span className={`font-bold flex items-center gap-1 ${attr.color}`}>
+              {displayCard.power}
+              {isBuffed && (
+                <span className={`text-[8px] font-bold ${displayCard.power > basePower ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  ({displayCard.power > basePower ? `+${displayCard.power - basePower}` : `${displayCard.power - basePower}`})
+                </span>
+              )}
             </span>
-          )}
-        </span>
+          </>
+        ) : (
+          <span className="text-cyber-text-dim uppercase text-[10px] w-full text-center">???</span>
+        )}
       </div>
     );
   }
@@ -130,30 +139,34 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         />
       </div>
 
-      {/* Rarity indicator */}
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-[10px] uppercase tracking-widest font-bold ${
-          card.rarity === 'Epic' ? 'text-neon-amber text-glow-amber' :
-          card.rarity === 'Rare' ? 'text-neon-magenta text-glow-magenta' :
-          'text-neon-cyan'
-        }`}>
-          {displayCard.rarity}
-        </span>
-        <span className={`text-[10px] uppercase tracking-wider ${attr.color}`}>
-          {displayCard.archetype}
-        </span>
-      </div>
+      {!faceDown && (
+        <>
+          {/* Rarity indicator */}
+          <div className="flex items-center justify-between mb-2">
+            <span className={`text-[10px] uppercase tracking-widest font-bold ${
+              card.rarity === 'Epic' ? 'text-neon-amber text-glow-amber' :
+              card.rarity === 'Rare' ? 'text-neon-magenta text-glow-magenta' :
+              'text-neon-cyan'
+            }`}>
+              {displayCard.rarity}
+            </span>
+            <span className={`text-[10px] uppercase tracking-wider ${attr.color}`}>
+              {displayCard.archetype}
+            </span>
+          </div>
 
-      {/* Card name */}
-      <h3 className="text-sm font-bold text-white mb-2 tracking-wide leading-tight min-h-[2.5rem]">
-        {displayCard.name}
-      </h3>
+          {/* Card name */}
+          <h3 className="text-sm font-bold text-white mb-2 tracking-wide leading-tight min-h-[2.5rem]">
+            {displayCard.name}
+          </h3>
+        </>
+      )}
 
       {/* Card Image */}
       <div className="relative w-full h-24 mb-3 rounded overflow-hidden border border-cyber-border/40 bg-cyber-darker group-hover:border-neon-cyan/30 transition-colors">
         <img
-          src={cardImagePath}
-          alt={displayCard.name}
+          src={imageSrc}
+          alt={faceDown ? 'Hidden card' : displayCard.name}
           className="w-full h-full object-cover"
           onError={(e) => {
             e.currentTarget.src = '/images/cards/default.png';
@@ -163,38 +176,42 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent pointer-events-none" />
       </div>
 
-      {/* Attribute & Power */}
-      <div className="flex items-center justify-between mb-3">
-        <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${attr.bg} border ${attr.border}`}>
-          <AttrIcon size={14} className={attr.color} />
-          <span className={`text-xs font-bold ${attr.color}`}>{displayCard.attribute}</span>
-        </div>
-        <div
-          className="relative flex flex-col items-center justify-center w-12 h-12 rounded-lg border-2"
-          style={{
-            borderColor: attr.glow,
-            boxShadow: `0 0 10px ${attr.glow}40, inset 0 0 10px ${attr.glow}20`,
-          }}
-        >
-          <Zap size={8} className={`absolute top-0.5 right-0.5 ${attr.color} opacity-50`} />
-          <span className={`text-lg font-black leading-none ${attr.color}`} style={{ textShadow: `0 0 10px ${attr.glow}` }}>
-            {displayCard.power}
-          </span>
-          {basePower !== undefined && basePower !== displayCard.power && (
-            <span className={`text-[8px] font-black leading-none mt-0.5 ${displayCard.power > basePower ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {displayCard.power > basePower ? `+${displayCard.power - basePower}` : `${displayCard.power - basePower}`}
-            </span>
-          )}
-        </div>
-      </div>
+      {!faceDown && (
+        <>
+          {/* Attribute & Power */}
+          <div className="flex items-center justify-between mb-3">
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${attr.bg} border ${attr.border}`}>
+              <AttrIcon size={14} className={attr.color} />
+              <span className={`text-xs font-bold ${attr.color}`}>{displayCard.attribute}</span>
+            </div>
+            <div
+              className="relative flex flex-col items-center justify-center w-12 h-12 rounded-lg border-2"
+              style={{
+                borderColor: attr.glow,
+                boxShadow: `0 0 10px ${attr.glow}40, inset 0 0 10px ${attr.glow}20`,
+              }}
+            >
+              <Zap size={8} className={`absolute top-0.5 right-0.5 ${attr.color} opacity-50`} />
+              <span className={`text-lg font-black leading-none ${attr.color}`} style={{ textShadow: `0 0 10px ${attr.glow}` }}>
+                {displayCard.power}
+              </span>
+              {basePower !== undefined && basePower !== displayCard.power && (
+                <span className={`text-[8px] font-black leading-none mt-0.5 ${displayCard.power > basePower ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {displayCard.power > basePower ? `+${displayCard.power - basePower}` : `${displayCard.power - basePower}`}
+                </span>
+              )}
+            </div>
+          </div>
 
-      {/* Effect */}
-      <div className="text-[11px] text-cyber-text-dim leading-relaxed border-t border-cyber-border pt-2 min-h-[2.5rem]">
-        {displayCard.effect}
-      </div>
+          {/* Effect */}
+          <div className="text-[11px] text-cyber-text-dim leading-relaxed border-t border-cyber-border pt-2 min-h-[2.5rem]">
+            {displayCard.effect}
+          </div>
+        </>
+      )}
 
       {/* Cost */}
-      {showCost && (
+      {showCost && !faceDown && (
         <div className="mt-2 pt-2 border-t border-cyber-border flex items-center justify-between">
           <span className="text-[10px] text-cyber-text-dim uppercase tracking-wider">{t('cost')}</span>
           <span className="text-sm font-bold text-neon-amber text-glow-amber">{displayCard.cost}¢</span>
@@ -202,7 +219,7 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
       )}
 
       {/* Hover glow overlay */}
-      {!disabled && (
+      {!disabled && !faceDown && (
         <div
           className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
           style={{
@@ -215,4 +232,3 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
 }
 
 export default CardDisplay;
-

@@ -125,6 +125,7 @@ export interface GameState {
   battleLog: BattleLogEntry[];
   lastResult: BattleResult | null;
   opponent: string;
+  opponentHand?: Card[];
   battleResult: string;
   battleSession: BattleSession | null;
   deckAPool: Card[];
