@@ -717,6 +717,66 @@ function BattleArena({
               <div className="text-sm font-bold text-neon-magenta">{opponentDeckCount} {t('units') || 'Units'}</div>
             </div>
           </div>
+
+          {/* Opponent Card Area (mirror of left column's flag/challenger block) */}
+          {flagHolderName === opponent ? (
+            <div className="border border-cyber-border/20 rounded-lg bg-cyber-surface/5 p-3">
+              <div className="flex items-center gap-1.5 px-4 py-1.5 rounded border text-[10px] font-mono font-bold transition-all border-neon-magenta text-neon-magenta bg-purple-950/10 text-glow-magenta shadow-[0_0_15px_rgba(255,0,255,0.15)]">
+                <Flag size={12} className="text-neon-magenta animate-pulse" />
+                <span className="uppercase">
+                  DEFENDING / {opponent} が支配中
+                </span>
+                {flagPowerValue > 0 && <span className="ml-2 font-black border-l border-cyber-border/40 pl-2 text-white">{flagPowerValue} POW</span>}
+              </div>
+
+              <div className="mt-3 flex items-center justify-center min-h-[140px]">
+                {currentFlagCard ? (
+                  <div key={currentFlagCard.id + '_' + currentFlagCard.power} className="transform scale-90 transition-all animate-card-reveal shadow-[0_0_20px_rgba(255,0,255,0.25)]">
+                    <CardDisplay card={currentFlagCard} disabled />
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center">
+                    NO DEFENSIVE GRID INTRUSION / 支配中のプログラムはありません
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="border border-cyber-border/20 rounded-lg bg-cyber-surface/5 p-3">
+              <div className="text-[9px] font-mono text-cyber-text-dim/60 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <span>OPPONENT CHALLENGE AUGMENTATIONS / 相手の挑戦めくり</span>
+                {challengerPower > 0 && (
+                  <span className="text-neon-green font-black px-1.5 border border-neon-green/35 rounded bg-green-950/10">
+                    計 {challengerPower} POW
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center gap-2 flex-wrap min-h-[140px] w-full px-2">
+                {currentClashCards.length > 0 ? (
+                  currentClashCards.map((cCard, idx) => {
+                    const isLatest = idx === currentClashCards.length - 1;
+                    return (
+                      <div
+                        key={cCard.id + '_' + idx}
+                        className={`transform scale-75 -mx-4 first:ml-0 last:mr-0 transition-all duration-300 ${
+                          isLatest
+                            ? 'animate-card-reveal z-10 shadow-[0_0_15px_rgba(255,0,255,0.3)] scale-80'
+                            : 'opacity-70 scale-75'
+                        }`}
+                      >
+                        <CardDisplay card={cCard} disabled />
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-[10px] text-cyber-text-dim/40 border border-dashed border-cyber-border/30 rounded p-6 font-mono text-center w-full">
+                    AWAITING DECK DRAW INTRUSION / ドローされるのを待っています
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
