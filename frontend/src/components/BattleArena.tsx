@@ -1,11 +1,16 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Flag, User, Cpu, Play, Pause, RotateCcw, Layers, Shield, Activity } from 'lucide-react';
 import type { BattleLogEntry, BattleSession, Card, BattleLogCard } from '../types/game';
-import MemorySlots from './MemorySlots';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
 import DeckViewerModal from './DeckViewerModal';
 import { useAudio } from '../context/AudioContext';
+
+function cardFromName(name: string, deck: Card[]): Card {
+  const found = deck.find(c => c.name === name);
+  if (found) return found;
+  return { id: name, name, attribute: 'None', archetype: 'Control', power: 0, rarity: 'Common', effect: '', effectType: '', cost: 0 };
+}
 
 const convertToFullCard = (logCard: BattleLogCard | Card | null | undefined): Card => {
   if (!logCard) {
@@ -207,6 +212,15 @@ function BattleArena({
     if (!currentEntry) return [];
     return parseMemSlots(currentEntry.cpuMemSlots);
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
+
+  const myCardList = useMemo(() => {
+    return myMemSlots.flat().map(name => cardFromName(name, isLiveMode ? (isPlayer1 ? battleSession.player1Deck : battleSession.player2Deck) : deck));
+  }, [myMemSlots, deck, isLiveMode, battleSession, isPlayer1]);
+
+  const opponentCardList = useMemo(() => {
+    const oppDeck = isLiveMode ? (isPlayer1 ? battleSession.player2Deck : battleSession.player1Deck) : deck;
+    return opponentMemSlots.flat().map(name => cardFromName(name, oppDeck));
+  }, [opponentMemSlots, deck, isLiveMode, battleSession, isPlayer1]);
 
   const myDeckCount = useMemo(() => {
     if (isLiveMode) {
@@ -452,12 +466,18 @@ function BattleArena({
       </div>
 
       {/* 2. Main Dual Board Area */}
-      <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[220px_1fr_220px] gap-6 items-center my-4 flex-1">
+      <div className="relative z-10 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6 items-center my-4 flex-1">
         
         {/* Left Col: Local Player State */}
         <div className="font-mono flex flex-col gap-3 self-start order-2 lg:order-1">
-          <MemorySlots slots={myMemSlots} label={t('yourMemory')} side="left" />
-          <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 flex justify-between items-center">
+          <div className="flex flex-wrap gap-2">
+            {myCardList.map((card, idx) => (
+              <div key={card.id + '_' + idx} className="transform scale-90 origin-top -mb-4">
+                <CardDisplay card={card} disabled />
+              </div>
+            ))}
+          </div>
+          <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 flex justify-between items-center mt-2">
             <div>
               <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
               <div className="text-sm font-bold text-neon-cyan">{myDeckCount} {t('units') || 'Units'}</div>
@@ -475,7 +495,7 @@ function BattleArena({
         </div>
 
         {/* Center: Duel Arena */}
-        <div className="flex flex-col items-center justify-between min-h-[460px] border border-cyber-border/20 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-6 relative order-1 lg:order-2 overflow-hidden">
+        <div className="flex flex-col items-center justify-between min-h-[480px] border border-cyber-border/20 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-6 relative order-1 lg:order-2 overflow-hidden">
           
           {/* Symmetrical Flash Overlays */}
           {flashState === 'cyan' && (
@@ -709,8 +729,14 @@ function BattleArena({
 
         {/* Right Col: Opponent State */}
         <div className="font-mono flex flex-col gap-3 self-start order-3">
-          <MemorySlots slots={opponentMemSlots} label={t('npcMemoryLabel', { opponent })} side="right" />
-          <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 text-right flex justify-between items-center">
+          <div className="flex flex-wrap gap-2 justify-end">
+            {opponentCardList.map((card, idx) => (
+              <div key={card.id + '_' + idx} className="transform scale-90 origin-top -mb-4">
+                <CardDisplay card={card} disabled />
+              </div>
+            ))}
+          </div>
+          <div className="border border-cyber-border/30 rounded p-2.5 bg-cyber-surface/30 text-right flex justify-between items-center mt-2">
             <Layers size={18} className="text-neon-magenta/50" />
             <div>
               <div className="text-[9px] text-cyber-text-dim uppercase tracking-wider">{t('deckLabel') || 'DECK MODULES'}</div>
