@@ -12,6 +12,7 @@ interface CardDisplayProps {
   disabled?: boolean;
   compact?: boolean;
   basePower?: number;
+  size?: 'sm' | 'md';
 }const attributeConfig = {
   Virus: { color: 'text-red-400', bg: 'bg-red-900/30', border: 'border-red-500/50', glow: '#ff0040', icon: Bug },
   AI: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Cpu },
@@ -28,7 +29,7 @@ interface CardDisplayProps {
   None: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User },
   Starter: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User }
 };
-function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower }: CardDisplayProps) {
+function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower, size = 'md' }: CardDisplayProps) {
   const { translateCard, t } = useTranslation();
   const { playSE } = useAudio();
   const hoverGuard = useRef<number>(0);
@@ -101,7 +102,7 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         bg-cyber-surface/80 backdrop-blur-sm
         transition-all duration-300 ease-out
         ${!disabled ? 'cursor-pointer hover:scale-105 hover:-translate-y-1' : 'opacity-60 cursor-not-allowed'}
-        ${compact ? 'p-2' : 'p-4 w-48'}
+        ${compact ? 'p-2' : size === 'sm' ? 'p-2 w-28' : 'p-4 w-48'}
       `}
       style={{ boxShadow: rarityStyle.shadow }}
     >
@@ -114,6 +115,7 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
       </div>
 
       {/* Rarity indicator */}
+      {size !== 'sm' && (
       <div className="flex items-center justify-between mb-2">
         <span className={`text-[10px] uppercase tracking-widest font-bold ${
           card.rarity === 'Epic' ? 'text-neon-amber text-glow-amber' :
@@ -126,14 +128,15 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
           {displayCard.archetype}
         </span>
       </div>
+      )}
 
       {/* Card name */}
-      <h3 className="text-sm font-bold text-white mb-2 tracking-wide leading-tight min-h-[2.5rem]">
+      <h3 className={`font-bold text-white mb-2 tracking-wide leading-tight ${size === 'sm' ? 'text-[10px] min-h-[1.6rem]' : 'text-sm min-h-[2.5rem]'}`}>
         {displayCard.name}
       </h3>
 
       {/* Card Image */}
-      <div className="relative w-full h-24 mb-3 rounded overflow-hidden border border-cyber-border/40 bg-cyber-darker group-hover:border-neon-cyan/30 transition-colors">
+      <div className={`relative w-full ${size === 'sm' ? 'h-16 mb-2' : 'h-24 mb-3'} rounded overflow-hidden border border-cyber-border/40 bg-cyber-darker group-hover:border-neon-cyan/30 transition-colors`}>
         <img
           src={cardImagePath}
           alt={displayCard.name}
@@ -147,20 +150,20 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
       </div>
 
       {/* Attribute & Power */}
-      <div className="flex items-center justify-between mb-3">
-        <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${attr.bg} border ${attr.border}`}>
-          <AttrIcon size={14} className={attr.color} />
-          <span className={`text-xs font-bold ${attr.color}`}>{displayCard.attribute}</span>
+      <div className={`flex items-center justify-between ${size === 'sm' ? 'mb-1' : 'mb-3'}`}>
+        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${attr.bg} border ${attr.border}`}>
+          <AttrIcon size={size === 'sm' ? 10 : 14} className={attr.color} />
+          {size !== 'sm' && <span className={`text-xs font-bold ${attr.color}`}>{displayCard.attribute}</span>}
         </div>
         <div
-          className="relative flex flex-col items-center justify-center w-12 h-12 rounded-lg border-2"
+          className={`relative flex flex-col items-center justify-center rounded-lg border-2 ${size === 'sm' ? 'w-8 h-8' : 'w-12 h-12'}`}
           style={{
             borderColor: attr.glow,
             boxShadow: `0 0 10px ${attr.glow}40, inset 0 0 10px ${attr.glow}20`,
           }}
         >
-          <Zap size={8} className={`absolute top-0.5 right-0.5 ${attr.color} opacity-50`} />
-          <span className={`text-lg font-black leading-none ${attr.color}`} style={{ textShadow: `0 0 10px ${attr.glow}` }}>
+          <Zap size={size === 'sm' ? 6 : 8} className={`absolute top-0.5 right-0.5 ${attr.color} opacity-50`} />
+          <span className={`${size === 'sm' ? 'text-sm' : 'text-lg'} font-black leading-none ${attr.color}`} style={{ textShadow: `0 0 10px ${attr.glow}` }}>
             {displayCard.power}
           </span>
           {basePower !== undefined && basePower !== displayCard.power && (
@@ -172,9 +175,11 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
       </div>
 
       {/* Effect */}
+      {size !== 'sm' && (
       <div className="text-[11px] text-cyber-text-dim leading-relaxed border-t border-cyber-border pt-2 min-h-[2.5rem]">
         {displayCard.effect}
       </div>
+      )}
 
       {/* Cost */}
       {showCost && (

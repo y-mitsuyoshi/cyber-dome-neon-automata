@@ -73,7 +73,7 @@ function MemorySlots({ slots, maxSlots = 6, label, side, compact = false }: Memo
           const imgPath = topCard ? getCardImagePath(topCard.id) : null;
 
           return (
-            <div key={i} className="relative shrink-0" style={{ width: compact ? 52 : 64, height: compact ? 68 : 82 }}>
+            <div key={i} className="relative shrink-0" style={{ width: compact ? 44 : 64, height: compact ? 56 : 82 }}>
               {/* Stack visual effect layers (card-back feel) */}
               {!isEmpty && slot.count > 1 && (
                 <>

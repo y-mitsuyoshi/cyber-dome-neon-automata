@@ -134,105 +134,102 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
   const defendingCard = stack.isDefending ? stack.flagCard : null;
   const attackingCards = stack.isDefending ? [] : stack.challengerCards;
   const hasAny = defendingCard || attackingCards.length > 0;
-  const isTurn = isMyDrawTurn;
 
   if (!hasAny) {
     return (
-      <div className="flex flex-col items-center justify-center py-6">
-        <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-6 py-4 text-${accent}/40`}>
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
           {side === 'opp' ? '相手のカードを待っています' : 'カードをめくってください'}
         </div>
       </div>
     );
   }
 
-  // When defending: show the flag card large with a flag badge + power.
+  // When defending: show the flag card with a flag badge + power.
   if (defendingCard) {
     return (
-      <div className="flex flex-col items-center gap-1 relative">
-        <div className={`flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-${accent}`}>
+      <div className="flex flex-col items-center gap-1 relative h-full justify-center">
+        <div className={`flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-${accent}`}>
           <Flag size={11} className="animate-pulse" />
-          <span>フラッグ防衛</span>
+          <span>防衛中</span>
           <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">
             POW {flagPower}
           </span>
         </div>
         <div
           key={defendingCard.id + '_' + defendingCard.power + '_flag'}
-          className="transform scale-95 transition-all animate-card-reveal"
-          style={{ boxShadow: `0 0 24px ${accentShadow}` }}
+          className="transition-all animate-card-reveal"
+          style={{ boxShadow: `0 0 18px ${accentShadow}` }}
         >
-          <CardDisplay card={defendingCard} disabled />
+          <CardDisplay card={defendingCard} disabled size="sm" />
         </div>
       </div>
     );
   }
 
-  // When attacking: show stacked challenger cards fanned, with cumulative power & how much more needed.
+  // When attacking: show stacked challenger cards with cumulative power & how much more needed.
   const cumulative = challengerPower;
   const needed = Math.max(0, flagPower - cumulative + 1);
   const willTake = cumulative > flagPower;
 
+  // Stack offset for fanned cards (px). Fixed width container so layout doesn't shift.
+  const CARD_W = 112; // sm card width ~28*4
+  const OVERLAP = 40;
+  const stackWidth = CARD_W + Math.max(0, attackingCards.length - 1) * OVERLAP;
+
   return (
-    <div className="flex flex-col items-center gap-1 relative">
-      <div className={`flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider ${willTake ? 'text-neon-green' : `text-${accent}`}`}>
+    <div className="flex flex-col items-center gap-1 relative h-full justify-center">
+      <div className={`flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider ${willTake ? 'text-neon-green' : `text-${accent}`}`}>
         <span>挑戦中</span>
         <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">
           計 {cumulative} POW
         </span>
         {!willTake && flagPower > 0 && (
           <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">
-            あと {needed} POW で奪取
+            あと {needed} POW
           </span>
         )}
         {willTake && (
           <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">
-            フラッグ奪取！
+            奪取！
           </span>
         )}
       </div>
 
-      <div className="flex items-end justify-center min-h-[150px] relative">
+      <div className="relative" style={{ width: stackWidth, height: 120 }}>
         {attackingCards.length === 0 ? (
-          <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-6 py-4 text-${accent}/40`}>
-            {isTurn ? 'カードをめくってください' : '待機中'}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
+              {isMyDrawTurn ? 'カードをめくる' : '待機中'}
+            </div>
           </div>
         ) : (
-          <div className="flex items-end justify-center" style={{ minWidth: 120 + (attackingCards.length - 1) * 52 }}>
-            {attackingCards.map((cCard, idx) => {
-              const isLatest = idx === attackingCards.length - 1;
-              const isTop = idx === attackingCards.length - 1;
-              return (
-                <div
-                  key={cCard.id + '_' + idx}
-                  className="transition-all duration-300"
-                  style={{
-                    marginLeft: idx === 0 ? 0 : -88,
-                    zIndex: idx,
-                    transform: isLatest ? 'scale(0.72) translateY(-4px)' : 'scale(0.68)',
-                    opacity: isLatest ? 1 : 0.78,
-                    boxShadow: isLatest ? `0 0 18px ${accentShadow}` : 'none',
-                  }}
-                >
-                  <div className={isLatest ? 'animate-card-reveal' : ''}>
-                    <CardDisplay card={cCard} disabled />
-                  </div>
-                  {isTop && cCard.power > 0 && (
-                    <div className="text-center text-[9px] font-mono text-cyber-text-dim mt-0.5">
-                      +{cCard.power}
-                    </div>
-                  )}
+          attackingCards.map((cCard, idx) => {
+            const isLatest = idx === attackingCards.length - 1;
+            return (
+              <div
+                key={cCard.id + '_' + idx}
+                className="absolute top-0 transition-all duration-300"
+                style={{
+                  left: idx * OVERLAP,
+                  zIndex: idx,
+                  opacity: isLatest ? 1 : 0.7,
+                  boxShadow: isLatest ? `0 0 14px ${accentShadow}` : 'none',
+                }}
+              >
+                <div className={isLatest ? 'animate-card-reveal' : ''}>
+                  <CardDisplay card={cCard} disabled size="sm" />
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })
         )}
       </div>
       {/* Quick list of stacked card names */}
       {attackingCards.length > 1 && (
-        <div className="flex flex-wrap items-center justify-center gap-1 max-w-md mt-1">
+        <div className="flex flex-wrap items-center justify-center gap-1 max-w-md mt-0.5">
           {attackingCards.map((c, i) => (
-            <span key={i} className={`text-[9px] font-mono px-1.5 py-0.5 rounded border border-${accent}/30 bg-cyber-darker/60 text-${accent}/80`}>
+            <span key={i} className={`text-[9px] font-mono px-1 py-0.5 rounded border border-${accent}/30 bg-cyber-darker/60 text-${accent}/80`}>
               {translateCardName(c.name)} {c.power}
             </span>
           ))}
@@ -605,7 +602,7 @@ function BattleArena({
   ];
 
   return (
-    <div className="min-h-screen bg-cyber-dark relative overflow-hidden flex flex-col justify-between p-4 select-none">
+    <div className="h-screen bg-cyber-dark relative overflow-hidden flex flex-col p-2 sm:p-4 select-none">
       {/* Background gradients */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -635,10 +632,10 @@ function BattleArena({
       </div>
 
       {/* 2. Main Vertical Battle Board — Opponent (top) vs Player (bottom) */}
-      <div className="relative z-10 max-w-5xl mx-auto w-full flex flex-col gap-3 my-4 flex-1 min-h-[560px]">
+      <div className="relative z-10 max-w-5xl mx-auto w-full flex flex-col gap-2 my-2 flex-1 min-h-0">
 
         {/* ===== OPPONENT AREA (TOP) ===== */}
-        <div className="flex flex-col gap-2 border border-neon-magenta/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-3 relative overflow-hidden">
+        <div className="flex flex-col gap-1.5 border border-neon-magenta/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-2 relative overflow-hidden shrink-0">
           {flashState === 'magenta' && (
             <div className="absolute inset-0 bg-neon-magenta/20 border border-neon-magenta shadow-[inset_0_0_40px_rgba(255,0,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
           )}
@@ -663,7 +660,7 @@ function BattleArena({
           </div>
 
           {/* Opponent active stack area — cards fanned/stacked */}
-          <div className="flex items-end justify-center min-h-[150px] relative">
+          <div className="flex items-end justify-center h-[150px] relative overflow-hidden">
             <PlayerStackView
               stack={oppStack}
               side="opp"
@@ -678,27 +675,27 @@ function BattleArena({
         </div>
 
         {/* ===== CENTER: Turn indicator + action resolution ===== */}
-        <div className="flex flex-col items-center gap-2 py-1 z-10">
+        <div className="flex flex-col items-center gap-1.5 py-0.5 z-10 shrink-0">
           {/* Active Turn Indicator Banner */}
           <div className="w-full max-w-md text-center">
             {isReplayFinished ? (
-              <div className="text-neon-green text-glow-green text-xs font-bold font-mono tracking-widest uppercase border border-neon-green/30 bg-green-950/15 py-1.5 rounded animate-pulse">
+              <div className="text-neon-green text-glow-green text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-green/30 bg-green-950/15 py-1 rounded animate-pulse">
                 バトル決着
               </div>
             ) : isMyDrawTurn ? (
-              <div className="text-neon-cyan text-glow-cyan text-xs font-bold font-mono tracking-widest uppercase border border-neon-cyan/30 bg-cyan-950/15 py-1.5 rounded animate-pulse">
+              <div className="text-neon-cyan text-glow-cyan text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-cyan/30 bg-cyan-950/15 py-1 rounded animate-pulse">
                 &gt;&gt; あなたのめくり番 &lt;&lt;
               </div>
             ) : isOpponentDrawTurn ? (
-              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/30 bg-purple-950/15 py-1.5 rounded animate-pulse">
+              <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/30 bg-purple-950/15 py-1 rounded animate-pulse">
                 &gt;&gt; 相手のめくり番 &lt;&lt;
               </div>
             ) : showChoiceUI ? (
-              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/40 bg-purple-950/30 py-1.5 rounded animate-pulse">
+              <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/40 bg-purple-950/30 py-1 rounded animate-pulse">
                 ⚡ 効果選択待機中 ⚡
               </div>
             ) : isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer !== playerName ? (
-              <div className="text-neon-magenta text-glow-magenta text-xs font-bold font-mono tracking-widest uppercase border border-neon-magenta/20 bg-purple-950/10 py-1.5 rounded animate-pulse">
+              <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/20 bg-purple-950/10 py-1 rounded animate-pulse">
                 相手の効果選択中...
               </div>
             ) : (
@@ -709,13 +706,13 @@ function BattleArena({
           </div>
 
           {/* Action resolution details */}
-          <div className="w-full max-w-2xl text-center px-4 py-2 border border-cyber-border/10 rounded bg-cyber-dark/40 min-h-[44px] flex items-center justify-center">
-            <p className="text-[10px] font-mono text-cyber-text leading-relaxed">
+          <div className="w-full max-w-2xl text-center px-3 py-1 border border-cyber-border/10 rounded bg-cyber-dark/40 min-h-[32px] flex items-center justify-center">
+            <p className="text-[10px] font-mono text-cyber-text leading-relaxed line-clamp-2">
               {activeLog.length > 0
                 ? translateBattleDetail(activeLog[activeLog.length - 1].details)
                 : t('initializingArenaLink')}
               {activeLog.length > 0 && activeLog[activeLog.length - 1].effectTriggered && activeLog[activeLog.length - 1].effectTriggered !== 'None' && activeLog[activeLog.length - 1].effectTriggered !== '' && (
-                <span className="text-neon-green block font-bold mt-1 text-[9px] animate-pulse">
+                <span className="text-neon-green block font-bold mt-0.5 text-[9px] animate-pulse">
                   ⚡ {translateBattleDetail(activeLog[activeLog.length - 1].effectTriggered)}
                 </span>
               )}
@@ -724,13 +721,13 @@ function BattleArena({
 
           {/* Interactive Choice Panel (inline, not overlay) */}
           {showChoiceUI && choiceConfig && (
-            <div className="w-full max-w-3xl bg-cyber-darker/95 backdrop-blur-md flex flex-col items-center p-4 border-2 border-neon-magenta/40 rounded-xl animate-fade-in relative z-40">
+            <div className="w-full max-w-3xl bg-cyber-darker/95 backdrop-blur-md flex flex-col items-center p-3 border-2 border-neon-magenta/40 rounded-xl animate-fade-in relative z-40">
               <div className="text-neon-magenta text-glow-magenta font-black tracking-widest text-xs uppercase mb-1 animate-pulse">
                 ⚡ {choiceConfig.title} ⚡
               </div>
-              <p className="text-[10px] text-cyber-text-dim mb-3 text-center max-w-md">{choiceConfig.instructions}</p>
+              <p className="text-[10px] text-cyber-text-dim mb-2 text-center max-w-md">{choiceConfig.instructions}</p>
 
-              <div className="flex gap-3 flex-wrap justify-center my-2 overflow-y-auto max-h-[240px] p-2">
+              <div className="flex gap-2 flex-wrap justify-center my-1 overflow-y-auto max-h-[200px] p-2">
                 {battleSession.actionOptions.map((optCard) => {
                   const fullCard = convertToFullCard(optCard);
                   const isSelected = selectedCards.includes(optCard.id);
@@ -740,12 +737,12 @@ function BattleArena({
                       key={optCard.id}
                       onClick={() => handleSelectCard(optCard.id)}
                       className={`relative cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 ${
-                        isSelected ? 'ring-2 ring-neon-magenta scale-102 opacity-100 z-10' : 'opacity-80 hover:opacity-100'
+                        isSelected ? 'ring-2 ring-neon-magenta scale-105 opacity-100 z-10' : 'opacity-80 hover:opacity-100'
                       }`}
                     >
-                      <CardDisplay card={fullCard} disabled={false} />
+                      <CardDisplay card={fullCard} disabled={false} size="sm" />
                       {isSelected && (
-                        <div className="absolute top-2 right-2 bg-neon-magenta text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-white/20">
+                        <div className="absolute top-1 right-1 bg-neon-magenta text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-white/20">
                           {selectIdx + 1}
                         </div>
                       )}
@@ -787,7 +784,7 @@ function BattleArena({
                     setCurrentLogIndex((prev) => Math.min(prev + 1, battleLog.length - 1));
                   }
                 }}
-                className={`w-full py-3 px-5 rounded-lg border-2 font-mono font-bold text-sm uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-md flex items-center justify-center gap-2 ${
+                className={`w-full py-2 px-4 rounded-lg border-2 font-mono font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-md flex items-center justify-center gap-2 ${
                   isMyDrawTurn
                     ? 'border-neon-cyan text-neon-cyan bg-cyan-950/20 hover:bg-cyan-950/40 text-glow-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)] animate-pulse'
                     : isOpponentDrawTurn
@@ -795,7 +792,7 @@ function BattleArena({
                     : 'border-cyber-border text-cyber-text bg-cyber-surface/30 hover:bg-cyber-surface/50 font-medium disabled:opacity-40 disabled:cursor-not-allowed'
                 }`}
               >
-                <Play size={16} className={isMyDrawTurn ? 'animate-bounce' : ''} />
+                <Play size={14} className={isMyDrawTurn ? 'animate-bounce' : ''} />
                 {isMyDrawTurn ? (
                   <span>{t('drawNextCard')}</span>
                 ) : isOpponentDrawTurn ? (
@@ -807,7 +804,7 @@ function BattleArena({
             ) : (
               <button
                 onClick={onComplete}
-                className="w-full py-3 px-5 rounded-lg border-2 border-neon-green text-neon-green bg-green-950/20 hover:bg-green-950/40 text-glow-green font-bold text-sm uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-[0_0_15px_rgba(0,255,102,0.25)] animate-pulse animate-neon-pulse"
+                className="w-full py-2 px-4 rounded-lg border-2 border-neon-green text-neon-green bg-green-950/20 hover:bg-green-950/40 text-glow-green font-bold text-xs uppercase tracking-widest cursor-pointer transition-all duration-150 transform active:scale-95 shadow-[0_0_15px_rgba(0,255,102,0.25)] animate-pulse animate-neon-pulse"
               >
                 {t('continueToStandings')}
               </button>
@@ -816,13 +813,13 @@ function BattleArena({
         </div>
 
         {/* ===== PLAYER AREA (BOTTOM) ===== */}
-        <div className="flex flex-col gap-2 border border-neon-cyan/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-3 relative overflow-hidden">
+        <div className="flex flex-col gap-1.5 border border-neon-cyan/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-2 relative overflow-hidden shrink-0">
           {flashState === 'cyan' && (
             <div className="absolute inset-0 bg-neon-cyan/20 border border-neon-cyan shadow-[inset_0_0_40px_rgba(0,240,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
           )}
 
           {/* Player active stack area — cards fanned/stacked */}
-          <div className="flex items-start justify-center min-h-[150px] relative">
+          <div className="flex items-start justify-center h-[150px] relative overflow-hidden">
             <PlayerStackView
               stack={myStack}
               side="me"
@@ -867,7 +864,7 @@ function BattleArena({
       </div>
 
       {/* 3. Replay / Speed / Auto Controllers */}
-      <div className="relative z-10 max-w-3xl mx-auto w-full border border-cyber-border/30 rounded-lg p-3 bg-cyber-darker/90 backdrop-blur-md mb-3 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
+      <div className="relative z-10 max-w-3xl mx-auto w-full border border-cyber-border/30 rounded-lg p-2 bg-cyber-darker/90 backdrop-blur-md mb-2 flex flex-col sm:flex-row items-center justify-between gap-2 font-mono shrink-0">
         
         {/* Play/Pause controls */}
         <div className="flex items-center gap-2">
@@ -963,7 +960,7 @@ function BattleArena({
       </div>
 
       {/* 4. Bottom Event Log feed */}
-      <div className="relative z-10 max-w-4xl mx-auto w-full border border-cyber-border/30 rounded-lg p-3 bg-cyber-surface/50 max-h-32 overflow-y-auto font-mono text-[10px] shadow-inner">
+      <div className="relative z-10 max-w-4xl mx-auto w-full border border-cyber-border/30 rounded-lg p-2 bg-cyber-surface/50 max-h-24 overflow-y-auto font-mono text-[10px] shadow-inner shrink-0">
         <div className="flex items-center gap-2 mb-2 border-b border-cyber-border/20 pb-1">
           <Activity size={12} className="text-neon-green" />
           <span className="text-[9px] text-neon-green uppercase tracking-widest font-bold">
