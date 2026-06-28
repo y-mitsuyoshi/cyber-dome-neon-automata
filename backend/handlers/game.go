@@ -668,7 +668,9 @@ func resolveRound(gs *models.GameState) {
 			// Let's check if the winning card has c_hero effect
 			// Since we want to award Hero bonus:
 			var winningCard *models.Card
-			if len(session.ActiveCards) > 0 {
+			if session.FlagCard != nil {
+				winningCard = session.FlagCard
+			} else if len(session.ActiveCards) > 0 {
 				winningCard = &session.ActiveCards[0]
 			}
 			if winningCard != nil && winningCard.EffectType == "hero" {

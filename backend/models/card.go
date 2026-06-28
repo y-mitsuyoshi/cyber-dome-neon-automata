@@ -167,6 +167,7 @@ type BattleSession struct {
 	Player2NextAttackBuff int              `json:"player2NextAttackBuff"`
 	FlagHolder            string           `json:"flagHolder"`
 	FlagPower             int              `json:"flagPower"`
+	FlagCard              *Card            `json:"flagCard,omitempty"` // The card currently defending the flag
 	Step                  int              `json:"step"`
 	IsFinished            bool             `json:"isFinished"`
 	Winner                string           `json:"winner"`

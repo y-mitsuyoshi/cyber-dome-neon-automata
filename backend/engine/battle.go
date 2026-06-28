@@ -646,7 +646,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 			bs.logEntry("reveal", challengerSide, &cCard, challengerPower, cEffect,
 				bs.FlagHolder, fmt.Sprintf("Challenger cumulative power: %d vs flag: %d", challengerPower, bs.FlagPower))
 
-			if challengerPower > bs.FlagPower {
+			if challengerPower >= bs.FlagPower {
 				flagTaken = true
 				winCardPower = ePower
 				break

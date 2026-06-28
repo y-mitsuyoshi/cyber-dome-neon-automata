@@ -210,10 +210,139 @@ func TestInteractiveBattle(t *testing.T) {
 	if session.FlagHolder != "P1" {
 		t.Errorf("Expected P1 to hold flag, got %s", session.FlagHolder)
 	}
-	if len(session.ActiveCards) != 1 {
-		t.Errorf("Expected 1 active card, got %d", len(session.ActiveCards))
+	// After the flag is claimed, ActiveCards must be reset so the next
+	// challenger's reveal stack starts fresh (the defending card is tracked
+	// on session.FlagCard instead).
+	if len(session.ActiveCards) != 0 {
+		t.Errorf("Expected 0 active cards after flag claim, got %d", len(session.ActiveCards))
+	}
+	if session.FlagCard == nil {
+		t.Errorf("Expected FlagCard to be set after flag claim")
 	}
 	if session.TurnOwner != "P2" {
 		t.Errorf("Expected TurnOwner to switch to P2, got %s", session.TurnOwner)
+	}
+}
+
+// TestInteractiveBattleFlagNotStolenIncorrectly exercises the bug where the
+// previous defender's flag card lingered in ActiveCards after the turn swap.
+// As a result the new challenger's accumulated power was inflated by the
+// leftover defender card, causing the flag to be stolen even when the
+// challenger's own cards were strictly weaker than the flag power.
+func TestInteractiveBattleFlagNotStolenIncorrectly(t *testing.T) {
+	// P1 will draw first and claim the flag with a power 5 card.
+	// P2 then draws a power 4 card. 4 is NOT greater than 5, so the flag
+	// must stay with P1.
+	p1Deck := []models.Card{
+		{ID: "p1_a", Name: "A", Attribute: "None", Power: 5},
+	}
+	p2Deck := []models.Card{
+		{ID: "p2_b", Name: "B", Attribute: "None", Power: 4},
+	}
+
+	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
+	session.TurnOwner = "P1"
+	session.PendingActionPlayer = "P1"
+
+	StepBattle(session, false, false) // P1 claims the flag (Power 5)
+	if session.FlagHolder != "P1" {
+		t.Fatalf("Expected P1 to hold flag after first draw, got %s", session.FlagHolder)
+	}
+	if session.FlagPower != 5 {
+		t.Fatalf("Expected FlagPower 5, got %d", session.FlagPower)
+	}
+
+	session.TurnOwner = "P2"
+	session.PendingActionPlayer = "P2"
+	StepBattle(session, false, false) // P2 draws power 4
+
+	if session.FlagHolder != "P1" {
+		t.Errorf("Flag must remain with P1 (5 vs 4), got holder %s and power %d",
+			session.FlagHolder, session.FlagPower)
+	}
+	if session.ChallengerPower != 4 {
+		t.Errorf("ChallengerPower must equal P2's card power (4), got %d", session.ChallengerPower)
+	}
+	// ActiveCards must contain only the challenger's stack, not the leftover defender card.
+	if len(session.ActiveCards) != 1 || session.ActiveCards[0].ID != "p2_b" {
+		t.Errorf("ActiveCards must contain only P2's card, got %+v", session.ActiveCards)
+	}
+}
+
+// TestInteractiveBattleMemoryNotDuplicated ensures the defender's old flag
+// card is benched into the defender's memory only — not into the challenger's
+// memory too (the latter used to happen because the leftover winning card in
+// ActiveCards[0] was treated as a challenger non-winning card when stolen).
+func TestInteractiveBattleMemoryNotDuplicated(t *testing.T) {
+	// P1 claims flag with a power 1 card. P2 then draws a power 3 card and
+	// steals the flag. The previous defender's card (power 1) should only go
+	// to P1's bench, never to P2's bench.
+	p1Deck := []models.Card{
+		{ID: "p1_x", Name: "P1Card", Attribute: "None", Power: 1},
+	}
+	p2Deck := []models.Card{
+		{ID: "p2_y", Name: "P2Card", Attribute: "None", Power: 3},
+	}
+
+	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
+	session.TurnOwner = "P1"
+	session.PendingActionPlayer = "P1"
+
+	StepBattle(session, false, false) // P1 claims flag
+
+	session.TurnOwner = "P2"
+	session.PendingActionPlayer = "P2"
+	StepBattle(session, false, false) // P2 steals flag
+
+	if session.FlagHolder != "P2" {
+		t.Fatalf("Expected P2 to hold flag now, got %s", session.FlagHolder)
+	}
+
+	p1Names := memSlotNames(session.Player1Mem)
+	p2Names := memSlotNames(session.Player2Mem)
+
+	// P1's old flag card must be on P1's bench.
+	if len(p1Names) != 1 || !containsName(p1Names[0], "P1Card") {
+		t.Errorf("P1 memory should contain its old flag card, got %v", p1Names)
+	}
+	// P2's bench must be empty (P2's winning card became the new flag, not benched).
+	if len(p2Names) != 0 {
+		t.Errorf("P2 memory must not contain P1's card, got %v", p2Names)
+	}
+}
+
+func containsName(slotName string, cardName string) bool {
+	return slotName == cardName ||
+		len(slotName) >= len(cardName) && (slotName[:len(cardName)] == cardName)
+}
+
+func TestInteractiveBattleFlagStolenOnEqualPower(t *testing.T) {
+	// P1 claims flag with power 3.
+	// P2 draws card with power 3. Since P2 has equal power, they should steal the flag.
+	p1Deck := []models.Card{
+		{ID: "p1_x", Name: "P1Card", Attribute: "None", Power: 3},
+	}
+	p2Deck := []models.Card{
+		{ID: "p2_y", Name: "P2Card", Attribute: "None", Power: 3},
+	}
+
+	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
+	session.TurnOwner = "P1"
+	session.PendingActionPlayer = "P1"
+
+	StepBattle(session, false, false) // P1 claims flag
+	if session.FlagHolder != "P1" {
+		t.Fatalf("Expected P1 to hold flag, got %s", session.FlagHolder)
+	}
+
+	session.TurnOwner = "P2"
+	session.PendingActionPlayer = "P2"
+	StepBattle(session, false, false) // P2 steals flag because power is equal (3 >= 3)
+
+	if session.FlagHolder != "P2" {
+		t.Fatalf("Expected P2 to hold flag on equal power, got %s", session.FlagHolder)
+	}
+	if session.FlagPower != 3 {
+		t.Fatalf("Expected FlagPower to be 3, got %d", session.FlagPower)
 	}
 }

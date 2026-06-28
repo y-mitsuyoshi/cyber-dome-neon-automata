@@ -763,7 +763,12 @@ func SubmitChoice(session *models.BattleSession, action *models.BattleAction, is
 			activePlayer = session.Player2Name
 			oppPlayer = session.Player1Name
 		}
-		winningCard := session.ActiveCards[len(session.ActiveCards)-1]
+		var winningCard models.Card
+		if session.FlagCard != nil {
+			winningCard = *session.FlagCard
+		} else if len(session.ActiveCards) > 0 {
+			winningCard = session.ActiveCards[len(session.ActiveCards)-1]
+		}
 		// Determine transition log effectText (we can check from log if hero/cowboy triggered)
 		transitionToDrawPhase(session, activePlayer, oppPlayer, winningCard, "")
 	} else {
@@ -1031,8 +1036,14 @@ func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppP
 	// winner) as the new defender's stack, so both sides can see how the flag
 	// was claimed. Must capture BEFORE resetting ActiveCards.
 	session.DefenderStack = append([]models.Card{}, session.ActiveCards...)
-	// Reset active cards: now contains only the new defending flag card
-	session.ActiveCards = []models.Card{winningCard}
+	// Track the flag-defending card explicitly. ActiveCards must be reset to
+	// empty so the next challenger's reveal stack starts fresh — keeping the
+	// previous winning card in ActiveCards caused it to be (a) double-counted
+	// into the next challenger's accumulated power and (b) incorrectly benched
+	// into the challenger's memory when they later took the flag.
+	wc := winningCard
+	session.FlagCard = &wc
+	session.ActiveCards = []models.Card{}
 	session.ChallengerPower = 0
 
 	logCard := &models.BattleLogCard{
@@ -1087,7 +1098,7 @@ func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppP
 
 func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 	// Check if challenger power exceeds flag power
-	if session.ChallengerPower > session.FlagPower {
+	if session.ChallengerPower >= session.FlagPower {
 		// FLAG SECURED!
 		oldFlagHolder := session.FlagHolder
 
@@ -1119,18 +1130,13 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		var oldFlagCard *models.Card
 
 		// 1. Move old defender cards to defender's memory
-		if oldFlagHolder != "" {
-			// Find the previous defender card
-			for i := len(session.Log) - 1; i >= 0; i-- {
-				if session.Log[i].Action == "flag_change" && session.Log[i].Player == oldFlagHolder && session.Log[i].Card != nil {
-					// Found the card
-					c := convertLogCardToCard(session.Log[i].Card)
-					oldFlagCard = &c
-					break
-				}
-			}
+		if oldFlagHolder != "" && session.FlagCard != nil {
+			// The previous defender's flag card is tracked explicitly on the
+			// session; no need to scan the log (avoids accidentally picking up
+			// a stale entry from earlier in the same step).
+			oldFlagCard = session.FlagCard
 
-			if oldFlagCard != nil {
+			{
 				// Check Prince effect: Prince is banished instead of benched when losing the flag
 				if oldFlagCard.EffectType == "prince" {
 					*oppDiscard = append(*oppDiscard, *oldFlagCard)
@@ -1288,7 +1294,9 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		if hasLossChoice && len(lossOptions) > 0 {
 			// Preserve the challenger's full stack before resetting ActiveCards.
 			session.DefenderStack = append([]models.Card{}, session.ActiveCards...)
-			session.ActiveCards = []models.Card{winningCard}
+			wc := winningCard
+			session.FlagCard = &wc
+			session.ActiveCards = []models.Card{}
 			session.FlagHolder = activePlayerName
 
 			if isOpponentNPC {
@@ -1400,8 +1408,11 @@ func calculateIndividualCardPower(card models.Card, myMem, oppMem *[]models.Memo
 		power += countDirectors(myMem)
 	}
 
-	// Cook buff
-	if hasCook(myMem) && session.FlagHolder == playerName && isFlagCard(session, card.ID) {
+	// Cook buff: while this card's owner holds the flag, give the flag-defender
+	// +1 power per cook on the bench. The flag holder's cards are only ever
+	// evaluated during the transition into flag-holder state, so this is
+	// equivalent to checking "is this the defending flag card?".
+	if hasCook(myMem) && session.FlagHolder == playerName {
 		power += countCooks(myMem)
 	}
 
@@ -1546,15 +1557,6 @@ func countEffectInMem(mem *[]models.MemorySlot, effectType string) int {
 		}
 	}
 	return count
-}
-
-func isFlagCard(session *models.BattleSession, cardID string) bool {
-	// Usually the last card in activeCards of the flag holder is the flag card.
-	// But during the defender's state, activeCards has exactly the flag card.
-	if len(session.ActiveCards) > 0 {
-		return session.ActiveCards[0].ID == cardID
-	}
-	return false
 }
 
 func getUniqueCardsInMem(mem []models.MemorySlot) []models.Card {
