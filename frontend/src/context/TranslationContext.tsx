@@ -215,7 +215,18 @@ const uiDict: Record<Locale, Record<string, string>> = {
     Matrix: "Matrix",
     None: "None",
     units: "Units",
-    initializingArenaLink: "INITIALIZING INTERACTIVE ARENA LINK..."
+    initializingArenaLink: "INITIALIZING INTERACTIVE ARENA LINK...",
+    drawNextCard: "Draw Card",
+    opponentDrawNext: "Draw Opponent",
+    nextStep: "Next Step",
+    continueToStandings: "View Standings →",
+    confirmChoice: "Confirm",
+    skipChoice: "Skip",
+    pauseLabel: "Pause",
+    autoLabel: "Auto",
+    speedLabel: "Speed",
+    eventsCount: "{count} events",
+    stepShort: "Step {step}"
   },
   ja: {
     // Title Screen
@@ -409,7 +420,18 @@ const uiDict: Record<Locale, Record<string, string>> = {
     Matrix: "マトリクス",
     None: "なし",
     units: "枚",
-    initializingArenaLink: "電脳アリーナ回線を初期化中..."
+    initializingArenaLink: "電脳アリーナ回線を初期化中...",
+    drawNextCard: "カードをめくる",
+    opponentDrawNext: "相手のカードをめくる",
+    nextStep: "次へ進む",
+    continueToStandings: "リザルト確認 →",
+    confirmChoice: "確定",
+    skipChoice: "スキップ",
+    pauseLabel: "一時停止",
+    autoLabel: "オート",
+    speedLabel: "速度",
+    eventsCount: "{count} 件",
+    stepShort: "ステップ {step}"
   }
 };
 

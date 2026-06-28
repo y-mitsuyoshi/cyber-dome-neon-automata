@@ -1,0 +1,6 @@
+# Go vendor directory (regenerate with: go mod vendor)
+backend/vendor/
+
+# Node
+node_modules/
+frontend/node_modules/

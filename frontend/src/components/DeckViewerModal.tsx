@@ -124,7 +124,7 @@ export default function DeckViewerModal({
                             `}
                           >
                             <Trash2 size={10} />
-                            {t('deleteCardText') || 'Delete (Free)'}
+                            {t('deleteCardText')}
                           </button>
                         )}
                       </div>

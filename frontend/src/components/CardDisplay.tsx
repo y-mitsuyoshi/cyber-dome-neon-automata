@@ -3,6 +3,7 @@ import { Cpu, Bug, HardDrive, User, Zap, Shield, Building, Rocket, Film, Ghost, 
 import type { Card } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
+import { getCardImagePath } from '../utils/cardImage';
 
 interface CardDisplayProps {
   card: Card;
@@ -35,25 +36,7 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
   // Translate the card details for rendering
   const displayCard = useMemo(() => translateCard(card), [card, translateCard]);
 
-  const cardImagePath = useMemo(() => {
-    const id = card.id;
-    if (id.startsWith('starter_')) {
-      const mapping: Record<string, string> = {
-        starter_virus_1: 'virus_001',
-        starter_virus_2: 'virus_002',
-        starter_ai_1: 'ai_001',
-        starter_ai_2: 'ai_002',
-        starter_hw_1: 'hw_001',
-        starter_hw_2: 'hw_002',
-        starter_nr_1: 'nr_001',
-        starter_nr_2: 'nr_002',
-        starter_net_1: 'nr_003',
-        starter_ai_3: 'ai_003',
-      };
-      return `/images/cards/${mapping[id] || 'default'}.png`;
-    }
-    return `/images/cards/${id}.png`;
-  }, [card.id]);
+  const cardImagePath = useMemo(() => getCardImagePath(card.id), [card.id]);
 
   // Use original English values for style lookups
   const attr = attributeConfig[card.attribute as keyof typeof attributeConfig] || attributeConfig.None;
