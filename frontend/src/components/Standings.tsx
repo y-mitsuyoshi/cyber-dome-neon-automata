@@ -21,11 +21,11 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
     return b.fans - a.fans;
   });
 
-  const { t, translateBattleResult, locale } = useTranslation();
+  const { t, translateBattleResult } = useTranslation();
   const isFinalRound = round >= maxRounds;
 
   const roundLabel = round === maxRounds
-    ? (locale === 'ja' ? '決勝戦 / FINALS' : 'FINALS')
+    ? t('finalsLabel')
     : t('roundOf', { round: round, maxRounds: maxRounds - 1 });
 
   // Localize Go backend match results banner
@@ -99,7 +99,7 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-bold">
               {t('rankHeader')}
             </span>
-            <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-bold">
+            <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-bold min-w-0">
               {t('combatantHeader')}
             </span>
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim font-bold text-center">
@@ -141,9 +141,9 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
               </div>
 
               {/* Name */}
-              <div className="flex items-center gap-2">
-                {player.isPlayer && <User size={14} className="text-neon-cyan" />}
-                <span className={`font-bold text-sm ${
+              <div className="flex items-center gap-2 min-w-0">
+                {player.isPlayer && <User size={14} className="text-neon-cyan shrink-0" />}
+                <span className={`font-bold text-sm truncate ${
                   player.isPlayer ? 'text-neon-cyan text-glow-cyan' : 'text-cyber-text'
                 }`}>
                   {player.name}

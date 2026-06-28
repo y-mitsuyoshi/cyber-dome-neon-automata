@@ -458,7 +458,7 @@ function App() {
     <div className="min-h-screen bg-cyber-dark text-cyber-text flex flex-col relative">
       {/* Global Error Alert Banner */}
       {error && (
-        <div className="fixed top-4 left-4 right-4 z-50 bg-red-950/90 border border-neon-red/50 text-neon-red px-4 py-3 rounded flex items-center justify-between shadow-lg backdrop-blur-md animate-flicker">
+        <div className="fixed top-4 left-4 right-4 z-50 bg-red-950/90 border border-neon-red/50 text-neon-red px-4 py-3 rounded flex items-center justify-between shadow-lg backdrop-blur-md">
           <div className="flex items-center gap-2">
             <AlertCircle size={18} />
             <span className="text-xs font-bold uppercase tracking-widest">{error}</span>
@@ -501,10 +501,10 @@ function App() {
         <div className="fixed inset-0 z-40 bg-cyber-dark/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in p-4 text-center">
           <ShieldAlert size={48} className="text-neon-cyan animate-pulse mb-4 text-glow-cyan" />
           <h2 className="text-xl font-bold tracking-[0.25em] text-neon-cyan text-glow-cyan uppercase mb-2">
-            {t('waitingForOpponents') || 'WAITING FOR OPPONENTS'}
+            {t('waitingForOpponents')}
           </h2>
-          <p className="text-xs font-mono text-cyber-text-dim max-w-sm uppercase tracking-wider animate-pulse">
-            {t('waitingForOpponentsDesc') || 'WAITING FOR OTHER COMMANDERS TO FINISH REPLAY ANALYSES...'}
+          <p className="text-xs text-cyber-text-dim mt-2 animate-pulse">
+            {t('waitingForOpponentsDesc')}
           </p>
         </div>
       )}
@@ -582,10 +582,10 @@ function App() {
         <div className="flex flex-col sm:flex-row items-center justify-between px-6 gap-2">
           <div className="flex items-center gap-2">
             <span className={`inline-block w-1.5 h-1.5 rounded-full bg-neon-green ${lobbyCode ? 'animate-pulse' : ''}`} />
-            <span>Antigravity NetLink-982 {lobbyCode ? 'MULTIPLAYER' : 'SOLO'}</span>
+            <span>{t('systemFooterName')} {lobbyCode ? t('modeMultiplayer') : t('modeSolo')}</span>
             <span className="mx-2">|</span>
             <Terminal size={8} className="inline mr-1" />
-            <span>Cyber-Dome Autonomous Grid System</span>
+            <span>{t('systemFooterSubtitle')}</span>
           </div>
           
           {/* Cyber Lang & Audio Selector */}
@@ -609,13 +609,13 @@ function App() {
                 playSE('click');
                 setLocale('ja');
               }}
-              className={`px-1.5 py-0.5 rounded cursor-pointer transition-all flex items-center gap-1 ${
+              className={`px-1.5 py-0.5 rounded cursor-pointer transition-all ${
                 locale === 'ja'
                   ? 'text-neon-magenta border border-neon-magenta/30 bg-neon-magenta/5 font-bold shadow-[0_0_8px_rgba(255,0,127,0.1)]'
                   : 'text-cyber-border hover:text-cyber-text'
               }`}
             >
-              🌐 日本語
+              日本語
             </button>
 
             {/* Audio Synth Control */}
@@ -627,10 +627,10 @@ function App() {
                   ? 'text-neon-red border border-neon-red/30 bg-neon-red/5 font-bold shadow-[0_0_8px_rgba(255,0,0,0.1)] animate-pulse'
                   : 'text-neon-green border border-neon-green/30 bg-neon-green/5 font-bold shadow-[0_0_8px_rgba(0,255,0,0.1)]'
               }`}
-              title={isMuted ? 'Unmute Audio Context' : 'Mute Audio Context'}
+              title={isMuted ? t('unmuteAudio') : t('muteAudio')}
             >
               {isMuted ? <VolumeX size={10} /> : <Volume2 size={10} />}
-              <span>{isMuted ? 'AUDIO_OFF' : 'AUDIO_ON'}</span>
+              <span>{isMuted ? t('audioOff') : t('audioOn')}</span>
             </button>
           </div>
         </div>

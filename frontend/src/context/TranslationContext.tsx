@@ -226,7 +226,22 @@ const uiDict: Record<Locale, Record<string, string>> = {
     autoLabel: "Auto",
     speedLabel: "Speed",
     eventsCount: "{count} events",
-    stepShort: "Step {step}"
+    stepShort: "Step {step}",
+    waitingForOpponents: "Waiting for Opponents",
+    waitingForOpponentsDesc: "Waiting for other combatants...",
+    finalsLabel: "FINALS",
+    confirmBtn: "Confirm",
+    systemFooterName: "Antigravity NetLink-982",
+    systemFooterSubtitle: "Cyber-Dome Autonomous Grid System",
+    modeMultiplayer: "Multiplayer",
+    modeSolo: "Solo",
+    audioOff: "Audio Off",
+    audioOn: "Audio On",
+    muteAudio: "Mute Audio",
+    unmuteAudio: "Unmute Audio",
+    systemManual: "System Manual",
+    manualLoading: "Loading Data Archives...",
+    manualLoadError: "Failed to load manual data from archives."
   },
   ja: {
     // Title Screen
@@ -431,7 +446,22 @@ const uiDict: Record<Locale, Record<string, string>> = {
     autoLabel: "オート",
     speedLabel: "速度",
     eventsCount: "{count} 件",
-    stepShort: "ステップ {step}"
+    stepShort: "ステップ {step}",
+    waitingForOpponents: "他のコバタントを待機中",
+    waitingForOpponentsDesc: "他の対戦者の準備完了を待っています...",
+    finalsLabel: "決勝戦",
+    confirmBtn: "確定",
+    systemFooterName: "アンチグラビティ・NetLink-982",
+    systemFooterSubtitle: "サイバー・ドーム自律グリッドシステム",
+    modeMultiplayer: "マルチプレイ",
+    modeSolo: "ソロ",
+    audioOff: "音声オフ",
+    audioOn: "音声オン",
+    muteAudio: "ミュート",
+    unmuteAudio: "ミュート解除",
+    systemManual: "システムマニュアル",
+    manualLoading: "データアーカイブを読み込み中...",
+    manualLoadError: "マニュアルの読み込みに失敗しました。"
   }
 };
 

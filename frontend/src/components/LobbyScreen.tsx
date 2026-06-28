@@ -36,10 +36,11 @@ function LobbyScreen({
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    if (chatMessages.length > 0) {
+    const lastMsg = chatMessages[chatMessages.length - 1];
+    if (lastMsg && lastMsg.from !== playerName) {
       playSE('click');
     }
-  }, [chatMessages, playSE]);
+  }, [chatMessages, playSE, playerName]);
 
   if (!lobbyState) {
     return (
@@ -54,11 +55,28 @@ function LobbyScreen({
     );
   }
 
-  const handleCopyCode = () => {
+  const handleCopyCode = async () => {
     playSE('click');
-    navigator.clipboard.writeText(lobbyState.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(lobbyState.code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = lobbyState.code;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch (err) {
+      console.error('clipboard copy failed', err);
+    }
   };
 
   const handleSendChat = (e: React.FormEvent) => {

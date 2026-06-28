@@ -130,9 +130,9 @@ function GameOver({ standings, onRestart }: GameOverProps) {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                {player.isPlayer && <User size={14} className="text-neon-cyan" />}
-                <span className={`font-bold text-sm ${
+              <div className="flex items-center gap-2 min-w-0">
+                {player.isPlayer && <User size={14} className="text-neon-cyan shrink-0" />}
+                <span className={`font-bold text-sm truncate ${
                   player.isPlayer ? 'text-neon-cyan text-glow-cyan' :
                   i === 0 ? 'text-neon-amber' : 'text-cyber-text'
                 }`}>

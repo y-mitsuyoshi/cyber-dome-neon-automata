@@ -245,3 +245,29 @@
 .text-glow-amber {
   text-shadow: 0 0 7px #ffbf00, 0 0 10px #ffbf00, 0 0 21px #ffbf00;
 }
+
+/* ===== REDUCED MOTION: disable all decorative animations ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-flicker,
+  .animate-neon-pulse,
+  .animate-warning-pulse,
+  .animate-pulse,
+  .animate-glitch,
+  .animate-card-reveal,
+  .animate-slide-in,
+  .animate-slide-in-left,
+  .animate-epic-aura,
+  .animate-fade-in,
+  .animate-bounce {
+    animation: none !important;
+  }
+}

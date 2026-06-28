@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { X, BookOpen } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import { useTranslation } from '../context/TranslationContext';
 
 interface ManualModalProps {
   onClose: () => void;
@@ -9,11 +10,13 @@ interface ManualModalProps {
 
 export default function ManualModal({ onClose }: ManualModalProps) {
   const { playSE } = useAudio();
+  const { t, locale } = useTranslation();
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    fetch('/MANUAL.md')
+    const path = locale === 'ja' ? '/MANUAL.md' : '/MANUAL.md';
+    fetch(path)
       .then(res => res.text())
       .then(text => {
         setContent(text);
@@ -21,26 +24,41 @@ export default function ManualModal({ onClose }: ManualModalProps) {
       })
       .catch(err => {
         console.error(err);
-        setContent('Failed to load manual data from archives.');
+        setContent(t('manualLoadError'));
         setLoading(false);
       });
-  }, []);
+  }, [locale, t]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        playSE('click');
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose, playSE]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-cyber-dark/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-[100] bg-cyber-dark/90 backdrop-blur-md flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) { playSE('click'); onClose(); } }}
+    >
       <div className="w-full max-w-4xl max-h-[85vh] bg-cyber-darker border-2 border-neon-cyan/40 p-6 rounded-lg shadow-[0_0_30px_rgba(0,240,255,0.15)] relative flex flex-col animate-slide-in">
         {/* Header */}
         <div className="flex justify-between items-center mb-4 border-b border-neon-cyan/20 pb-4">
           <div className="flex items-center gap-3">
             <BookOpen className="text-neon-cyan animate-pulse" size={24} />
             <h2 className="text-xl font-black text-neon-cyan uppercase tracking-[0.2em] text-glow-cyan">
-              SYSTEM MANUAL
+              {t('systemManual')}
             </h2>
           </div>
           <button
             onClick={() => { playSE('click'); onClose(); }}
             onMouseEnter={() => playSE('hover')}
             className="p-1 text-cyber-border hover:text-neon-cyan hover:bg-neon-cyan/10 rounded transition-all cursor-pointer"
+            aria-label={t('cancelBtn')}
           >
             <X size={24} />
           </button>
@@ -50,7 +68,7 @@ export default function ManualModal({ onClose }: ManualModalProps) {
         <div className="overflow-y-auto flex-1 pr-4 text-cyber-text font-mono text-sm leading-relaxed scrollbar-thin scrollbar-thumb-neon-cyan/40 scrollbar-track-transparent">
           {loading ? (
             <div className="flex justify-center items-center h-full text-neon-cyan animate-pulse tracking-widest uppercase">
-              Loading Data Archives...
+              {t('manualLoading')}
             </div>
           ) : (
             <ReactMarkdown

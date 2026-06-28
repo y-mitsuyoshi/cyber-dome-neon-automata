@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Zap, Terminal, Plus, ArrowRight, BookOpen } from 'lucide-react';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
@@ -23,6 +23,17 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
   const [hoveredManual, setHoveredManual] = useState(false);
 
   const { t } = useTranslation();
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showJoinModal) { playSE('click'); setShowJoinModal(false); setCode(''); }
+        else if (showManualModal) { playSE('click'); setShowManualModal(false); }
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [showJoinModal, showManualModal, playSE]);
 
   const getActiveName = () => name.trim() || 'PLAYER_ONE';
 
@@ -215,7 +226,10 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
 
       {/* JOIN ARENA CODE MODAL */}
       {showJoinModal && (
-        <div className="fixed inset-0 z-50 bg-cyber-dark/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 bg-cyber-dark/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) { playSE('click'); setShowJoinModal(false); setCode(''); } }}
+        >
           <form
             onSubmit={handleJoinSubmit}
             className="w-full max-w-sm bg-cyber-darker border border-neon-cyan/50 p-6 rounded shadow-2xl relative animate-slide-in"

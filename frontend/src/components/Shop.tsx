@@ -170,7 +170,6 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
         isOpen={isDeckModalOpen}
         onClose={() => setIsDeckModalOpen(false)}
         deck={deck}
-        credits={credits}
         onDeleteCard={onDelete}
         deleteModeSupported={deleteModeSupportedInModal}
       />
