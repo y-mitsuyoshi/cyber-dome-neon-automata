@@ -39,7 +39,7 @@ func popCardFromPool(pool *[]models.Card, round int) models.Card {
 		} else {
 			targetDeck = "C"
 		}
-		
+
 		var matchingCards []models.Card
 		for _, c := range all {
 			if c.Deck == targetDeck {
@@ -51,7 +51,7 @@ func popCardFromPool(pool *[]models.Card, round int) models.Card {
 		}
 		return all[rand.Intn(len(all))].Clone()
 	}
-	
+
 	idx := rand.Intn(len(*pool))
 	card := (*pool)[idx]
 	*pool = append((*pool)[:idx], (*pool)[idx+1:]...)

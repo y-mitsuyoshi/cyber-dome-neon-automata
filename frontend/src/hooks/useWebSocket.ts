@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
-const getWsUrl = (code: string, name: string) => {
+const getWsUrl = (code: string, name: string, isSpectator: boolean) => {
   let base = API_URL;
   if (!base) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -11,7 +11,8 @@ const getWsUrl = (code: string, name: string) => {
   } else {
     base = base.replace(/^http/, 'ws');
   }
-  return `${base}/api/ws?code=${code}&name=${encodeURIComponent(name)}`;
+  const endpoint = isSpectator ? '/api/ws/spectate' : '/api/ws';
+  return `${base}${endpoint}?code=${code}&name=${encodeURIComponent(name)}`;
 };
 
 export interface LobbyPlayer {
@@ -31,7 +32,7 @@ export interface ChatMessage {
   text: string;
 }
 
-export const useWebSocket = (code: string | null, name: string | null) => {
+export const useWebSocket = (code: string | null, name: string | null, isSpectator: boolean = false) => {
   const [connected, setConnected] = useState(false);
   const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -51,7 +52,7 @@ export const useWebSocket = (code: string | null, name: string | null) => {
       wsRef.current.close();
     }
 
-    const wsUrl = getWsUrl(code, name);
+    const wsUrl = getWsUrl(code, name, isSpectator);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

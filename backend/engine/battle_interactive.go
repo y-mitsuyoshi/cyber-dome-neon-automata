@@ -94,7 +94,7 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 		session.IsFinished = true
 		session.Winner = oppPlayerName
 		session.Loser = activePlayerName
-		
+
 		session.Log = append(session.Log, models.BattleLogEntry{
 			Step:            session.Step,
 			Action:          "deck_empty",
@@ -181,7 +181,7 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 		}
 	case "talent":
 		deckCount := len(*activeDeck)
-		if deckCount % 2 == 0 {
+		if deckCount%2 == 0 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
 					session.ActiveCards[i].Power += 3
@@ -600,7 +600,7 @@ func SubmitChoice(session *models.BattleSession, action *models.BattleAction, is
 		// Reorder top 3 cards based on CardIDs list
 		if len(action.CardIDs) > 0 {
 			var reordered []models.Card
-			
+
 			// Extract them
 			for _, id := range action.CardIDs {
 				for i, c := range *activeDeck {
@@ -992,7 +992,7 @@ func resolveNPCChoice(session *models.BattleSession, npcName string, action stri
 func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppPlayerName string, winningCard models.Card, effectText string) {
 	// Update flag details
 	session.FlagHolder = activePlayerName
-	
+
 	// Flag power becomes the winning card's power
 	var activeMem, oppMem *[]models.MemorySlot
 	if session.TurnOwner == session.Player1Name {
@@ -1018,7 +1018,11 @@ func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppP
 	session.TurnOwner = oppPlayerName
 	session.PendingActionPlayer = oppPlayerName
 	session.RequiredAction = "DRAW"
-	
+
+	// Preserve the challenger's full stack (all revealed cards including the
+	// winner) as the new defender's stack, so both sides can see how the flag
+	// was claimed. Must capture BEFORE resetting ActiveCards.
+	session.DefenderStack = append([]models.Card{}, session.ActiveCards...)
 	// Reset active cards: now contains only the new defending flag card
 	session.ActiveCards = []models.Card{winningCard}
 	session.ChallengerPower = 0
@@ -1078,7 +1082,7 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 	if session.ChallengerPower > session.FlagPower {
 		// FLAG SECURED!
 		oldFlagHolder := session.FlagHolder
-		
+
 		var activeMem *[]models.MemorySlot
 		var oppMem *[]models.MemorySlot
 		var oppDeck *[]models.Card
@@ -1274,6 +1278,8 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		}
 
 		if hasLossChoice && len(lossOptions) > 0 {
+			// Preserve the challenger's full stack before resetting ActiveCards.
+			session.DefenderStack = append([]models.Card{}, session.ActiveCards...)
 			session.ActiveCards = []models.Card{winningCard}
 			session.FlagHolder = activePlayerName
 

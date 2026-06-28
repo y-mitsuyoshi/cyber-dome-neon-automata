@@ -61,6 +61,9 @@ function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
     const flagHolder = battleSession.flagHolder;
     const isDefending = flagHolder === myName;
     const active = battleSession.activeCards.map(c => convertToFullCard(c));
+    // DefenderStack holds all cards the current flag holder revealed to claim
+    // the flag — shown so both sides can see how the flag was taken.
+    const defenderStack = (battleSession.defenderStack || []).map(c => convertToFullCard(c));
     if (!flagHolder) {
       const isMine = battleSession.turnOwner === myName;
       return {
@@ -70,8 +73,14 @@ function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
       };
     }
     if (isDefending) {
-      return { flagCard: active[0] || null, challengerCards: [], isDefending: true };
+      // Show the full stack the defender revealed; the top card is the flag card.
+      return {
+        flagCard: active[0] || null,
+        challengerCards: defenderStack,
+        isDefending: true,
+      };
     }
+    // I am the challenger: my revealed cards are in activeCards[1:]
     return { flagCard: null, challengerCards: active.slice(1), isDefending: false };
   }
 
@@ -126,14 +135,38 @@ interface PlayerStackViewProps {
   challengerPower: number;
 }
 
-function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower }: PlayerStackViewProps) {
-  const { translateCardName } = useTranslation();
-  const accent = side === 'me' ? 'neon-cyan' : 'neon-magenta';
-  const accentShadow = side === 'me' ? 'rgba(0,240,255,0.3)' : 'rgba(255,0,255,0.3)';
+function StackCardThumb({ card, isFlag }: { card: Card; isFlag: boolean }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      className="relative transition-all duration-200"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <CardDisplay card={card} disabled size="sm" />
+      {isFlag && (
+        <div className={`absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 text-[8px] font-mono font-bold text-neon-amber bg-cyber-darker border border-neon-amber/50 px-1 py-0.5 rounded-full shadow-[0_0_8px_rgba(255,191,0,0.4)] whitespace-nowrap z-20`}>
+          <Flag size={8} /> FLAG
+        </div>
+      )}
+      {hover && (
+        <div className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 scale-90 origin-top">
+          <CardDisplay card={card} disabled />
+        </div>
+      )}
+    </div>
+  );
+}
 
-  const defendingCard = stack.isDefending ? stack.flagCard : null;
-  const attackingCards = stack.isDefending ? [] : stack.challengerCards;
-  const hasAny = defendingCard || attackingCards.length > 0;
+function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower }: PlayerStackViewProps) {
+  const accent = side === 'me' ? 'neon-cyan' : 'neon-magenta';
+
+  // Unified card list: when defending, show the defender's revealed stack (flag card is the last/top);
+  // when attacking, show challenger cards. Either way it's a fanned stack.
+  const isDefending = stack.isDefending;
+  const cards = isDefending ? stack.challengerCards : stack.challengerCards;
+  const flagCard = isDefending ? stack.flagCard : null;
+  const hasAny = cards.length > 0 || flagCard;
 
   if (!hasAny) {
     return (
@@ -145,67 +178,53 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
     );
   }
 
-  // When defending: show the flag card with a flag badge + power.
-  if (defendingCard) {
-    return (
-      <div className="flex flex-col items-center gap-1 relative h-full justify-center">
-        <div className={`flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-${accent}`}>
-          <Flag size={11} className="animate-pulse" />
-          <span>防衛中</span>
-          <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">
-            POW {flagPower}
-          </span>
-        </div>
-        <div
-          key={defendingCard.id + '_' + defendingCard.power + '_flag'}
-          className="transition-all animate-card-reveal"
-          style={{ boxShadow: `0 0 18px ${accentShadow}` }}
-        >
-          <CardDisplay card={defendingCard} disabled size="sm" />
-        </div>
-      </div>
-    );
-  }
-
-  // When attacking: show stacked challenger cards with cumulative power & how much more needed.
-  const cumulative = challengerPower;
+  // Status label
+  const cumulative = isDefending ? flagPower : challengerPower;
   const needed = Math.max(0, flagPower - cumulative + 1);
-  const willTake = cumulative > flagPower;
+  const willTake = !isDefending && challengerPower > flagPower;
 
-  // Stack offset for fanned cards (px). Fixed width container so layout doesn't shift.
-  const CARD_W = 112; // sm card width ~28*4
-  const OVERLAP = 40;
-  const stackWidth = CARD_W + Math.max(0, attackingCards.length - 1) * OVERLAP;
+  // Stack layout constants. Fixed container so layout never shifts on card add.
+  const CARD_W = 112;
+  const OVERLAP = 34;
+  const n = cards.length;
+  const stackWidth = Math.max(CARD_W, CARD_W + (n - 1) * OVERLAP);
 
   return (
     <div className="flex flex-col items-center gap-1 relative h-full justify-center">
+      {/* Status badge */}
       <div className={`flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider ${willTake ? 'text-neon-green' : `text-${accent}`}`}>
-        <span>挑戦中</span>
-        <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">
-          計 {cumulative} POW
-        </span>
-        {!willTake && flagPower > 0 && (
-          <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">
-            あと {needed} POW
-          </span>
-        )}
-        {willTake && (
-          <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">
-            奪取！
-          </span>
+        {isDefending ? (
+          <>
+            <Flag size={11} className="animate-pulse" />
+            <span>防衛中</span>
+            <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">POW {flagPower}</span>
+          </>
+        ) : (
+          <>
+            <span>挑戦中</span>
+            <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">計 {cumulative} POW</span>
+            {!willTake && flagPower > 0 && (
+              <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">あと {needed} POW</span>
+            )}
+            {willTake && (
+              <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">奪取！</span>
+            )}
+          </>
         )}
       </div>
 
-      <div className="relative" style={{ width: stackWidth, height: 120 }}>
-        {attackingCards.length === 0 ? (
+      {/* Fanned stack */}
+      <div className="relative" style={{ width: stackWidth, height: 130 }}>
+        {n === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
               {isMyDrawTurn ? 'カードをめくる' : '待機中'}
             </div>
           </div>
         ) : (
-          attackingCards.map((cCard, idx) => {
-            const isLatest = idx === attackingCards.length - 1;
+          cards.map((cCard, idx) => {
+            const isLatest = idx === n - 1;
+            const isFlag = isDefending && isLatest;
             return (
               <div
                 key={cCard.id + '_' + idx}
@@ -213,28 +232,15 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
                 style={{
                   left: idx * OVERLAP,
                   zIndex: idx,
-                  opacity: isLatest ? 1 : 0.7,
-                  boxShadow: isLatest ? `0 0 14px ${accentShadow}` : 'none',
+                  opacity: isLatest ? 1 : 0.72,
                 }}
               >
-                <div className={isLatest ? 'animate-card-reveal' : ''}>
-                  <CardDisplay card={cCard} disabled size="sm" />
-                </div>
+                <StackCardThumb card={cCard} isFlag={!!isFlag} />
               </div>
             );
           })
         )}
       </div>
-      {/* Quick list of stacked card names */}
-      {attackingCards.length > 1 && (
-        <div className="flex flex-wrap items-center justify-center gap-1 max-w-md mt-0.5">
-          {attackingCards.map((c, i) => (
-            <span key={i} className={`text-[9px] font-mono px-1 py-0.5 rounded border border-${accent}/30 bg-cyber-darker/60 text-${accent}/80`}>
-              {translateCardName(c.name)} {c.power}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -635,7 +641,7 @@ function BattleArena({
       <div className="relative z-10 max-w-5xl mx-auto w-full flex flex-col gap-2 my-2 flex-1 min-h-0">
 
         {/* ===== OPPONENT AREA (TOP) ===== */}
-        <div className="flex flex-col gap-1.5 border border-neon-magenta/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-2 relative overflow-hidden shrink-0">
+        <div className="flex flex-col gap-1.5 border border-neon-magenta/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-2 relative overflow-hidden min-h-0 flex-1">
           {flashState === 'magenta' && (
             <div className="absolute inset-0 bg-neon-magenta/20 border border-neon-magenta shadow-[inset_0_0_40px_rgba(255,0,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
           )}
@@ -660,7 +666,7 @@ function BattleArena({
           </div>
 
           {/* Opponent active stack area — cards fanned/stacked */}
-          <div className="flex items-end justify-center h-[150px] relative overflow-hidden">
+          <div className="flex items-end justify-center flex-1 min-h-[120px] max-h-[150px] relative overflow-hidden">
             <PlayerStackView
               stack={oppStack}
               side="opp"
@@ -813,13 +819,13 @@ function BattleArena({
         </div>
 
         {/* ===== PLAYER AREA (BOTTOM) ===== */}
-        <div className="flex flex-col gap-1.5 border border-neon-cyan/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-2 relative overflow-hidden shrink-0">
+        <div className="flex flex-col gap-1.5 border border-neon-cyan/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-2 relative overflow-hidden min-h-0">
           {flashState === 'cyan' && (
             <div className="absolute inset-0 bg-neon-cyan/20 border border-neon-cyan shadow-[inset_0_0_40px_rgba(0,240,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
           )}
 
           {/* Player active stack area — cards fanned/stacked */}
-          <div className="flex items-start justify-center h-[150px] relative overflow-hidden">
+          <div className="flex items-start justify-center flex-1 min-h-[120px] max-h-[150px] relative overflow-hidden">
             <PlayerStackView
               stack={myStack}
               side="me"

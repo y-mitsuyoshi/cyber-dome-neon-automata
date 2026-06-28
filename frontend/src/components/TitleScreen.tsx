@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Zap, Terminal, Plus, ArrowRight, BookOpen, Users } from 'lucide-react';
+import { Zap, Terminal, Plus, ArrowRight, BookOpen, Users, Eye } from 'lucide-react';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
 import ManualModal from './ManualModal';
@@ -8,10 +8,11 @@ interface TitleScreenProps {
   onStartSolo: (name: string, playerCount: number) => void;
   onCreateLobby: (name: string, maxPlayers: number) => void;
   onJoinLobby: (code: string, name: string) => void;
+  onSpectateLobby: (code: string, name: string) => void;
   loading: boolean;
 }
 
-function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: TitleScreenProps) {
+function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, onSpectateLobby, loading }: TitleScreenProps) {
   const { playSE } = useAudio();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -19,6 +20,7 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
   const [soloPlayerCount, setSoloPlayerCount] = useState(8);
   const [lobbyMaxPlayers, setLobbyMaxPlayers] = useState(8);
   const [showManualModal, setShowManualModal] = useState(false);
+  const [spectateMode, setSpectateMode] = useState(false);
   const [hoveredSolo, setHoveredSolo] = useState(false);
   const [hoveredCreate, setHoveredCreate] = useState(false);
   const [hoveredJoin, setHoveredJoin] = useState(false);
@@ -43,7 +45,12 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
     e.preventDefault();
     if (!code.trim()) return;
     playSE('click');
-    onJoinLobby(code.toUpperCase().trim(), getActiveName());
+    const trimmedCode = code.toUpperCase().trim();
+    if (spectateMode) {
+      onSpectateLobby(trimmedCode, getActiveName());
+    } else {
+      onJoinLobby(trimmedCode, getActiveName());
+    }
   };
 
   return (
@@ -279,7 +286,7 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
       {showJoinModal && (
         <div
           className="fixed inset-0 z-50 bg-cyber-dark/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={(e) => { if (e.target === e.currentTarget) { playSE('click'); setShowJoinModal(false); setCode(''); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) { playSE('click'); setShowJoinModal(false); setCode(''); setSpectateMode(false); } }}
         >
           <form
             onSubmit={handleJoinSubmit}
@@ -305,6 +312,21 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
               autoFocus
             />
 
+            {/* Spectator mode toggle */}
+            <div className="flex items-center gap-2 mb-4">
+              <input
+                type="checkbox"
+                id="spectate-mode"
+                checked={spectateMode}
+                onChange={(e) => { playSE('click'); setSpectateMode(e.target.checked); }}
+                className="w-3.5 h-3.5 accent-neon-magenta cursor-pointer"
+              />
+              <label htmlFor="spectate-mode" className="text-[10px] font-mono text-neon-magenta uppercase tracking-wider cursor-pointer flex items-center gap-1">
+                <Eye size={12} />
+                {t('spectatorMode')}
+              </label>
+            </div>
+
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
@@ -312,6 +334,7 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
                   playSE('click');
                   setShowJoinModal(false);
                   setCode('');
+                  setSpectateMode(false);
                 }}
                 className="px-4 py-2 border border-cyber-border text-cyber-text-dim rounded text-xs uppercase hover:bg-cyber-surface/10 cursor-pointer"
               >
@@ -319,9 +342,14 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 bg-neon-cyan text-cyber-dark font-bold rounded text-xs uppercase hover:bg-neon-cyan/80 cursor-pointer flex items-center gap-1.5"
+                className={`px-6 py-2 rounded text-xs uppercase cursor-pointer flex items-center gap-1.5 font-bold ${
+                  spectateMode
+                    ? 'bg-neon-magenta text-white hover:bg-neon-magenta/80'
+                    : 'bg-neon-cyan text-cyber-dark hover:bg-neon-cyan/80'
+                }`}
               >
-                {t('connectBtn')} <ArrowRight size={12} />
+                {spectateMode ? <Eye size={12} /> : <ArrowRight size={12} />}
+                {spectateMode ? t('spectateBtn') : t('connectBtn')}
               </button>
             </div>
           </form>

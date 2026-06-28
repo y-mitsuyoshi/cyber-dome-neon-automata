@@ -68,7 +68,7 @@ type nameValidationError struct{ msg string }
 func (e *nameValidationError) Error() string { return e.msg }
 
 var (
-	errNameTooShort   = &nameValidationError{"name must be at least 2 characters"}
-	errNameTooLong    = &nameValidationError{"name must be 16 characters or fewer"}
+	errNameTooShort    = &nameValidationError{"name must be at least 2 characters"}
+	errNameTooLong     = &nameValidationError{"name must be 16 characters or fewer"}
 	errNameInvalidChar = &nameValidationError{"name contains characters that are not allowed"}
 )

@@ -81,6 +81,7 @@ export interface BattleSession {
   pendingActionPlayer: string; // Player name we are waiting for
   actionOptions: Card[];
   activeCards: Card[];
+  defenderStack?: Card[];
   challengerPower: number;
 }
 
@@ -130,4 +131,33 @@ export interface GameState {
   deckAPool: Card[];
   deckBPool: Card[];
   deckCPool: Card[];
+}
+
+export interface SpectatorBattleSession {
+  label: string;
+  p1: string;
+  p2: string;
+  flagHolder: string;
+  flagPower: number;
+  turnOwner: string;
+  requiredAction: string;
+  isFinished: boolean;
+  log: BattleLogEntry[];
+  step: number;
+}
+
+export interface SpectatorMatchup {
+  p1: string;
+  p2: string;
+}
+
+export interface SpectatorGameState {
+  gameId: string;
+  currentRound: number;
+  maxRounds: number;
+  phase: string;
+  standings: Standing[];
+  matchups: SpectatorMatchup[];
+  battleSessions: SpectatorBattleSession[];
+  isSpectator: true;
 }

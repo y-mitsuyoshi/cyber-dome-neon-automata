@@ -10,47 +10,47 @@ const maxMemorySlots = 6
 
 // BattleState tracks the internal state during a battle simulation.
 type BattleState struct {
-	PlayerDeck     []models.Card
-	CPUDeck        []models.Card
-	PlayerMem      []models.MemorySlot
-	CPUMem         []models.MemorySlot
-	PlayerDiscard  []models.Card
-	CPUDiscard     []models.Card
-	FlagCard       *models.Card
-	FlagHolder     string // "player" or "cpu"
-	FlagPower      int
-	Step           int
-	Log            []models.BattleLogEntry
-	PrevCardAttr   map[string]string // last card attribute by side
-	NullifyNext    map[string]bool   // whether next card effect is nullified per side
-	LockedCards    map[string]string // side -> locked card name (skip it)
-	PlayerExtraFans int
-	CPUExtraFans   int
+	PlayerDeck           []models.Card
+	CPUDeck              []models.Card
+	PlayerMem            []models.MemorySlot
+	CPUMem               []models.MemorySlot
+	PlayerDiscard        []models.Card
+	CPUDiscard           []models.Card
+	FlagCard             *models.Card
+	FlagHolder           string // "player" or "cpu"
+	FlagPower            int
+	Step                 int
+	Log                  []models.BattleLogEntry
+	PrevCardAttr         map[string]string // last card attribute by side
+	NullifyNext          map[string]bool   // whether next card effect is nullified per side
+	LockedCards          map[string]string // side -> locked card name (skip it)
+	PlayerExtraFans      int
+	CPUExtraFans         int
 	PlayerNextAttackBuff int
-	CPUNextAttackBuff   int
+	CPUNextAttackBuff    int
 }
 
 // newBattleState initialises a fresh battle.
 func newBattleState(playerDeck, cpuDeck []models.Card) *BattleState {
 	return &BattleState{
-		PlayerDeck:      playerDeck,
-		CPUDeck:         cpuDeck,
-		PlayerMem:       []models.MemorySlot{},
-		CPUMem:          []models.MemorySlot{},
-		PlayerDiscard:   []models.Card{},
-		CPUDiscard:      []models.Card{},
-		FlagCard:        nil,
-		FlagHolder:      "",
-		FlagPower:       0,
-		Step:            0,
-		Log:             []models.BattleLogEntry{},
-		PrevCardAttr:    map[string]string{"player": "", "cpu": ""},
-		NullifyNext:     map[string]bool{"player": false, "cpu": false},
-		LockedCards:     map[string]string{"player": "", "cpu": ""},
-		PlayerExtraFans: 0,
-		CPUExtraFans:    0,
+		PlayerDeck:           playerDeck,
+		CPUDeck:              cpuDeck,
+		PlayerMem:            []models.MemorySlot{},
+		CPUMem:               []models.MemorySlot{},
+		PlayerDiscard:        []models.Card{},
+		CPUDiscard:           []models.Card{},
+		FlagCard:             nil,
+		FlagHolder:           "",
+		FlagPower:            0,
+		Step:                 0,
+		Log:                  []models.BattleLogEntry{},
+		PrevCardAttr:         map[string]string{"player": "", "cpu": ""},
+		NullifyNext:          map[string]bool{"player": false, "cpu": false},
+		LockedCards:          map[string]string{"player": "", "cpu": ""},
+		PlayerExtraFans:      0,
+		CPUExtraFans:         0,
 		PlayerNextAttackBuff: 0,
-		CPUNextAttackBuff:   0,
+		CPUNextAttackBuff:    0,
 	}
 }
 
@@ -616,7 +616,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				return models.BattleResult{
 					Winner: winner, Loser: loser,
 					Reason: fmt.Sprintf("%s ran out of cards", loser),
-					Log: bs.Log, FansGained: 2,
+					Log:    bs.Log, FansGained: 2,
 				}
 			}
 
@@ -692,7 +692,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 						return models.BattleResult{
 							Winner: winner, Loser: loser,
 							Reason: fmt.Sprintf("%s memory overflow", loser),
-							Log: bs.Log, FansGained: 3,
+							Log:    bs.Log, FansGained: 3,
 						}
 					}
 					bs.logEntry("bench", oldFlagHolder, oldFlagCard, 0, "Card benched", bs.FlagHolder,
@@ -736,7 +736,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 					return models.BattleResult{
 						Winner: winner, Loser: loser,
 						Reason: fmt.Sprintf("%s memory overflow", loser),
-						Log: bs.Log, FansGained: 3,
+						Log:    bs.Log, FansGained: 3,
 					}
 				}
 				bs.logEntry("bench", challengerSide, &revealedCards[i], 0, "Card benched", bs.FlagHolder,
@@ -794,7 +794,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				return models.BattleResult{
 					Winner: winner, Loser: loser,
 					Reason: "Both decks exhausted, flag holder wins",
-					Log: bs.Log, FansGained: 2,
+					Log:    bs.Log, FansGained: 2,
 				}
 			}
 
@@ -805,7 +805,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				return models.BattleResult{
 					Winner: "player", Loser: "cpu",
 					Reason: "CPU ran out of cards",
-					Log: bs.Log, FansGained: 2,
+					Log:    bs.Log, FansGained: 2,
 				}
 			}
 			if bs.FlagHolder == "cpu" && len(bs.PlayerDeck) == 0 {
@@ -814,7 +814,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				return models.BattleResult{
 					Winner: "cpu", Loser: "player",
 					Reason: "Player ran out of cards",
-					Log: bs.Log, FansGained: 2,
+					Log:    bs.Log, FansGained: 2,
 				}
 			}
 		}
@@ -830,7 +830,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 			return models.BattleResult{
 				Winner: bs.FlagHolder, Loser: loser,
 				Reason: "Battle step limit reached, flag holder wins",
-				Log: bs.Log, FansGained: 1,
+				Log:    bs.Log, FansGained: 1,
 			}
 		}
 	}

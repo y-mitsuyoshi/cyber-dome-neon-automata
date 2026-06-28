@@ -23,7 +23,7 @@ func TestUniqueSlotCount(t *testing.T) {
 			Count: 1,
 		},
 	}
-	
+
 	// Should be 2 slots - 1 reduction = 1
 	count := uniqueSlotCount(mem)
 	if count != 1 {
@@ -49,7 +49,7 @@ func TestBenchPowerBonus(t *testing.T) {
 			Count: 1,
 		},
 	}
-	
+
 	// Should be 2 bonus power
 	bonus := benchPowerBonus(mem)
 	if bonus != 2 {
@@ -75,7 +75,7 @@ func TestCountAttributeInMemory(t *testing.T) {
 			Count: 1,
 		},
 	}
-	
+
 	count := countAttributeInMemory(mem, "Orbit")
 	if count != 2 {
 		t.Errorf("Expected 2, got %d", count)
@@ -91,10 +91,10 @@ func TestRunBattle(t *testing.T) {
 		{Name: "Card3", Power: 2, Attribute: "Virus"},
 		{Name: "Card4", Power: 2, Attribute: "Virus"},
 	}
-	
+
 	// Player card is much stronger (10 vs 2,2). Player should win.
 	result := RunBattle(playerDeck, cpuDeck)
-	
+
 	if result.Winner != "player" {
 		t.Errorf("Expected player to win, got %s", result.Winner)
 	}
@@ -103,7 +103,7 @@ func TestRunBattle(t *testing.T) {
 func TestGetMatchupsEven(t *testing.T) {
 	// 4 players (even count) should result in 3 rounds of matchmaking
 	numPlayers := 4
-	
+
 	// Verify single round-robin uniqueness:
 	// Every player must play every other player exactly once across all 3 rounds.
 	played := make(map[string]int)
@@ -136,7 +136,7 @@ func TestGetMatchupsEven(t *testing.T) {
 func TestGetMatchupsOdd(t *testing.T) {
 	// 3 players (odd count) should introduce a dummy player -1 for BYE, resulting in 3 rounds
 	numPlayers := 3
-	
+
 	// Across 3 rounds, each player must receive exactly one BYE (index -1)
 	byes := make(map[int]int)
 	played := make(map[string]int)

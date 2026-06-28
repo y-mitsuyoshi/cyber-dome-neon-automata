@@ -7,6 +7,7 @@ import Shop from './components/Shop';
 import BattleArena from './components/BattleArena';
 import Standings from './components/Standings';
 import GameOver from './components/GameOver';
+import SpectatorScreen from './components/SpectatorScreen';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useTranslation } from './context/TranslationContext';
 import { useAudio } from './context/AudioContext';
@@ -28,7 +29,7 @@ import {
   completeBattle,
 } from './api/client';
 
-type Screen = 'title' | 'lobby' | 'game';
+type Screen = 'title' | 'lobby' | 'game' | 'spectate';
 
 function App() {
   const { isMuted, toggleMute, playBGM, playSE } = useAudio();
@@ -78,6 +79,15 @@ function App() {
   }, [screen, gameState?.phase, gameState?.currentRound, gameState?.maxRounds, playBGM, playSE]);
 
   // WebSocket Hook
+  // Spectator mode state
+  const [spectatorCode, setSpectatorCode] = useState<string | null>(null);
+  const [spectatorName, setSpectatorName] = useState<string>('SPECTATOR');
+  const [spectatorGameId, setSpectatorGameId] = useState<string | null>(null);
+
+  const isSpectator = screen === 'spectate';
+  const wsCode = isSpectator ? spectatorCode : lobbyCode;
+  const wsName = isSpectator ? spectatorName : (lobbyCode ? playerName : null);
+
   const {
     connected,
     lobbyState,
@@ -91,7 +101,16 @@ function App() {
     resetBattleTrigger,
     resetGameId,
     resetKicked,
-  } = useWebSocket(lobbyCode, lobbyCode ? playerName : null);
+  } = useWebSocket(wsCode, wsName, isSpectator);
+
+  // Spectator: listen for game_starting to know when game has started
+  useEffect(() => {
+    if (wsGameId && isSpectator) {
+      setSpectatorGameId(wsGameId);
+      setScreen('spectate');
+      resetGameId();
+    }
+  }, [wsGameId, isSpectator, resetGameId]);
 
   // WS Kicked Redirection Listener
   useEffect(() => {
@@ -221,6 +240,14 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // SPECTATOR MODE ENTRY
+  const handleSpectateLobby = (code: string, name: string) => {
+    playSE('click');
+    setError(null);
+    setSpectatorCode(code);
+    setSpectatorName(name || 'SPECTATOR');
   };
 
   // MULTIPLAYER CREATION
@@ -515,9 +542,35 @@ function App() {
           onStartSolo={handleStartSolo}
           onCreateLobby={handleCreateLobby}
           onJoinLobby={handleJoinLobby}
+          onSpectateLobby={handleSpectateLobby}
           loading={loading}
         />
       )}
+
+      {screen === 'spectate' && (spectatorGameId ? (
+        <SpectatorScreen
+          gameId={spectatorGameId}
+          onExit={handleRestart}
+        />
+      ) : (
+        <div className="min-h-screen bg-cyber-dark flex items-center justify-center font-mono">
+          <div className="text-center">
+            <span className="inline-block w-8 h-8 rounded-full border-4 border-neon-magenta border-t-transparent animate-spin mb-4" />
+            <p className="text-sm font-bold uppercase tracking-widest text-neon-magenta animate-pulse mb-2">
+              {t('spectatingSector')}
+            </p>
+            <p className="text-[10px] text-cyber-text-dim uppercase tracking-wider">
+              {lobbyState ? `${lobbyState.players.length} combatants in lobby` : t('loadingSpectator')}
+            </p>
+            <button
+              onClick={handleRestart}
+              className="mt-6 text-[10px] uppercase tracking-wider border border-cyber-border/40 text-cyber-text-dim px-3 py-1.5 rounded hover:border-neon-cyan hover:text-neon-cyan transition-colors cursor-pointer"
+            >
+              {t('cancelBtn')}
+            </button>
+          </div>
+        </div>
+      ))}
 
       {screen === 'lobby' && (
         <LobbyScreen

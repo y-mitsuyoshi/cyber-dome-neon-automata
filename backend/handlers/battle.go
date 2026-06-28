@@ -115,7 +115,7 @@ func HandleBattleStep(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if session.RequiredAction != "DRAW" {
-		writeError(w, http.StatusBadRequest, "An action choice is required: " + session.RequiredAction)
+		writeError(w, http.StatusBadRequest, "An action choice is required: "+session.RequiredAction)
 		return
 	}
 
@@ -333,7 +333,7 @@ func HandleBattleComplete(w http.ResponseWriter, r *http.Request) {
 		gs.Phase = "results"
 		gs.ReadyPlayers = make(map[string]bool)
 		gs.BattleSessions = make(map[string]*models.BattleSession) // Clear sessions
-		
+
 		go BroadcastGameStateBroadcast(gs.LobbyCode, gs.Phase, gs.CurrentRound)
 	}
 

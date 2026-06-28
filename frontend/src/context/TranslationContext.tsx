@@ -206,6 +206,8 @@ const uiDict: Record<Locale, Record<string, string>> = {
     // App Screen
     disconnectedMainframe: "DISCONNECTED: You have been kicked from the tournament mainframe.",
     acknowledgeBtn: "Acknowledge",
+    matchupsHeader: "Matchups",
+    activeEncounters: "Active Encounters",
     Mainframe: "Mainframe",
     Sector: "Sector",
     Orbit: "Orbit",
@@ -241,7 +243,13 @@ const uiDict: Record<Locale, Record<string, string>> = {
     unmuteAudio: "Unmute Audio",
     systemManual: "System Manual",
     manualLoading: "Loading Data Archives...",
-    manualLoadError: "Failed to load manual data from archives."
+    manualLoadError: "Failed to load manual data from archives.",
+    spectatorMode: "Spectator Mode",
+    spectateBtn: "Spectate",
+    spectateDesc: "Watch the arena in read-only mode.",
+    spectatingSector: "SPECTATING SECTOR",
+    loadingSpectator: "Linking to spectator feed...",
+    spectateError: "Failed to connect to spectator feed."
   },
   ja: {
     // Title Screen
@@ -426,6 +434,8 @@ const uiDict: Record<Locale, Record<string, string>> = {
     // App Screen
     disconnectedMainframe: "接続切断：アリーナのメインフレームからキックされました。",
     acknowledgeBtn: "確認",
+    matchupsHeader: "対戦カード",
+    activeEncounters: "アクティブ戦闘",
     Mainframe: "メインフレーム",
     Sector: "セクター",
     Orbit: "オービット",
@@ -461,7 +471,13 @@ const uiDict: Record<Locale, Record<string, string>> = {
     unmuteAudio: "ミュート解除",
     systemManual: "システムマニュアル",
     manualLoading: "データアーカイブを読み込み中...",
-    manualLoadError: "マニュアルの読み込みに失敗しました。"
+    manualLoadError: "マニュアルの読み込みに失敗しました。",
+    spectatorMode: "観戦モード",
+    spectateBtn: "観戦する",
+    spectateDesc: "読み取り専用でアリーナを観戦します。",
+    spectatingSector: "観戦中",
+    loadingSpectator: "観戦フィードにリンク中...",
+    spectateError: "観戦フィードへの接続に失敗しました。"
   }
 };
 

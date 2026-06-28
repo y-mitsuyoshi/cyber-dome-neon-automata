@@ -47,7 +47,7 @@ func CreateNPC(name string, strategy string) models.Player {
 // NPCShopPhase simulates a symmetrical shop phase for an NPC player.
 func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 	strategy := npc.AIStrategy
-	
+
 	// Max 3 purchase/reroll iterations to prevent infinite loops and simulate human speed
 	for iter := 0; iter < 3; iter++ {
 		// Generate standard shop of 5 cards using the shared pool

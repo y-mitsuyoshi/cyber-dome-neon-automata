@@ -193,13 +193,13 @@ func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerNam
 	for _, p := range gs.Players {
 		if p.Name != playerName {
 			npcs = append(npcs, map[string]interface{}{
-				"name":       p.Name,
-				"strategy":   p.AIStrategy,
-				"deckSize":   len(p.Deck),
-				"wins":       p.Wins,
-				"fans":       p.Fans,
-				"isNpc":      p.IsNPC,
-				"ready":      gs.ReadyPlayers[p.Name],
+				"name":     p.Name,
+				"strategy": p.AIStrategy,
+				"deckSize": len(p.Deck),
+				"wins":     p.Wins,
+				"fans":     p.Fans,
+				"isNpc":    p.IsNPC,
+				"ready":    gs.ReadyPlayers[p.Name],
 			})
 		}
 	}
@@ -251,16 +251,16 @@ func WriteSpectatorGameState(w http.ResponseWriter, gs *models.GameState) {
 		}
 		seen[key] = true
 		sessions = append(sessions, map[string]interface{}{
-			"label":   key,
-			"p1":      session.Player1Name,
-			"p2":      session.Player2Name,
-			"flagHolder": session.FlagHolder,
-			"flagPower":  session.FlagPower,
-			"turnOwner":  session.TurnOwner,
+			"label":          key,
+			"p1":             session.Player1Name,
+			"p2":             session.Player2Name,
+			"flagHolder":     session.FlagHolder,
+			"flagPower":      session.FlagPower,
+			"turnOwner":      session.TurnOwner,
 			"requiredAction": session.RequiredAction,
-			"isFinished": session.IsFinished,
-			"log":       session.Log,
-			"step":      session.Step,
+			"isFinished":     session.IsFinished,
+			"log":            session.Log,
+			"step":           session.Step,
 		})
 	}
 
@@ -563,7 +563,7 @@ func HandleKickPlayer(w http.ResponseWriter, r *http.Request) {
 	targetPlayer.IsNPC = true
 	// Choose a strategy randomly
 	targetPlayer.AIStrategy = engine.NPCStrategies[rand.Intn(len(engine.NPCStrategies))]
-	
+
 	// Mark them as ready in current round standby so they don't block
 	gs.ReadyPlayers[req.TargetName] = true
 
@@ -795,7 +795,7 @@ func advanceRound(gs *models.GameState) {
 			if len(standings) >= 2 {
 				top1Name := standings[0].Name
 				top2Name := standings[1].Name
-				
+
 				top1Idx := -1
 				top2Idx := -1
 				for idx, p := range gs.Players {
@@ -805,7 +805,7 @@ func advanceRound(gs *models.GameState) {
 						top2Idx = idx
 					}
 				}
-				gs.Matchups = [][2]int{ {top1Idx, top2Idx} }
+				gs.Matchups = [][2]int{{top1Idx, top2Idx}}
 			}
 			// Start battle phase immediately for the finals
 			resolveRound(gs)

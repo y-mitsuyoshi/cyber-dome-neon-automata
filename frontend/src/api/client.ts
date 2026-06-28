@@ -1,4 +1,4 @@
-import type { GameState, Card, BattleSession, Standing, BattleLogEntry, NPC, BattleResult } from '../types/game';
+import type { GameState, Card, BattleSession, Standing, BattleLogEntry, NPC, BattleResult, SpectatorGameState } from '../types/game';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -230,4 +230,8 @@ export async function completeBattle(gameId: string, playerName: string): Promis
     body: JSON.stringify({ gameId, playerName }),
   });
   return mapGameState(raw);
+}
+
+export async function getSpectatorGameState(gameId: string): Promise<SpectatorGameState> {
+  return apiFetch<SpectatorGameState>(`/api/game/state?gameId=${gameId}&spectator=true`);
 }

@@ -48,10 +48,10 @@ func (c *Client) Close() {
 // Hub manages active WebSocket connections.
 type Hub struct {
 	sync.RWMutex
-	Clients    map[*Client]bool
+	Clients            map[*Client]bool
 	LobbyCodeToClients map[string]map[string]*Client // lobbyCode -> playerName -> Client
-	Register   chan *Client
-	Unregister chan *Client
+	Register           chan *Client
+	Unregister         chan *Client
 }
 
 // GlobalHub is the singleton instance.
