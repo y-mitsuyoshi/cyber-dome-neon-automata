@@ -67,9 +67,9 @@ function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
     if (!flagHolder) {
       const isMine = battleSession.turnOwner === myName;
       return {
-        flagCard: isMine ? (active[0] || null) : null,
-        challengerCards: isMine ? [] : active,
-        isDefending: isMine,
+        flagCard: null,
+        challengerCards: isMine ? active : [],
+        isDefending: false,
       };
     }
     if (isDefending) {
@@ -101,13 +101,18 @@ function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
 
   const isDefending = defenderName === myName;
   if (flagChangeIdx === -1) {
-    const entry = battleLog[currentLogIndex];
-    const isFirst = entry && entry.action === 'reveal' && entry.flagHolder === entry.player;
-    const mine = isFirst && entry.player === myName;
+    // Before the first flag change: reveal cards belong to the player who played them.
+    const challengerCards: Card[] = [];
+    for (let i = 0; i <= currentLogIndex; i++) {
+      const entry = battleLog[i];
+      if (entry && entry.action === 'reveal' && entry.player === myName && entry.card) {
+        challengerCards.push(convertToFullCard(entry.card));
+      }
+    }
     return {
-      flagCard: mine && entry?.card ? convertToFullCard(entry.card) : null,
-      challengerCards: [],
-      isDefending: mine,
+      flagCard: null,
+      challengerCards,
+      isDefending: false,
     };
   }
 
@@ -150,7 +155,10 @@ function StackCardThumb({ card, isFlag }: { card: Card; isFlag: boolean }) {
         </div>
       )}
       {hover && (
-        <div className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 scale-90 origin-top">
+        <div
+          className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 scale-90 origin-top"
+          style={{ transform: 'rotateX(0deg) rotateY(0deg) rotateZ(0deg) translateZ(80px) scale(0.9)' }}
+        >
           <CardDisplay card={card} disabled />
         </div>
       )}
@@ -164,9 +172,29 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
   // Unified card list: when defending, show the defender's revealed stack (flag card is the last/top);
   // when attacking, show challenger cards. Either way it's a fanned stack.
   const isDefending = stack.isDefending;
-  const cards = isDefending ? stack.challengerCards : stack.challengerCards;
-  const flagCard = isDefending ? stack.flagCard : null;
-  const hasAny = cards.length > 0 || flagCard;
+  const cards = useMemo(() => {
+    const arr = [...stack.challengerCards];
+    if (isDefending && stack.flagCard) {
+      const lastCard = arr[arr.length - 1];
+      if (!lastCard || lastCard.id !== stack.flagCard.id) {
+        arr.push(stack.flagCard);
+      }
+    }
+    return arr;
+  }, [stack.challengerCards, isDefending, stack.flagCard]);
+  const hasAny = cards.length > 0;
+
+  const [newKeys, setNewKeys] = useState<string[]>([]);
+  const prevKeys = useRef<string[]>([]);
+  const currentKeys = useMemo(() => cards.map((c, idx) => `${c.id}_${idx}`), [cards]);
+
+  useEffect(() => {
+    const news = currentKeys.filter(key => !prevKeys.current.includes(key));
+    if (news.length > 0) {
+      setNewKeys(news);
+    }
+    prevKeys.current = currentKeys;
+  }, [currentKeys]);
 
   if (!hasAny) {
     return (
@@ -214,7 +242,7 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
       </div>
 
       {/* Fanned stack */}
-      <div className="relative" style={{ width: stackWidth, height: 130 }}>
+      <div className="relative perspective-arena" style={{ width: stackWidth, height: 130 }}>
         {n === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
@@ -225,14 +253,29 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
           cards.map((cCard, idx) => {
             const isLatest = idx === n - 1;
             const isFlag = isDefending && isLatest;
+            const cardKey = `${cCard.id}_${idx}`;
+            const isNew = newKeys.includes(cardKey);
+            const newIndex = newKeys.indexOf(cardKey);
+
+            // Staggered delay for newly mounted cards
+            const animationDelay = isNew ? `${newIndex * 150}ms` : '0ms';
+
+            // Card 3D tilt styles
+            const cardClass = isNew
+              ? (side === 'me' ? 'animate-draw-card-me' : 'animate-draw-card-opp')
+              : (side === 'me'
+                  ? (isLatest ? 'card-static-me-latest' : 'card-static-me')
+                  : (isLatest ? 'card-static-opp-latest' : 'card-static-opp'));
+
             return (
               <div
-                key={cCard.id + '_' + idx}
-                className="absolute top-0 transition-all duration-300"
+                key={cardKey}
+                className={`absolute top-0 transition-all duration-300 ${cardClass}`}
                 style={{
                   left: idx * OVERLAP,
                   zIndex: idx,
                   opacity: isLatest ? 1 : 0.72,
+                  animationDelay,
                 }}
               >
                 <StackCardThumb card={cCard} isFlag={!!isFlag} />
@@ -607,6 +650,10 @@ function BattleArena({
     { label: '4.0x', value: 200 },
   ];
 
+  const flagHolder = isLiveMode
+    ? (battleSession?.flagHolder || '')
+    : (hasLog && activeLog && activeLog[currentLogIndex] ? activeLog[currentLogIndex].flagHolder : '');
+
   return (
     <div className="h-screen bg-cyber-dark relative overflow-hidden flex flex-col p-2 sm:p-4 select-none">
       {/* Background gradients */}
@@ -640,33 +687,46 @@ function BattleArena({
       {/* 2. Main Vertical Battle Board — Opponent (top) vs Player (bottom) */}
       <div className="relative z-10 max-w-5xl mx-auto w-full flex flex-col gap-2 my-2 flex-1 min-h-0">
 
-        {/* ===== OPPONENT AREA (TOP) ===== */}
-        <div className="flex flex-col gap-1.5 border border-neon-magenta/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-2 relative overflow-hidden min-h-0 flex-1">
-          {flashState === 'magenta' && (
-            <div className="absolute inset-0 bg-neon-magenta/20 border border-neon-magenta shadow-[inset_0_0_40px_rgba(255,0,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
-          )}
-
-          {/* Opponent header row: name | deck | memory */}
-          <div className="flex items-center justify-between gap-3 font-mono">
+        {/* ===== OPPONENT PANEL (TOP) ===== */}
+        <div className="flex flex-col gap-1 border border-neon-magenta/20 rounded-xl bg-cyber-surface/5 p-2 font-mono shrink-0">
+          {/* Opponent header row: name | deck */}
+          <div className="flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 min-w-0">
-              <Cpu size={16} className="text-neon-magenta shrink-0" />
-              <span className="text-neon-magenta font-bold text-sm truncate">{opponent}</span>
+              <Cpu size={14} className="text-neon-magenta shrink-0" />
+              <span className="text-neon-magenta font-bold truncate">{opponent}</span>
               {oppStack.isDefending && (
-                <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-neon-amber font-bold border border-neon-amber/40 px-1.5 py-0.5 rounded bg-amber-950/20 animate-pulse">
-                  <Flag size={10} /> 防衛中
+                <span className="flex items-center gap-0.5 text-[8px] uppercase tracking-wider text-neon-amber font-bold border border-neon-amber/40 px-1 py-0.5 rounded bg-amber-950/20 animate-pulse">
+                  <Flag size={8} /> DEFENDING
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2 text-[10px]">
               <span className="text-cyber-text-dim uppercase tracking-wider">{t('deckLabel')}</span>
               <span className="text-neon-magenta font-bold flex items-center gap-1">
-                <Layers size={12} />{opponentDeckCount}
+                <Layers size={10} />{opponentDeckCount}
               </span>
             </div>
           </div>
+          {/* Opponent memory */}
+          <MemorySlots slots={opponentMemSlots} label={t('npcMemoryLabel', { opponent })} side="right" compact />
+        </div>
 
-          {/* Opponent active stack area — cards fanned/stacked */}
-          <div className="flex items-end justify-center flex-1 min-h-[120px] max-h-[150px] relative overflow-hidden">
+        {/* ===== CENTRAL BATTLEGROUND (PLAYMAT) ===== */}
+        <div className={`flex flex-col border rounded-2xl bg-cyber-surface/20 backdrop-blur-sm relative overflow-hidden flex-1 min-h-0 transition-all duration-300 ${
+          flagHolder === playerName ? 'border-neon-cyan/40 shadow-[0_0_15px_rgba(0,240,255,0.1)]' :
+          flagHolder === opponent ? 'border-neon-magenta/40 shadow-[0_0_15px_rgba(255,0,255,0.1)]' :
+          'border-cyber-border/40'
+        }`}>
+          {/* Flash overlays inside playmat */}
+          {flashState === 'cyan' && (
+            <div className="absolute inset-0 bg-neon-cyan/20 border-2 border-neon-cyan shadow-[inset_0_0_50px_rgba(0,240,255,0.4)] rounded-2xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
+          )}
+          {flashState === 'magenta' && (
+            <div className="absolute inset-0 bg-neon-magenta/20 border-2 border-neon-magenta shadow-[inset_0_0_50px_rgba(255,0,255,0.4)] rounded-2xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
+          )}
+
+          {/* Opponent Stack (Top) */}
+          <div className="flex-1 flex items-end justify-center min-h-0 relative py-2 overflow-hidden border-b border-cyber-border/10">
             <PlayerStackView
               stack={oppStack}
               side="opp"
@@ -676,11 +736,89 @@ function BattleArena({
             />
           </div>
 
-          {/* Opponent memory (compact horizontal) */}
-          <MemorySlots slots={opponentMemSlots} label={t('npcMemoryLabel', { opponent })} side="right" compact />
+          {/* Center Flag/Trophy Bar (Playmat Center) */}
+          <div className="shrink-0 w-full py-1.5 flex items-center justify-between border-y border-cyber-border/20 bg-cyber-darker/60 px-4 relative z-20 font-mono">
+            {/* Left: Player Challenger Badge */}
+            <div className="flex-1 flex justify-start text-[10px] text-cyber-text-dim">
+              {!isReplayFinished && flagHolder === opponent && challengerPower > 0 && (
+                <div className="flex items-center gap-1.5 text-neon-cyan font-bold uppercase tracking-wider animate-pulse">
+                  <span>Power: {challengerPower}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Center Flag Indicator */}
+            <div className="shrink-0 flex items-center gap-3">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                flagHolder === playerName ? 'border-neon-cyan bg-cyan-950/20 text-neon-cyan shadow-[0_0_12px_rgba(0,240,255,0.4)] animate-pulse' :
+                flagHolder === opponent ? 'border-neon-magenta bg-purple-950/20 text-neon-magenta shadow-[0_0_12px_rgba(255,0,255,0.4)] animate-pulse' :
+                'border-neon-amber bg-amber-950/20 text-neon-amber shadow-[0_0_12px_rgba(255,191,0,0.4)]'
+              } transition-all duration-300`}>
+                <Flag size={14} className={flagHolder ? 'animate-pulse' : ''} />
+              </div>
+              <div className="text-center">
+                <div className="text-[8px] uppercase text-cyber-text-dim tracking-widest font-bold">FLAG POWER</div>
+                <div className="text-sm font-black text-white leading-none">{flagPowerValue}</div>
+              </div>
+            </div>
+
+            {/* Right: Opponent Challenger Badge */}
+            <div className="flex-1 flex justify-end text-[10px] text-cyber-text-dim">
+              {!isReplayFinished && flagHolder === playerName && challengerPower > 0 && (
+                <div className="flex items-center gap-1.5 text-neon-magenta font-bold uppercase tracking-wider animate-pulse">
+                  <span>Power: {challengerPower}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Player Stack (Bottom) */}
+          <div className="flex-1 flex items-start justify-center min-h-0 relative py-2 overflow-hidden border-t border-cyber-border/10">
+            <PlayerStackView
+              stack={myStack}
+              side="me"
+              isMyDrawTurn={isMyDrawTurn}
+              flagPower={flagPowerValue}
+              challengerPower={challengerPower}
+            />
+          </div>
         </div>
 
-        {/* ===== CENTER: Turn indicator + action resolution ===== */}
+        {/* ===== PLAYER PANEL (BOTTOM) ===== */}
+        <div className="flex flex-col gap-1 border border-neon-cyan/20 rounded-xl bg-cyber-surface/5 p-2 font-mono shrink-0">
+          {/* Player memory */}
+          <MemorySlots slots={myMemSlots} label={t('yourMemory')} side="left" compact />
+          
+          {/* Player header row */}
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <User size={14} className="text-neon-cyan shrink-0" />
+              <span className="text-neon-cyan font-bold truncate">{playerName}</span>
+              {myStack.isDefending && (
+                <span className="flex items-center gap-0.5 text-[8px] uppercase tracking-wider text-neon-amber font-bold border border-neon-amber/40 px-1 py-0.5 rounded bg-amber-950/20 animate-pulse">
+                  <Flag size={8} /> DEFENDING
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowDeckModal(true)}
+                className="flex items-center gap-1.5 border border-neon-cyan/45 hover:border-neon-cyan rounded px-2 py-1 bg-cyber-surface/30 text-neon-cyan font-bold hover:bg-neon-cyan/10 transition-all text-[10px] cursor-pointer uppercase tracking-wider font-mono"
+              >
+                <Layers size={12} className="text-neon-cyan" />
+                {t('viewDeckBtn')}
+              </button>
+              <div className="flex items-center gap-2 text-[10px]">
+                <span className="text-cyber-text-dim uppercase tracking-wider">{t('deckLabel')}</span>
+                <span className="text-neon-cyan font-bold flex items-center gap-1">
+                  <Layers size={12} />{myDeckCount}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== CONTROLS PANEL (BOTTOM CENTER) ===== */}
         <div className="flex flex-col items-center gap-1.5 py-0.5 z-10 shrink-0">
           {/* Active Turn Indicator Banner */}
           <div className="w-full max-w-md text-center">
@@ -815,55 +953,6 @@ function BattleArena({
                 {t('continueToStandings')}
               </button>
             )}
-          </div>
-        </div>
-
-        {/* ===== PLAYER AREA (BOTTOM) ===== */}
-        <div className="flex flex-col gap-1.5 border border-neon-cyan/30 rounded-xl bg-cyber-surface/10 backdrop-blur-sm p-2 relative overflow-hidden min-h-0">
-          {flashState === 'cyan' && (
-            <div className="absolute inset-0 bg-neon-cyan/20 border border-neon-cyan shadow-[inset_0_0_40px_rgba(0,240,255,0.3)] rounded-xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
-          )}
-
-          {/* Player active stack area — cards fanned/stacked */}
-          <div className="flex items-start justify-center flex-1 min-h-[120px] max-h-[150px] relative overflow-hidden">
-            <PlayerStackView
-              stack={myStack}
-              side="me"
-              isMyDrawTurn={isMyDrawTurn}
-              flagPower={flagPowerValue}
-              challengerPower={challengerPower}
-            />
-          </div>
-
-          {/* Player memory (compact horizontal) */}
-          <MemorySlots slots={myMemSlots} label={t('yourMemory')} side="left" compact />
-
-          {/* Player header row */}
-          <div className="flex items-center justify-between gap-3 font-mono">
-            <div className="flex items-center gap-2 min-w-0">
-              <User size={16} className="text-neon-cyan shrink-0" />
-              <span className="text-neon-cyan font-bold text-sm truncate">{playerName}</span>
-              {myStack.isDefending && (
-                <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-neon-amber font-bold border border-neon-amber/40 px-1.5 py-0.5 rounded bg-amber-950/20 animate-pulse">
-                  <Flag size={10} /> 防衛中
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowDeckModal(true)}
-                className="flex items-center gap-1.5 border border-neon-cyan/45 hover:border-neon-cyan rounded px-2 py-1 bg-cyber-surface/30 text-neon-cyan font-bold hover:bg-neon-cyan/10 transition-all text-[10px] cursor-pointer uppercase tracking-wider font-mono"
-              >
-                <Layers size={12} className="text-neon-cyan" />
-                {t('viewDeckBtn')}
-              </button>
-              <div className="flex items-center gap-2 text-[10px]">
-                <span className="text-cyber-text-dim uppercase tracking-wider">{t('deckLabel')}</span>
-                <span className="text-neon-cyan font-bold flex items-center gap-1">
-                  <Layers size={12} />{myDeckCount}
-                </span>
-              </div>
-            </div>
           </div>
         </div>
 

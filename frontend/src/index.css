@@ -271,3 +271,77 @@
     animation: none !important;
   }
 }
+
+/* ===== 3D BATTLE ARENA & CARD REVEAL ANIMATIONS ===== */
+.perspective-arena {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+/* Card draw animations with 3D flip-reveal and slide-in from deck */
+@keyframes drawCardMe {
+  0% {
+    transform: translate(350px, 120px) rotateX(-45deg) rotateY(180deg) rotateZ(30deg) scale(0.3);
+    opacity: 0;
+    filter: brightness(2);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 0) rotateX(-12deg) rotateY(-2deg) rotateZ(0deg) scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+@keyframes drawCardOpp {
+  0% {
+    transform: translate(350px, -120px) rotateX(45deg) rotateY(180deg) rotateZ(-30deg) scale(0.3);
+    opacity: 0;
+    filter: brightness(2);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 0) rotateX(12deg) rotateY(2deg) rotateZ(0deg) scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+.animate-draw-card-me {
+  animation: drawCardMe 0.6s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+}
+
+.animate-draw-card-opp {
+  animation: drawCardOpp 0.6s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+}
+
+/* Static 3D positioning for cards that have finished drawing */
+.card-static-me {
+  transform: rotateX(-12deg) rotateY(-2deg) rotateZ(0deg);
+  transform-style: preserve-3d;
+}
+
+.card-static-opp {
+  transform: rotateX(12deg) rotateY(2deg) rotateZ(0deg);
+  transform-style: preserve-3d;
+}
+
+.card-static-me-latest {
+  transform: rotateX(-8deg) rotateY(-1deg) translateZ(8px) scale(1.02);
+  transform-style: preserve-3d;
+  box-shadow: 0 10px 20px rgba(0, 240, 255, 0.15);
+}
+
+.card-static-opp-latest {
+  transform: rotateX(8deg) rotateY(1deg) translateZ(8px) scale(1.02);
+  transform-style: preserve-3d;
+  box-shadow: 0 -10px 20px rgba(255, 0, 255, 0.15);
+}
