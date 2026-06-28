@@ -234,6 +234,61 @@ func WritePlayerGameState(w http.ResponseWriter, gs *models.GameState, playerNam
 	})
 }
 
+// WriteSpectatorGameState returns a read-only, lobby-wide view of the game state
+// for spectators. It includes standings, phase, round, matchups, and any
+// currently-active battle sessions, but never exposes private hands/decks/credits.
+func WriteSpectatorGameState(w http.ResponseWriter, gs *models.GameState) {
+	standings := buildStandings(gs, "")
+
+	// Collect the active battle sessions (one per ongoing match). Key them by a
+	// synthetic match label so spectators can pick which one to view.
+	sessions := make([]map[string]interface{}, 0)
+	seen := map[string]bool{}
+	for _, session := range gs.BattleSessions {
+		key := session.Player1Name + " vs " + session.Player2Name
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		sessions = append(sessions, map[string]interface{}{
+			"label":   key,
+			"p1":      session.Player1Name,
+			"p2":      session.Player2Name,
+			"flagHolder": session.FlagHolder,
+			"flagPower":  session.FlagPower,
+			"turnOwner":  session.TurnOwner,
+			"requiredAction": session.RequiredAction,
+			"isFinished": session.IsFinished,
+			"log":       session.Log,
+			"step":      session.Step,
+		})
+	}
+
+	// Matchup labels for the current round
+	matchups := make([]map[string]interface{}, 0, len(gs.Matchups))
+	for _, pair := range gs.Matchups {
+		p1, p2 := "BYE", "BYE"
+		if pair[0] >= 0 && pair[0] < len(gs.Players) {
+			p1 = gs.Players[pair[0]].Name
+		}
+		if pair[1] >= 0 && pair[1] < len(gs.Players) {
+			p2 = gs.Players[pair[1]].Name
+		}
+		matchups = append(matchups, map[string]interface{}{"p1": p1, "p2": p2})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"gameId":         gs.GameID,
+		"currentRound":   gs.CurrentRound,
+		"maxRounds":      gs.MaxRounds,
+		"phase":          gs.Phase,
+		"standings":      standings,
+		"matchups":       matchups,
+		"battleSessions": sessions,
+		"isSpectator":    true,
+	})
+}
+
 // BroadcastGameStateBroadcast broadcasts a phase transition update via WS.
 func BroadcastGameStateBroadcast(lobbyCode string, phase string, round int) {
 	if lobbyCode == "" {
@@ -257,16 +312,23 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		PlayerName string `json:"playerName"`
+		PlayerName  string `json:"playerName"`
+		PlayerCount int    `json:"playerCount"`
 	}
 	// Decode request body if present
 	if r.Body != nil {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 	}
 
-	playerName := req.PlayerName
-	if playerName == "" {
+	playerName, verr := ValidatePlayerName(req.PlayerName)
+	if verr != nil {
 		playerName = "PLAYER_ONE"
+	}
+
+	// Player count: 3..8, default 8
+	playerCount := req.PlayerCount
+	if playerCount < 3 || playerCount > 8 {
+		playerCount = 8
 	}
 
 	gameID := generateID()
@@ -283,11 +345,11 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 		IsNPC:   false,
 	}
 
-	// Create 7 NPCs to fill the tournament to 8 (solo mode)
-	players := make([]models.Player, 8)
+	// Create (playerCount-1) NPCs to fill the tournament
+	players := make([]models.Player, playerCount)
 	players[0] = player
 
-	for i := 1; i <= 7; i++ {
+	for i := 1; i < playerCount; i++ {
 		name := engine.NPCNames[(i-1)%len(engine.NPCNames)]
 		strat := engine.NPCStrategies[(i-1)%len(engine.NPCStrategies)]
 		players[i] = engine.CreateNPC(name, strat)
@@ -297,11 +359,18 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 
 	deckA, deckB, deckC := engine.GenerateDeckPools()
 
+	// MaxRounds: round-robin + 1 finals. For even N -> N-1 rounds, odd N -> N rounds, +1 finals.
+	rrRounds := playerCount - 1
+	if playerCount%2 == 1 {
+		rrRounds = playerCount
+	}
+	maxRounds := rrRounds + 1
+
 	gs := &models.GameState{
 		GameID:         gameID,
 		HostName:       playerName,
 		CurrentRound:   1,
-		MaxRounds:      8,
+		MaxRounds:      maxRounds,
 		Phase:          "shop",
 		Players:        players,
 		Shops:          make(map[string]*models.ShopState),
@@ -334,7 +403,7 @@ func HandleNewGame(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleGameState returns the current player-centric game state.
-// GET /api/game/state?gameId=XXX&playerName=YYY
+// GET /api/game/state?gameId=XXX&playerName=YYY&spectator=1
 func HandleGameState(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "GET required")
@@ -343,6 +412,7 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 
 	gameID := r.URL.Query().Get("gameId")
 	playerName := r.URL.Query().Get("playerName")
+	spectator := r.URL.Query().Get("spectator")
 	if gameID == "" {
 		writeError(w, http.StatusBadRequest, "gameId required")
 		return
@@ -360,6 +430,11 @@ func HandleGameState(w http.ResponseWriter, r *http.Request) {
 
 	gs.Mu.Lock()
 	defer gs.Mu.Unlock()
+
+	if spectator != "" {
+		WriteSpectatorGameState(w, gs)
+		return
+	}
 
 	WritePlayerGameState(w, gs, playerName)
 }

@@ -54,7 +54,7 @@ func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 		shop := GenerateShop(gs, round)
 		boughtAny := false
 
-		// 1. Evaluate and buy matching cards
+		// 1. Evaluate and buy matching cards — score by attribute + power + synergy
 		remainingCards := make([]models.Card, 0, len(shop.Cards))
 		for _, card := range shop.Cards {
 			isPreferred := false
@@ -72,6 +72,10 @@ func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 			}
 
 			cost := card.RarityCost()
+			if !isPreferred && npc.Credits >= cost && card.Power >= 7 {
+				// High-power off-strategy cards are still worth grabbing late
+				isPreferred = true
+			}
 			if isPreferred && npc.Credits >= cost {
 				// Buy the card!
 				npc.Credits -= cost
@@ -81,7 +85,7 @@ func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 				remainingCards = append(remainingCards, card)
 			}
 		}
-		
+
 		// Return unbought cards to the pool
 		ReturnCardsToPool(gs, remainingCards)
 
@@ -96,9 +100,10 @@ func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 	}
 
 	// 3. Compact deck: If deck is getting bloated (> 10 cards)
-	// delete a card that does NOT match their strategy archetype. Deletion is free.
-	if len(npc.Deck) > 10 {
+	// delete cards that do NOT match their strategy archetype. Deletion is free.
+	for len(npc.Deck) > 10 {
 		deleteIdx := -1
+		lowestPower := 999
 		for i, card := range npc.Deck {
 			isNonMatching := false
 			switch strategy {
@@ -110,15 +115,18 @@ func NPCShopPhase(gs *models.GameState, npc *models.Player, round int) {
 				isNonMatching = (card.Attribute != "Mainframe" && card.Attribute != "Sector" && card.Attribute != "DeepWeb")
 			}
 
-			if isNonMatching {
+			if isNonMatching && card.Power < lowestPower {
 				deleteIdx = i
-				break
+				lowestPower = card.Power
 			}
 		}
 
 		if deleteIdx != -1 {
-			// Delete card for free
+			// Delete the lowest-power non-matching card for free
 			npc.Deck = append(npc.Deck[:deleteIdx], npc.Deck[deleteIdx+1:]...)
+		} else {
+			// No non-matching cards left; stop to avoid deleting strategy cards
+			break
 		}
 	}
 }

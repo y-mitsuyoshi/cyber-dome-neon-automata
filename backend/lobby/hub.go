@@ -28,12 +28,13 @@ var upgrader = websocket.Upgrader{
 
 // Client represents a connected player.
 type Client struct {
-	Hub        *Hub
-	Conn       *websocket.Conn
-	Send       chan []byte
-	LobbyCode  string
-	PlayerName string
-	closeOnce  sync.Once
+	Hub         *Hub
+	Conn        *websocket.Conn
+	Send        chan []byte
+	LobbyCode   string
+	PlayerName  string
+	IsSpectator bool
+	closeOnce   sync.Once
 }
 
 // Close safely closes the connection and the send channel exactly once.
@@ -73,14 +74,18 @@ func (h *Hub) Run() {
 			}
 			h.LobbyCodeToClients[client.LobbyCode][client.PlayerName] = client
 
-			// Register in the lobby clients map too
-			if lobby := GlobalLobbyManager.GetLobby(client.LobbyCode); lobby != nil {
-				lobby.Clients[client.PlayerName] = client
+			// Register in the lobby clients map (but don't add spectators to the player roster)
+			if !client.IsSpectator {
+				if lobby := GlobalLobbyManager.GetLobby(client.LobbyCode); lobby != nil {
+					lobby.Clients[client.PlayerName] = client
+				}
 			}
 			h.Unlock()
 
-			// Broadcast updated lobby state
-			h.BroadcastLobbyState(client.LobbyCode)
+			// Broadcast updated lobby state (spectators don't change the roster, but this is harmless)
+			if !client.IsSpectator {
+				h.BroadcastLobbyState(client.LobbyCode)
+			}
 
 		case client := <-h.Unregister:
 			h.Lock()
@@ -94,11 +99,13 @@ func (h *Hub) Run() {
 					}
 				}
 
-				// Remove from lobby
+				// Remove from lobby (spectators don't affect the roster)
 				h.Unlock()
-				lobby, _ := GlobalLobbyManager.LeaveLobby(client.LobbyCode, client.PlayerName)
-				if lobby != nil {
-					h.BroadcastLobbyState(client.LobbyCode)
+				if !client.IsSpectator {
+					lobby, _ := GlobalLobbyManager.LeaveLobby(client.LobbyCode, client.PlayerName)
+					if lobby != nil {
+						h.BroadcastLobbyState(client.LobbyCode)
+					}
 				}
 			} else {
 				h.Unlock()
@@ -292,4 +299,30 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request, code string, name
 	go client.readPump()
 
 	fmt.Printf("WebSocket client registered: name=%s, lobby=%s\n", name, code)
+}
+
+// ServeWsSpectator handles websocket requests from a spectator (read-only).
+// GET /api/ws/spectate?code=XXX&name=YYY
+func ServeWsSpectator(hub *Hub, w http.ResponseWriter, r *http.Request, code string, name string) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WS Upgrade error: %v", err)
+		return
+	}
+
+	client := &Client{
+		Hub:         hub,
+		Conn:        conn,
+		Send:        make(chan []byte, 256),
+		LobbyCode:   code,
+		PlayerName:  name,
+		IsSpectator: true,
+	}
+	client.Hub.Register <- client
+
+	// Start read and write pumps
+	go client.writePump()
+	go client.readPump()
+
+	fmt.Printf("WebSocket spectator registered: name=%s, lobby=%s\n", name, code)
 }

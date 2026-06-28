@@ -47,6 +47,7 @@ func main() {
 
 	// WebSocket Endpoint
 	mux.HandleFunc("/api/ws", handlers.HandleWS)
+	mux.HandleFunc("/api/ws/spectate", handlers.HandleWSSpectator)
 
 	// Wrap with CORS middleware
 	handler := middleware.CORS(mux)

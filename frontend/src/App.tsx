@@ -205,14 +205,14 @@ function App() {
   }, [connected]);
 
   // OFFLINE SOLO START
-  const handleStartSolo = async (name: string) => {
+  const handleStartSolo = async (name: string, playerCount: number) => {
     playSE('click');
     setLoading(true);
     setError(null);
     setPlayerName(name);
     setLobbyCode(null);
     try {
-      const state = await createNewGame(name);
+      const state = await createNewGame(name, playerCount);
       setGameState(state);
       setScreen('game');
     } catch (err: unknown) {
@@ -224,12 +224,12 @@ function App() {
   };
 
   // MULTIPLAYER CREATION
-  const handleCreateLobby = async (name: string) => {
+  const handleCreateLobby = async (name: string, maxPlayers: number) => {
     playSE('click');
     setLoading(true);
     setError(null);
     try {
-      const res = await createLobby(name);
+      const res = await createLobby(name, maxPlayers);
       setPlayerName(name);
       setLobbyCode(res.code);
       setScreen('lobby');

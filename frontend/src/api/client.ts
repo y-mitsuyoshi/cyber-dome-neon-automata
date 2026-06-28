@@ -103,10 +103,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 // SOLO / OFFLINE ENTRYPOINT
-export async function createNewGame(playerName: string): Promise<GameState> {
+export async function createNewGame(playerName: string, playerCount?: number): Promise<GameState> {
   const raw = await apiFetch<RawGameState>('/api/game/new', {
     method: 'POST',
-    body: JSON.stringify({ playerName }),
+    body: JSON.stringify({ playerName, playerCount }),
   });
   return mapGameState(raw);
 }
@@ -189,10 +189,10 @@ export interface RawLobbyState {
   host: string;
 }
 
-export async function createLobby(playerName: string): Promise<{ code: string; host: string }> {
+export async function createLobby(playerName: string, maxPlayers?: number): Promise<{ code: string; host: string }> {
   return apiFetch<{ code: string; host: string }>('/api/lobby/create', {
     method: 'POST',
-    body: JSON.stringify({ playerName }),
+    body: JSON.stringify({ playerName, maxPlayers }),
   });
 }
 

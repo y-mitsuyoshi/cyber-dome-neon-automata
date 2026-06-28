@@ -15,13 +15,14 @@ type LobbyPlayer struct {
 
 // Lobby represents a game room.
 type Lobby struct {
-	Code      string                 `json:"code"`
-	Players   []LobbyPlayer          `json:"players"`
-	Host      string                 `json:"host"`
-	GameID    string                 `json:"gameId,omitempty"`
-	Status    string                 `json:"status"` // "waiting", "playing", "finished"
-	CreatedAt time.Time              `json:"createdAt"`
-	Clients   map[string]interface{} `json:"-"` // Maps player names to client connections (Client pointer, initialized in hub)
+	Code       string                 `json:"code"`
+	Players    []LobbyPlayer          `json:"players"`
+	Host       string                 `json:"host"`
+	GameID     string                 `json:"gameId,omitempty"`
+	Status     string                 `json:"status"` // "waiting", "playing", "finished"
+	MaxPlayers int                    `json:"maxPlayers"`
+	CreatedAt  time.Time              `json:"createdAt"`
+	Clients    map[string]interface{} `json:"-"` // Maps player names to client connections (Client pointer, initialized in hub)
 }
 
 // LobbyManager handles all active lobbies in memory.
@@ -51,20 +52,22 @@ func (lm *LobbyManager) GenerateCode() string {
 }
 
 // CreateLobby initializes a new lobby.
-func (lm *LobbyManager) CreateLobby(hostName string) *Lobby {
+func (lm *LobbyManager) CreateLobby(hostName string, maxPlayers int) *Lobby {
 	lm.Lock()
 	defer lm.Unlock()
 
+	if maxPlayers < 3 || maxPlayers > 8 {
+		maxPlayers = 8
+	}
 	code := lm.GenerateCode()
 	lobby := &Lobby{
-		Code: code,
-		Players: []LobbyPlayer{
-			{Name: hostName, IsNPC: false},
-		},
-		Host:      hostName,
-		Status:    "waiting",
-		CreatedAt: time.Now(),
-		Clients:   make(map[string]interface{}),
+		Code:       code,
+		Players:    []LobbyPlayer{{Name: hostName, IsNPC: false}},
+		Host:       hostName,
+		Status:     "waiting",
+		MaxPlayers: maxPlayers,
+		CreatedAt:  time.Now(),
+		Clients:    make(map[string]interface{}),
 	}
 	lm.Lobbies[code] = lobby
 	return lobby
@@ -84,8 +87,12 @@ func (lm *LobbyManager) JoinLobby(code string, playerName string) (*Lobby, error
 		return nil, errors.New("game has already started")
 	}
 
-	if len(lobby.Players) >= 8 {
-		return nil, errors.New("lobby is full (max 8 players)")
+	maxN := lobby.MaxPlayers
+	if maxN < 3 || maxN > 8 {
+		maxN = 8
+	}
+	if len(lobby.Players) >= maxN {
+		return nil, errors.New("lobby is full")
 	}
 
 	// Check for duplicate player names
@@ -166,7 +173,11 @@ func (lm *LobbyManager) AddNPC(code string, npcName string) (*Lobby, error) {
 		return nil, errors.New("game already started")
 	}
 
-	if len(lobby.Players) >= 8 {
+	maxN := lobby.MaxPlayers
+	if maxN < 3 || maxN > 8 {
+		maxN = 8
+	}
+	if len(lobby.Players) >= maxN {
 		return nil, errors.New("lobby is full")
 	}
 

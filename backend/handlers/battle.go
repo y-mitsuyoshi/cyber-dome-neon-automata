@@ -146,18 +146,51 @@ func HandleBattleStep(w http.ResponseWriter, r *http.Request) {
 	// Step the battle
 	engine.StepBattle(session, isP1NPC, isP2NPC)
 
+	// Auto-drive NPC turns: if after a step it's an NPC's turn to draw,
+	// continue stepping automatically so the round isn't stalled waiting on
+	// a human to click "next" on the NPC's behalf. Stops at interactive
+	// choices (requiredAction != DRAW), the human's turn, or battle finish.
+	autoDriveNPCs(session, isP1NPC, isP2NPC)
+
 	// If battle has finished, finalize it
 	if session.IsFinished {
 		finalizeBattleSession(gs, session)
 	} else {
-		// Symmetrical WS Broadcast to start render updates
+		// Broadcast step-advanced to all lobby members (combatants + spectators)
 		if gs.LobbyCode != "" {
-			lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player1Name, map[string]interface{}{"type": "battle_step_advanced"})
-			lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player2Name, map[string]interface{}{"type": "battle_step_advanced"})
+			lobby.GlobalHub.Broadcast(gs.LobbyCode, map[string]interface{}{"type": "battle_step_advanced"})
 		}
 	}
 
 	WritePlayerGameState(w, gs, req.PlayerName)
+}
+
+// autoDriveNPCs advances the battle automatically while it's an NPC's turn to
+// draw and no interactive (human) choice is pending. This keeps solo and
+// online battles flowing even when the opponent is an NPC, without forcing the
+// human player to click "next" on the NPC's behalf.
+func autoDriveNPCs(session *models.BattleSession, isP1NPC, isP2NPC bool) {
+	const maxAutoSteps = 40 // safety guard against runaway loops
+	for i := 0; i < maxAutoSteps; i++ {
+		if session.IsFinished {
+			return
+		}
+		if session.RequiredAction != "DRAW" {
+			// Interactive choice pending — let the owning player (or NPC AI) resolve
+			return
+		}
+		// Determine whose turn it is and whether they're an NPC.
+		turnNPC := false
+		if session.TurnOwner == session.Player1Name && isP1NPC {
+			turnNPC = true
+		} else if session.TurnOwner == session.Player2Name && isP2NPC {
+			turnNPC = true
+		}
+		if !turnNPC {
+			return // waiting on a human to click "draw"
+		}
+		engine.StepBattle(session, isP1NPC, isP2NPC)
+	}
 }
 
 // HandleBattleAction handles interactive card playing and discarding decisions per step.
@@ -229,10 +262,12 @@ func HandleBattleAction(w http.ResponseWriter, r *http.Request) {
 	// Submit choice to interactive engine
 	engine.SubmitChoice(session, action, isP1NPC, isP2NPC)
 
-	// Symmetrical WS Broadcast to start render updates
+	// Auto-drive any NPC turns that follow the resolved choice.
+	autoDriveNPCs(session, isP1NPC, isP2NPC)
+
+	// Broadcast step-advanced to all lobby members (combatants + spectators)
 	if gs.LobbyCode != "" {
-		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player1Name, map[string]interface{}{"type": "battle_step_advanced"})
-		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player2Name, map[string]interface{}{"type": "battle_step_advanced"})
+		lobby.GlobalHub.Broadcast(gs.LobbyCode, map[string]interface{}{"type": "battle_step_advanced"})
 	}
 
 	// If session is finished after submitting choice, finalize it
@@ -355,10 +390,9 @@ func finalizeBattleSession(gs *models.GameState, session *models.BattleSession) 
 	delete(gs.BattleSessions, session.Player1Name)
 	delete(gs.BattleSessions, session.Player2Name)
 
-	// Broadcast matchup complete via WS
+	// Broadcast matchup complete via WS to all lobby members (combatants + spectators)
 	if gs.LobbyCode != "" {
-		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player1Name, map[string]interface{}{"type": "battle_complete"})
-		lobby.GlobalHub.SendToPlayer(gs.LobbyCode, session.Player2Name, map[string]interface{}{"type": "battle_complete"})
+		lobby.GlobalHub.Broadcast(gs.LobbyCode, map[string]interface{}{"type": "battle_complete"})
 	}
 
 	// Symmetrical: Evaluate round resolution advancement

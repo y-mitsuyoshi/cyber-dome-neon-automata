@@ -787,36 +787,90 @@ func resolveNPCChoice(session *models.BattleSession, npcName string, action stri
 	details := ""
 	switch action {
 	case "CHOOSE_REPORTER", "CHOOSE_NAVIGATOR":
-		// Just keep the order as is
+		// Strategic: reorder top 2 so the higher-power card is on top (drawn next),
+		// the lower-power card is sent to the bottom.
 		if len(*activeDeck) >= 2 {
-			details = fmt.Sprintf("%s (AI) は効果を適用しました (順序維持)", npcName)
+			top := (*activeDeck)[0]
+			next := (*activeDeck)[1]
+			if next.Power > top.Power {
+				(*activeDeck)[0], (*activeDeck)[1] = next, top
+				// Move the now-second (lower) card to the bottom
+				low := (*activeDeck)[1]
+				*activeDeck = append((*activeDeck)[:1], (*activeDeck)[2:]...)
+				*activeDeck = append(*activeDeck, low)
+				details = fmt.Sprintf("%s (AI) は %s を山札の上に、%s を底に配置しました", npcName, next.Name, low.Name)
+			} else {
+				// Already optimal: keep top on top, send next to bottom
+				low := (*activeDeck)[1]
+				*activeDeck = append((*activeDeck)[:1], (*activeDeck)[2:]...)
+				*activeDeck = append(*activeDeck, low)
+				details = fmt.Sprintf("%s (AI) は %s を山札の上に維持し、%s を底に移動しました", npcName, top.Name, low.Name)
+			}
 		}
-	case "CHOOSE_JUGGLER":
-		// Sort by power descending to put highest on top
+	case "CHOOSE_JUGGLER", "CHOOSE_BUMPER_CAR":
+		// Strategic: sort the seen options by power descending so highest power is drawn next.
 		if len(options) > 0 {
-			// Remove top 3 from deck
 			limit := len(options)
+			if limit > len(*activeDeck) {
+				limit = len(*activeDeck)
+			}
 			*activeDeck = (*activeDeck)[limit:]
-			// Sort options descending by power
-			rand.Shuffle(len(options), func(i, j int) { options[i], options[j] = options[j], options[i] })
-			// Prepend back
-			*activeDeck = append(options, *activeDeck...)
-			details = fmt.Sprintf("%s (AI) は山札の上を並び替えました", npcName)
+			sorted := make([]models.Card, len(options))
+			copy(sorted, options)
+			// Stable sort by power descending (keep original order on ties to reduce churn)
+			for i := 1; i < len(sorted); i++ {
+				key := sorted[i]
+				j := i - 1
+				for j >= 0 && sorted[j].Power < key.Power {
+					sorted[j+1] = sorted[j]
+					j--
+				}
+				sorted[j+1] = key
+			}
+			*activeDeck = append(sorted, *activeDeck...)
+			details = fmt.Sprintf("%s (AI) は山札の上をパワー降順に並び替えました", npcName)
 		}
 	case "CHOOSE_SAILOR":
-		// Move the first card in options to bottom
-		if len(options) > 0 {
-			c := (*activeDeck)[0]
-			*activeDeck = append((*activeDeck)[1:], c)
-			details = fmt.Sprintf("%s (AI) は %s を山札の底に移動しました", npcName, c.Name)
+		// Strategic: move the lowest-power card among the seen options to the bottom,
+		// keeping higher-power cards on top for stronger attacks.
+		if len(options) > 0 && len(*activeDeck) > 0 {
+			// options are the full deck seen; find lowest power index in current deck top slice
+			limit := len(options)
+			if limit > len(*activeDeck) {
+				limit = len(*activeDeck)
+			}
+			lowIdx := 0
+			for i := 1; i < limit; i++ {
+				if (*activeDeck)[i].Power < (*activeDeck)[lowIdx].Power {
+					lowIdx = i
+				}
+			}
+			c := (*activeDeck)[lowIdx]
+			*activeDeck = append((*activeDeck)[:lowIdx], (*activeDeck)[lowIdx+1:]...)
+			*activeDeck = append(*activeDeck, c)
+			details = fmt.Sprintf("%s (AI) は最もパワーの低い %s を山札の底に移動しました", npcName, c.Name)
 		}
 	case "CHOOSE_FORTUNE_TELLER":
-		// Keep the first card in options on top
+		// Strategic: put the highest-power card from options on top so it's drawn next.
 		if len(options) > 0 {
-			details = fmt.Sprintf("%s (AI) は %s を山札の上に移動しました", npcName, options[0].Name)
+			best := options[0]
+			for _, c := range options {
+				if c.Power > best.Power {
+					best = c
+				}
+			}
+			// Remove best from deck and prepend it
+			for i, c := range *activeDeck {
+				if c.ID == best.ID {
+					*activeDeck = append((*activeDeck)[:i], (*activeDeck)[i+1:]...)
+					break
+				}
+			}
+			*activeDeck = append([]models.Card{best}, *activeDeck...)
+			details = fmt.Sprintf("%s (AI) は %s を山札の上に移動しました", npcName, best.Name)
 		}
 	case "CHOOSE_BUTLER":
-		// Banish the lowest power card on bench
+		// Strategic: banish the lowest-power card from bench (frees slots, minimal loss).
 		if len(options) > 0 {
 			lowest := options[0]
 			for _, c := range options {
@@ -831,9 +885,14 @@ func resolveNPCChoice(session *models.BattleSession, npcName string, action stri
 			}
 		}
 	case "CHOOSE_MAGICIAN":
-		// Banish the first valid card
+		// Strategic: banish the lowest-power valid card (≤3 power) to free a slot cheaply.
 		if len(options) > 0 {
 			target := options[0]
+			for _, c := range options {
+				if c.Power <= 3 && c.Power < target.Power {
+					target = c
+				}
+			}
 			c, found := removeCardFromMemory(activeMem, target.ID)
 			if found {
 				*activeDiscard = append(*activeDiscard, c)
@@ -841,9 +900,14 @@ func resolveNPCChoice(session *models.BattleSession, npcName string, action stri
 			}
 		}
 	case "CHOOSE_VAMPIRE":
-		// Put the first valid B card on top of deck
+		// Strategic: return the highest-power B-deck card to the top so it can attack again soon.
 		if len(options) > 0 {
 			target := options[0]
+			for _, c := range options {
+				if c.Power > target.Power {
+					target = c
+				}
+			}
 			c, found := removeCardFromMemory(activeMem, target.ID)
 			if found {
 				*activeDeck = append([]models.Card{c}, *activeDeck...)
@@ -851,16 +915,44 @@ func resolveNPCChoice(session *models.BattleSession, npcName string, action stri
 			}
 		}
 	case "CHOOSE_MOVIESTAR":
+		// Strategic: return up to 2 highest-power HoloMedia cards (power 1-2) to the top.
 		if len(options) > 0 {
-			target := options[0]
-			c, found := removeCardFromMemory(activeMem, target.ID)
-			if found {
-				*activeDeck = append([]models.Card{c}, *activeDeck...)
-				details = fmt.Sprintf("%s (AI) はムービースターの効果で %s を山札の上に戻しました", npcName, c.Name)
+			// Pick up to 2 highest power valid cards
+			chosen := make([]models.Card, 0, 2)
+			pool := make([]models.Card, len(options))
+			copy(pool, options)
+			for k := 0; k < 2 && len(pool) > 0; k++ {
+				bestIdx := 0
+				for i := 1; i < len(pool); i++ {
+					if pool[i].Power > pool[bestIdx].Power {
+						bestIdx = i
+					}
+				}
+				chosen = append(chosen, pool[bestIdx])
+				pool = append(pool[:bestIdx], pool[bestIdx+1:]...)
+			}
+			// Remove chosen from memory and prepend to deck (highest first)
+			prepend := make([]models.Card, 0, len(chosen))
+			for _, target := range chosen {
+				c, found := removeCardFromMemory(activeMem, target.ID)
+				if found {
+					prepend = append(prepend, c)
+				}
+			}
+			if len(prepend) > 0 {
+				*activeDeck = append(prepend, *activeDeck...)
+				names := ""
+				for i, c := range prepend {
+					if i > 0 {
+						names += ", "
+					}
+					names += c.Name
+				}
+				details = fmt.Sprintf("%s (AI) はムービースターの効果で %s を山札の上に戻しました", npcName, names)
 			}
 		}
 	case "CHOOSE_SIREN":
-		// Banish the highest power card from opponent's bench
+		// Strategic: banish the highest power card from opponent's bench.
 		if len(options) > 0 {
 			highest := options[0]
 			for _, c := range options {

@@ -31,13 +31,25 @@ func HandleCreateLobby(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		PlayerName string `json:"playerName"`
+		MaxPlayers int    `json:"maxPlayers"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.PlayerName == "" {
 		lobbyWriteError(w, http.StatusBadRequest, "PlayerName required")
 		return
 	}
 
-	lob := lobby.GlobalLobbyManager.CreateLobby(req.PlayerName)
+	playerName, verr := ValidatePlayerName(req.PlayerName)
+	if verr != nil {
+		lobbyWriteError(w, http.StatusBadRequest, verr.Error())
+		return
+	}
+
+	maxPlayers := 8
+	if req.MaxPlayers >= 3 && req.MaxPlayers <= 8 {
+		maxPlayers = req.MaxPlayers
+	}
+
+	lob := lobby.GlobalLobbyManager.CreateLobby(playerName, maxPlayers)
 	lobbyWriteJSON(w, http.StatusOK, map[string]string{
 		"code": lob.Code,
 		"host": lob.Host,
@@ -61,7 +73,13 @@ func HandleJoinLobby(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lob, err := lobby.GlobalLobbyManager.JoinLobby(req.Code, req.PlayerName)
+	playerName, verr := ValidatePlayerName(req.PlayerName)
+	if verr != nil {
+		lobbyWriteError(w, http.StatusBadRequest, verr.Error())
+		return
+	}
+
+	lob, err := lobby.GlobalLobbyManager.JoinLobby(req.Code, playerName)
 	if err != nil {
 		lobbyWriteError(w, http.StatusBadRequest, err.Error())
 		return

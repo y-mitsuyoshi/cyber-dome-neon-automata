@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Zap, Terminal, Plus, ArrowRight, BookOpen } from 'lucide-react';
+import { Zap, Terminal, Plus, ArrowRight, BookOpen, Users } from 'lucide-react';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
 import ManualModal from './ManualModal';
 
 interface TitleScreenProps {
-  onStartSolo: (name: string) => void;
-  onCreateLobby: (name: string) => void;
+  onStartSolo: (name: string, playerCount: number) => void;
+  onCreateLobby: (name: string, maxPlayers: number) => void;
   onJoinLobby: (code: string, name: string) => void;
   loading: boolean;
 }
@@ -16,6 +16,8 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [soloPlayerCount, setSoloPlayerCount] = useState(8);
+  const [lobbyMaxPlayers, setLobbyMaxPlayers] = useState(8);
   const [showManualModal, setShowManualModal] = useState(false);
   const [hoveredSolo, setHoveredSolo] = useState(false);
   const [hoveredCreate, setHoveredCreate] = useState(false);
@@ -115,36 +117,63 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value.substring(0, 16))}
+            onChange={(e) => {
+              // Limit to 16 runes (not UTF-16 code units) so Japanese names fit
+              const v = e.target.value;
+              const trimmed = Array.from(v).slice(0, 16).join('');
+              setName(trimmed);
+            }}
             placeholder={t('combatantPlaceholder')}
-            className="w-full bg-cyber-darker border border-cyber-border/60 rounded px-3 py-2 text-xs text-neon-cyan text-glow-cyan font-mono focus:outline-none focus:border-neon-cyan focus:ring-1 focus:ring-neon-cyan/20 transition-all uppercase placeholder-cyber-border/50"
+            className="w-full bg-cyber-darker border border-cyber-border/60 rounded px-3 py-2 text-xs text-neon-cyan text-glow-cyan font-mono focus:outline-none focus:border-neon-cyan focus:ring-1 focus:ring-neon-cyan/20 transition-all placeholder-cyber-border/50"
           />
         </div>
 
         {/* Actions panel */}
         <div className="flex flex-col gap-4 max-w-sm mx-auto">
           {/* Jack In Solo */}
-          <button
-            onClick={() => { playSE('click'); onStartSolo(getActiveName()); }}
-            onMouseEnter={() => { setHoveredSolo(true); playSE('hover'); }}
-            onMouseLeave={() => setHoveredSolo(false)}
-            disabled={loading}
-            className={`
-              w-full py-3.5 rounded border-2 border-neon-cyan
-              text-neon-cyan font-bold text-xs tracking-[0.2em] uppercase
-              transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer
-              ${loading ? 'opacity-50 cursor-wait' : ''}
-              ${hoveredSolo ? 'bg-neon-cyan/15 scale-[1.03]' : 'bg-cyber-darker/60'}
-            `}
-            style={{
-              boxShadow: hoveredSolo
-                ? '0 0 15px rgba(0,240,255,0.3), inset 0 0 10px rgba(0,240,255,0.1)'
-                : '0 0 5px rgba(0,240,255,0.1)',
-            }}
-          >
-            <Zap size={14} className="animate-pulse" />
-            {t('jackInSolo')}
-          </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2 text-[9px] font-mono uppercase tracking-widest text-cyber-text-dim">
+              <span className="flex items-center gap-1.5"><Users size={11} className="text-neon-cyan/70" />{t('playerCountLabel') || 'Players'}</span>
+              <div className="flex items-center gap-1">
+                {[3, 4, 5, 6, 7, 8].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => { playSE('click'); setSoloPlayerCount(n); }}
+                    onMouseEnter={() => playSE('hover')}
+                    className={`w-6 h-6 rounded border text-[10px] font-bold transition-all cursor-pointer ${
+                      soloPlayerCount === n
+                        ? 'border-neon-cyan text-neon-cyan bg-neon-cyan/15 shadow-[0_0_8px_rgba(0,240,255,0.2)]'
+                        : 'border-cyber-border/40 text-cyber-text-dim hover:text-neon-cyan hover:border-neon-cyan/50'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={() => { playSE('click'); onStartSolo(getActiveName(), soloPlayerCount); }}
+              onMouseEnter={() => { setHoveredSolo(true); playSE('hover'); }}
+              onMouseLeave={() => setHoveredSolo(false)}
+              disabled={loading}
+              className={`
+                w-full py-3.5 rounded border-2 border-neon-cyan
+                text-neon-cyan font-bold text-xs tracking-[0.2em] uppercase
+                transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer
+                ${loading ? 'opacity-50 cursor-wait' : ''}
+                ${hoveredSolo ? 'bg-neon-cyan/15 scale-[1.03]' : 'bg-cyber-darker/60'}
+              `}
+              style={{
+                boxShadow: hoveredSolo
+                  ? '0 0 15px rgba(0,240,255,0.3), inset 0 0 10px rgba(0,240,255,0.1)'
+                  : '0 0 5px rgba(0,240,255,0.1)',
+              }}
+            >
+              <Zap size={14} className="animate-pulse" />
+              {t('jackInSolo')}
+            </button>
+          </div>
 
           <div className="flex items-center gap-3 my-1">
             <div className="flex-1 h-px bg-cyber-border/10" />
@@ -156,27 +185,49 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, loading }: Title
 
           <div className="grid grid-cols-2 gap-3">
             {/* Create Arena */}
-            <button
-              onClick={() => { playSE('click'); onCreateLobby(getActiveName()); }}
-              onMouseEnter={() => { setHoveredCreate(true); playSE('hover'); }}
-              onMouseLeave={() => setHoveredCreate(false)}
-              disabled={loading}
-              className={`
-                py-3 rounded border border-neon-magenta
-                text-neon-magenta font-bold text-[10px] tracking-[0.2em] uppercase
-                transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer
-                ${loading ? 'opacity-50 cursor-wait' : ''}
-                ${hoveredCreate ? 'bg-neon-magenta/15 scale-[1.03]' : 'bg-cyber-darker/60'}
-              `}
-              style={{
-                boxShadow: hoveredCreate
-                  ? '0 0 12px rgba(255,0,255,0.25)'
-                  : 'none',
-              }}
-            >
-              <Plus size={12} />
-              {t('createArena')}
-            </button>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-end gap-1 text-[8px] font-mono uppercase tracking-widest text-cyber-text-dim">
+                <span>{t('maxPlayersLabel') || 'Max'}</span>
+                <div className="flex items-center gap-0.5">
+                  {[3, 4, 5, 6, 7, 8].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => { playSE('click'); setLobbyMaxPlayers(n); }}
+                      onMouseEnter={() => playSE('hover')}
+                      className={`w-5 h-5 rounded border text-[9px] font-bold transition-all cursor-pointer ${
+                        lobbyMaxPlayers === n
+                          ? 'border-neon-magenta text-neon-magenta bg-neon-magenta/15'
+                          : 'border-cyber-border/40 text-cyber-text-dim hover:text-neon-magenta'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => { playSE('click'); onCreateLobby(getActiveName(), lobbyMaxPlayers); }}
+                onMouseEnter={() => { setHoveredCreate(true); playSE('hover'); }}
+                onMouseLeave={() => setHoveredCreate(false)}
+                disabled={loading}
+                className={`
+                  py-3 rounded border border-neon-magenta
+                  text-neon-magenta font-bold text-[10px] tracking-[0.2em] uppercase
+                  transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer
+                  ${loading ? 'opacity-50 cursor-wait' : ''}
+                  ${hoveredCreate ? 'bg-neon-magenta/15 scale-[1.03]' : 'bg-cyber-darker/60'}
+                `}
+                style={{
+                  boxShadow: hoveredCreate
+                    ? '0 0 12px rgba(255,0,255,0.25)'
+                    : 'none',
+                }}
+              >
+                <Plus size={12} />
+                {t('createArena')}
+              </button>
+            </div>
 
             {/* Join Arena */}
             <button
