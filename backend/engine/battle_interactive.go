@@ -487,12 +487,20 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 		}
 	}
 
-	// 4. Log the reveal event
+	// Find the card in ActiveCards to get its fully buffed power
+	finalPower := card.Power
+	for _, ac := range session.ActiveCards {
+		if ac.ID == card.ID {
+			finalPower = ac.Power
+			break
+		}
+	}
+
 	logCard := &models.BattleLogCard{
 		ID:         card.ID,
 		Name:       card.Name,
-		Power:      card.Power,
-		BasePower:  card.Power, // original power
+		Power:      finalPower,
+		BasePower:  card.Power, // original power (excluding On Reveal buffs)
 		Attribute:  card.Attribute,
 		EffectType: card.EffectType,
 	}

@@ -266,7 +266,7 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
   const flagCardName = stack.flagCard ? stack.flagCard.name : '';
 
   const CARD_W = 112;
-  const OVERLAP = 34;
+  const OVERLAP = 54;
   const n = visibleCards.length;
   const stackWidth = Math.max(CARD_W, CARD_W + (n - 1) * OVERLAP);
 
@@ -277,23 +277,23 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
         {isDefending ? (
           <>
             <Flag size={11} className="animate-pulse" />
-            <span>{ownerLabel}: \u9632\u885b\u4e2d</span>
+            <span>{ownerLabel}: 防衛中</span>
             {flagCardName && (
               <span className="text-neon-amber font-black border border-neon-amber/30 px-1.5 rounded bg-amber-950/20">
-                \ud83c\udccf {flagCardName}
+                🃏 {flagCardName}
               </span>
             )}
             <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">POW {flagPower}</span>
           </>
         ) : (
           <>
-            <span>{ownerLabel}: \u6311\u6226\u4e2d</span>
-            <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">\u8a08 {cumulative} POW</span>
+            <span>{ownerLabel}: 挑戦中</span>
+            <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">計 {cumulative} POW</span>
             {!willTake && flagPower > 0 && (
-              <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">\u3042\u3068 {needed} POW \u5fc5\u8981</span>
+              <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">あと {needed} POW 必要</span>
             )}
             {willTake && (
-              <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">\ud83c\udff4 \u30d5\u30e9\u30c3\u30b0\u596a\u53d6\uff01</span>
+              <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">🏴 フラッグ奪取！</span>
             )}
           </>
         )}
@@ -304,7 +304,7 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
         {n === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
-              {isMyDrawTurn ? '\u30ab\u30fc\u30c9\u3092\u3081\u304f\u308b' : '\u5f85\u6a5f\u4e2d'}
+              {isMyDrawTurn ? 'カードをめくる' : '待機中'}
             </div>
           </div>
         ) : (
@@ -323,8 +323,8 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
             return (
               <div
                 key={cardKey}
-                className={`absolute top-0 ${cardClass}`}
-                style={{ left: idx * OVERLAP, zIndex: idx, opacity: isLatest ? 1 : 0.75 }}
+                className={`absolute top-0 ${cardClass} transition-all duration-200 hover:-translate-y-3 hover:scale-105 hover:!z-[99] hover:filter hover:brightness-110 cursor-pointer`}
+                style={{ left: idx * OVERLAP, zIndex: idx, opacity: isLatest ? 1 : 0.85 }}
               >
                 <StackCardThumb card={cCard} isFlag={!!isFlag} />
               </div>
@@ -373,7 +373,7 @@ function BattleArena({
   const [currentLogIndex, setCurrentLogIndex] = useState<number>(0);
   const [liveLogIndex, setLiveLogIndex] = useState<number>(0);
   const [isAutoPlay, setIsAutoPlay] = useState<boolean>(false);
-  const [playSpeed, setPlaySpeed] = useState<number>(1000); // ms per step
+  const [playSpeed, setPlaySpeed] = useState<number>(1200); // ms per step (slowed down from 1000ms for readability)
   const [flashState, setFlashState] = useState<'cyan' | 'magenta' | null>(null);
 
   // Interactive selection state
@@ -408,7 +408,7 @@ function BattleArena({
     if (isVisualizing && battleSession) {
       const timer = setTimeout(() => {
         setLiveLogIndex(prev => prev + 1);
-      }, 700); // 700ms delay per draw step for readable flow
+      }, 1400); // 1400ms delay per draw step for highly readable flow
       return () => clearTimeout(timer);
     }
   }, [isVisualizing, liveLogIndex, battleSession]);
@@ -516,51 +516,53 @@ function BattleArena({
 
   // Dual Board bindings (Dynamic depending on live vs historical mode)
   const isPlayer1 = useMemo(() => {
-    if (!isLiveMode || !battleSession) return true;
-    const p1 = (battleSession.player1Name || '').trim().toLowerCase();
     const cur = (playerName || '').trim().toLowerCase();
-    return p1 === cur;
-  }, [isLiveMode, battleSession, playerName]);
+    if (isLiveMode && battleSession) {
+      const p1 = (battleSession.player1Name || '').trim().toLowerCase();
+      return p1 === cur;
+    }
+    if (battleLog && battleLog.length > 0) {
+      const p1 = (battleLog[0].player || '').trim().toLowerCase();
+      return p1 === cur;
+    }
+    return true;
+  }, [isLiveMode, battleSession, playerName, battleLog]);
 
   const myMemSlots = useMemo(() => {
     if (isLiveMode) {
       return mapLiveMemSlots(isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem);
     }
-    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
-    return parseMemSlots(currentEntry.playerMemSlots);
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
+    return parseMemSlots(isPlayer1 ? currentEntry.playerMemSlots : currentEntry.cpuMemSlots);
+  }, [isLiveMode, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
 
   const opponentMemSlots = useMemo(() => {
     if (isLiveMode) {
       return mapLiveMemSlots(isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem);
     }
-    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
-    return parseMemSlots(currentEntry.cpuMemSlots);
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog]);
+    return parseMemSlots(isPlayer1 ? currentEntry.cpuMemSlots : currentEntry.playerMemSlots);
+  }, [isLiveMode, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
 
   const myDeckCount = useMemo(() => {
     if (isLiveMode) {
       return isPlayer1 ? battleSession.player1Deck.length : battleSession.player2Deck.length;
     }
-    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return 0;
-    const p1Name = battleLog.length > 0 ? battleLog[0].player : '';
-    const isP1 = p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
-    return isP1 ? currentEntry.playerDeckCount : currentEntry.cpuDeckCount;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, hasLog, playerName, isPlayer1]);
+    return isPlayer1 ? currentEntry.playerDeckCount : currentEntry.cpuDeckCount;
+  }, [isLiveMode, battleSession, activeStepIndex, battleLog, hasLog, isPlayer1]);
 
   const opponentDeckCount = useMemo(() => {
     if (isLiveMode) {
       return isPlayer1 ? battleSession.player2Deck.length : battleSession.player1Deck.length;
     }
-    const currentEntry = hasLog ? battleLog[Math.min(currentLogIndex, battleLog.length - 1)] : null;
+    const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return 0;
-    const p1Name = battleLog.length > 0 ? battleLog[0].player : '';
-    const isP1 = p1Name.trim().toLowerCase() === playerName.trim().toLowerCase();
-    return isP1 ? currentEntry.cpuDeckCount : currentEntry.playerDeckCount;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, isPlayer1, hasLog, playerName]);
+    return isPlayer1 ? currentEntry.cpuDeckCount : currentEntry.playerDeckCount;
+  }, [isLiveMode, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
 
   // Card Visuals: each player has their own stack of revealed cards.
   const buildMyStack = useMemo(() => buildPlayerStack({
@@ -841,7 +843,7 @@ function BattleArena({
         </div>
 
         {/* ===== CENTRAL BATTLEGROUND (PLAYMAT) ===== */}
-        <div className={`flex flex-col border rounded-2xl bg-cyber-surface/20 backdrop-blur-sm relative overflow-hidden flex-1 min-h-0 transition-all duration-300 ${
+        <div className={`flex flex-row border rounded-2xl bg-cyber-surface/20 backdrop-blur-sm relative overflow-hidden flex-1 min-h-0 transition-all duration-300 ${
           flagHolder === playerName ? 'border-neon-cyan/40 shadow-[0_0_15px_rgba(0,240,255,0.1)]' :
           flagHolder === opponent ? 'border-neon-magenta/40 shadow-[0_0_15px_rgba(255,0,255,0.1)]' :
           'border-cyber-border/40'
@@ -854,56 +856,8 @@ function BattleArena({
             <div className="absolute inset-0 bg-neon-magenta/20 border-2 border-neon-magenta shadow-[inset_0_0_50px_rgba(255,0,255,0.4)] rounded-2xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
           )}
 
-          {/* Opponent Stack (Top) */}
-          <div className="flex-1 flex items-end justify-center min-h-0 relative py-2 border-b border-cyber-border/10">
-            <PlayerStackView
-              stack={oppStack}
-              side="opp"
-              isMyDrawTurn={isOpponentDrawTurn}
-              flagPower={flagPowerValue}
-              challengerPower={challengerPower}
-              ownerLabel={opponent}
-            />
-          </div>
-
-          {/* Center Flag/Trophy Bar (Playmat Center) */}
-          <div className="shrink-0 w-full py-1.5 flex items-center justify-between border-y border-cyber-border/20 bg-cyber-darker/60 px-4 relative z-20 font-mono">
-            {/* Left: Player Challenger Badge */}
-            <div className="flex-1 flex justify-start text-[10px] text-cyber-text-dim">
-              {!isReplayFinished && flagHolder === opponent && challengerPower > 0 && (
-                <div className="flex items-center gap-1.5 text-neon-cyan font-bold uppercase tracking-wider animate-pulse">
-                  <span>Power: {challengerPower}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Center Flag Indicator */}
-            <div className="shrink-0 flex items-center gap-3">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
-                flagHolder === playerName ? 'border-neon-cyan bg-cyan-950/20 text-neon-cyan shadow-[0_0_12px_rgba(0,240,255,0.4)] animate-pulse' :
-                flagHolder === opponent ? 'border-neon-magenta bg-purple-950/20 text-neon-magenta shadow-[0_0_12px_rgba(255,0,255,0.4)] animate-pulse' :
-                'border-neon-amber bg-amber-950/20 text-neon-amber shadow-[0_0_12px_rgba(255,191,0,0.4)]'
-              } transition-all duration-300`}>
-                <Flag size={14} className={flagHolder ? 'animate-pulse' : ''} />
-              </div>
-              <div className="text-center">
-                <div className="text-[8px] uppercase text-cyber-text-dim tracking-widest font-bold">FLAG POWER</div>
-                <div className="text-sm font-black text-white leading-none">{flagPowerValue}</div>
-              </div>
-            </div>
-
-            {/* Right: Opponent Challenger Badge */}
-            <div className="flex-1 flex justify-end text-[10px] text-cyber-text-dim">
-              {!isReplayFinished && flagHolder === playerName && challengerPower > 0 && (
-                <div className="flex items-center gap-1.5 text-neon-magenta font-bold uppercase tracking-wider animate-pulse">
-                  <span>Power: {challengerPower}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Player Stack (Bottom) */}
-          <div className="flex-1 flex items-start justify-center min-h-0 relative py-2 border-t border-cyber-border/10">
+          {/* Player Stack (Left) */}
+          <div className="flex-1 flex items-center justify-center min-h-0 relative px-4 py-2 border-r border-cyber-border/10 overflow-hidden">
             <PlayerStackView
               stack={myStack}
               side="me"
@@ -911,6 +865,56 @@ function BattleArena({
               flagPower={flagPowerValue}
               challengerPower={challengerPower}
               ownerLabel={playerName}
+            />
+          </div>
+
+          {/* Center Flag/Trophy Bar (Playmat Vertical Divider) */}
+          <div className="shrink-0 w-24 h-full flex flex-col items-center justify-between py-6 bg-cyber-darker/60 relative z-20 font-mono">
+            {/* Top: Opponent Challenger Power */}
+            <div className="h-8 flex items-center justify-center text-center">
+              {!isReplayFinished && flagHolder === playerName && challengerPower > 0 && (
+                <div className="flex flex-col items-center text-[10px] text-neon-magenta font-bold uppercase tracking-wider animate-pulse">
+                  <span className="text-[7px] text-cyber-text-dim">CHALLENGER</span>
+                  <span>POW {challengerPower}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Center: Flag Indicator */}
+            <div className="flex flex-col items-center gap-1.5">
+              <div className={`flex items-center justify-center w-9 h-9 rounded-full border-2 ${
+                flagHolder === playerName ? 'border-neon-cyan bg-cyan-950/20 text-neon-cyan shadow-[0_0_12px_rgba(0,240,255,0.4)] animate-pulse' :
+                flagHolder === opponent ? 'border-neon-magenta bg-purple-950/20 text-neon-magenta shadow-[0_0_12px_rgba(255,0,255,0.4)] animate-pulse' :
+                'border-neon-amber bg-amber-950/20 text-neon-amber shadow-[0_0_12px_rgba(255,191,0,0.4)]'
+              } transition-all duration-300`}>
+                <Flag size={16} className={flagHolder ? 'animate-pulse' : ''} />
+              </div>
+              <div className="text-center">
+                <div className="text-[7px] uppercase text-cyber-text-dim tracking-widest font-bold">FLAG POWER</div>
+                <div className="text-sm font-black text-white leading-none">{flagPowerValue}</div>
+              </div>
+            </div>
+
+            {/* Bottom: Player Challenger Power */}
+            <div className="h-8 flex items-center justify-center text-center">
+              {!isReplayFinished && flagHolder === opponent && challengerPower > 0 && (
+                <div className="flex flex-col items-center text-[10px] text-neon-cyan font-bold uppercase tracking-wider animate-pulse">
+                  <span className="text-[7px] text-cyber-text-dim">CHALLENGER</span>
+                  <span>POW {challengerPower}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Opponent Stack (Right) */}
+          <div className="flex-1 flex items-center justify-center min-h-0 relative px-4 py-2 border-l border-cyber-border/10 overflow-hidden">
+            <PlayerStackView
+              stack={oppStack}
+              side="opp"
+              isMyDrawTurn={isOpponentDrawTurn}
+              flagPower={flagPowerValue}
+              challengerPower={challengerPower}
+              ownerLabel={opponent}
             />
           </div>
         </div>
