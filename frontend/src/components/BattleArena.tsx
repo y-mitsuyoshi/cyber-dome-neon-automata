@@ -213,14 +213,22 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
   const [newKeys, setNewKeys] = useState<string[]>([]);
   const prevKeys = useRef<string[]>([]);
   const currentKeys = useMemo(() => cards.map((c, idx) => `${c.id}_${idx}`), [cards]);
+  const wasDefending = useRef(isDefending);
 
   useEffect(() => {
+    if (wasDefending.current !== isDefending || currentKeys.length < prevKeys.current.length) {
+      prevKeys.current = [];
+    }
+    wasDefending.current = isDefending;
+
     const news = currentKeys.filter(key => !prevKeys.current.includes(key));
     if (news.length > 0) {
       setNewKeys(news);
+    } else {
+      setNewKeys([]);
     }
     prevKeys.current = currentKeys;
-  }, [currentKeys]);
+  }, [currentKeys, isDefending]);
 
   if (!hasAny) {
     return (
@@ -536,17 +544,69 @@ function BattleArena({
     if (isLiveMode) {
       return battleSession.turnOwner === playerName && battleSession.requiredAction === 'DRAW' && !battleSession.isFinished;
     }
-    const currentEntry = hasLog ? battleLog[currentLogIndex] : null;
-    return currentEntry ? currentEntry.player === playerName && currentEntry.action === 'reveal' : false;
+    const nextEntry = (hasLog && currentLogIndex + 1 < battleLog.length) ? battleLog[currentLogIndex + 1] : null;
+    return nextEntry ? nextEntry.player === playerName && nextEntry.action === 'reveal' : false;
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, playerName, hasLog]);
 
   const isOpponentDrawTurn = useMemo(() => {
     if (isLiveMode) {
       return battleSession.turnOwner !== playerName && battleSession.requiredAction === 'DRAW' && !battleSession.isFinished;
     }
-    const currentEntry = hasLog ? battleLog[currentLogIndex] : null;
-    return currentEntry ? currentEntry.player === opponent && currentEntry.action === 'reveal' : false;
+    const nextEntry = (hasLog && currentLogIndex + 1 < battleLog.length) ? battleLog[currentLogIndex + 1] : null;
+    return nextEntry ? nextEntry.player === opponent && nextEntry.action === 'reveal' : false;
   }, [isLiveMode, battleSession, currentLogIndex, battleLog, opponent, hasLog, playerName]);
+
+  const displayedLog = useMemo(() => {
+    if (isLiveMode) return activeLog;
+    return activeLog.slice(0, currentLogIndex + 1);
+  }, [isLiveMode, activeLog, currentLogIndex]);
+
+  const liveStatusMessage = useMemo(() => {
+    if (!hasLog || activeLog.length === 0) return { text: t('initializingArenaLink'), color: 'text-cyber-text-dim' };
+    const targetIdx = isLiveMode ? activeLog.length - 1 : currentLogIndex;
+    const entry = activeLog[targetIdx];
+    if (!entry) return { text: t('initializingArenaLink'), color: 'text-cyber-text-dim' };
+
+    const actionPlayer = entry.player;
+    const isPlayer = actionPlayer === playerName;
+    const pName = isPlayer ? 'あなた' : actionPlayer;
+    const color = isPlayer ? 'text-neon-cyan text-glow-cyan' : 'text-neon-magenta text-glow-magenta';
+
+    switch (entry.action) {
+      case 'reveal':
+        if (entry.card) {
+          return {
+            text: `${pName} が 「${entry.card.name}」 (POW ${entry.card.power}) をめくりました！`,
+            color,
+            card: entry.card,
+          };
+        }
+        return { text: `${pName} がカードをめくりました`, color };
+      case 'flag_change': {
+        const winnerName = entry.flagHolder === playerName ? 'あなた' : entry.flagHolder;
+        const winnerColor = entry.flagHolder === playerName ? 'text-neon-cyan text-glow-cyan' : 'text-neon-magenta text-glow-magenta';
+        return {
+          text: `🚩 ${winnerName} がフラッグを奪いました！ (防衛パワー: ${entry.currentPower})`,
+          color: winnerColor + ' font-black scale-105',
+        };
+      }
+      case 'memory_overflow':
+        return {
+          text: `⚠️ ${pName} のメモリが満杯 (オーバーフロー) になりました！`,
+          color: 'text-neon-red animate-pulse',
+        };
+      case 'deck_empty':
+        return {
+          text: `🚫 ${pName} の山札がなくなりました！`,
+          color: 'text-neon-red animate-pulse',
+        };
+      default:
+        return {
+          text: translateBattleDetail(entry.details || entry.action),
+          color: 'text-cyber-text',
+        };
+    }
+  }, [activeLog, currentLogIndex, hasLog, isLiveMode, playerName, t, translateBattleDetail]);
 
   const isReplayFinished = isLiveMode ? battleSession.isFinished : (currentLogIndex >= battleLog.length - 1);
   const flagPowerValue = isLiveMode ? battleSession.flagPower : (hasLog ? activeLog[currentLogIndex].currentPower : 0);
@@ -897,18 +957,18 @@ function BattleArena({
             )}
           </div>
 
-          {/* Action resolution details */}
-          <div className="w-full max-w-2xl text-center px-3 py-1 border border-cyber-border/10 rounded bg-cyber-dark/40 min-h-[32px] flex items-center justify-center">
-            <p className="text-[10px] font-mono text-cyber-text leading-relaxed line-clamp-2">
-              {activeLog.length > 0
-                ? translateBattleDetail(activeLog[activeLog.length - 1].details)
-                : t('initializingArenaLink')}
-              {activeLog.length > 0 && activeLog[activeLog.length - 1].effectTriggered && activeLog[activeLog.length - 1].effectTriggered !== 'None' && activeLog[activeLog.length - 1].effectTriggered !== '' && (
-                <span className="text-neon-green block font-bold mt-0.5 text-[9px] animate-pulse">
-                  ⚡ {translateBattleDetail(activeLog[activeLog.length - 1].effectTriggered)}
-                </span>
-              )}
+          {/* Action resolution details — Large Live Display */}
+          <div className="w-full max-w-2xl text-center px-4 py-2 border-2 border-cyber-border/20 rounded-xl bg-cyber-darker/80 min-h-[50px] flex flex-col items-center justify-center shadow-lg relative overflow-hidden">
+            {/* Ambient scanlines */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent pointer-events-none opacity-40" />
+            <p className={`text-xs font-mono font-bold leading-relaxed tracking-wider transition-all duration-300 ${liveStatusMessage.color}`}>
+              {liveStatusMessage.text}
             </p>
+            {activeLog.length > 0 && activeLog[isLiveMode ? activeLog.length - 1 : currentLogIndex]?.effectTriggered && activeLog[isLiveMode ? activeLog.length - 1 : currentLogIndex].effectTriggered !== 'None' && activeLog[isLiveMode ? activeLog.length - 1 : currentLogIndex].effectTriggered !== '' && (
+              <span className="text-neon-green font-bold mt-1 text-[10px] animate-pulse flex items-center gap-1">
+                ⚡ {translateBattleDetail(activeLog[isLiveMode ? activeLog.length - 1 : currentLogIndex].effectTriggered)}
+              </span>
+            )}
           </div>
 
           {/* Interactive Choice Panel (inline, not overlay) */}
@@ -1122,12 +1182,12 @@ function BattleArena({
             {t('combatLogHeader')}
           </span>
           <span className="text-[9px] text-cyber-text-dim ml-auto">
-            {t('eventsCount', { count: activeLog.length })}
+            {t('eventsCount', { count: displayedLog.length })}
           </span>
         </div>
         
         <div className="flex flex-col gap-1">
-          {activeLog.map((log, i) => {
+          {displayedLog.map((log, i) => {
             const displayLogAction = translateBattleDetail(log.details || log.action);
             const displayLogEffect = log.effectTriggered ? translateBattleDetail(log.effectTriggered) : '';
             const isPlayer = log.player === playerName;
@@ -1137,7 +1197,7 @@ function BattleArena({
               <div
                 key={i}
                 className={`flex items-start gap-2 py-1 px-1.5 rounded transition-all duration-300 ${
-                  i === activeLog.length - 1 ? 'bg-cyber-surface/40 border border-cyber-border/10 animate-slide-in' : ''
+                  i === displayedLog.length - 1 ? 'bg-cyber-surface/40 border border-cyber-border/10 animate-slide-in' : ''
                 }`}
               >
                 <div className={`mt-0.5 min-w-[14px] ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
@@ -1147,7 +1207,7 @@ function BattleArena({
                   <span className={`font-bold ${isSystem ? 'text-neon-green' : isPlayer ? 'text-neon-cyan' : 'text-neon-magenta'}`}>
                     {isSystem ? '[SYS]' : `[${log.player}]`}
                   </span>{' '}
-                  <span className={i === activeLog.length - 1 ? 'text-cyber-text font-semibold' : 'text-cyber-text-dim/70'}>
+                  <span className={i === displayedLog.length - 1 ? 'text-cyber-text font-semibold' : 'text-cyber-text-dim/70'}>
                     {displayLogAction}
                   </span>
                   {log.effectTriggered && log.effectTriggered !== 'None' && log.effectTriggered !== '' && (
