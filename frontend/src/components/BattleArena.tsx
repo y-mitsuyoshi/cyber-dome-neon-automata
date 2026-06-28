@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Flag, User, Cpu, Play, Pause, RotateCcw, Layers, Shield, Activity } from 'lucide-react';
 import type { BattleLogEntry, BattleSession, Card, BattleLogCard, MemorySlot } from '../types/game';
 import MemorySlots from './MemorySlots';
@@ -138,15 +139,33 @@ interface PlayerStackViewProps {
   isMyDrawTurn: boolean;
   flagPower: number;
   challengerPower: number;
+  ownerLabel: string;
 }
 
 function StackCardThumb({ card, isFlag }: { card: Card; isFlag: boolean }) {
   const [hover, setHover] = useState(false);
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    setHover(true);
+    if (thumbRef.current) {
+      const rect = thumbRef.current.getBoundingClientRect();
+      setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setHover(false);
+    setTooltipPos(null);
+  }, []);
+
   return (
     <div
+      ref={thumbRef}
       className="relative transition-all duration-200"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <CardDisplay card={card} disabled size="sm" />
       {isFlag && (
@@ -154,19 +173,26 @@ function StackCardThumb({ card, isFlag }: { card: Card; isFlag: boolean }) {
           <Flag size={8} /> FLAG
         </div>
       )}
-      {hover && (
+      {hover && tooltipPos && createPortal(
         <div
-          className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 scale-90 origin-top"
-          style={{ transform: 'rotateX(0deg) rotateY(0deg) rotateZ(0deg) translateZ(80px) scale(0.9)' }}
+          className="pointer-events-none animate-fade-in"
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            transform: 'translate(-50%, -100%) translateY(-8px)',
+            zIndex: 9999,
+          }}
         >
           <CardDisplay card={card} disabled />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
 }
 
-function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower }: PlayerStackViewProps) {
+function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower, ownerLabel }: PlayerStackViewProps) {
   const accent = side === 'me' ? 'neon-cyan' : 'neon-magenta';
 
   // Unified card list: when defending, show the defender's revealed stack (flag card is the last/top);
@@ -200,7 +226,7 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
-          {side === 'opp' ? '相手のカードを待っています' : 'カードをめくってください'}
+          {side === 'opp' ? `${ownerLabel} のカードを待っています` : 'カードをめくってください'}
         </div>
       </div>
     );
@@ -211,6 +237,9 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
   const needed = Math.max(0, flagPower - cumulative + 1);
   const willTake = !isDefending && challengerPower > flagPower;
 
+  // Flag card name for display
+  const flagCardName = stack.flagCard ? stack.flagCard.name : '';
+
   // Stack layout constants. Fixed container so layout never shifts on card add.
   const CARD_W = 112;
   const OVERLAP = 34;
@@ -220,29 +249,34 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
   return (
     <div className="flex flex-col items-center gap-1 relative h-full justify-center">
       {/* Status badge */}
-      <div className={`flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider ${willTake ? 'text-neon-green' : `text-${accent}`}`}>
+      <div className={`flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-wider flex-wrap justify-center ${willTake ? 'text-neon-green' : `text-${accent}`}`}>
         {isDefending ? (
           <>
             <Flag size={11} className="animate-pulse" />
-            <span>防衛中</span>
+            <span>{ownerLabel}: 防衛中</span>
+            {flagCardName && (
+              <span className="text-neon-amber font-black border border-neon-amber/30 px-1.5 rounded bg-amber-950/20">
+                🃏 {flagCardName}
+              </span>
+            )}
             <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">POW {flagPower}</span>
           </>
         ) : (
           <>
-            <span>挑戦中</span>
+            <span>{ownerLabel}: 挑戦中</span>
             <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">計 {cumulative} POW</span>
             {!willTake && flagPower > 0 && (
-              <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">あと {needed} POW</span>
+              <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">あと {needed} POW 必要</span>
             )}
             {willTake && (
-              <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">奪取！</span>
+              <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">🏴 フラッグ奪取！</span>
             )}
           </>
         )}
       </div>
 
       {/* Fanned stack */}
-      <div className="relative perspective-arena" style={{ width: stackWidth, height: 130 }}>
+      <div className="relative" style={{ width: stackWidth, height: 140 }}>
         {n === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
@@ -260,7 +294,7 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
             // Staggered delay for newly mounted cards
             const animationDelay = isNew ? `${newIndex * 150}ms` : '0ms';
 
-            // Card 3D tilt styles
+            // Card draw or static styles
             const cardClass = isNew
               ? (side === 'me' ? 'animate-draw-card-me' : 'animate-draw-card-opp')
               : (side === 'me'
@@ -274,7 +308,7 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
                 style={{
                   left: idx * OVERLAP,
                   zIndex: idx,
-                  opacity: isLatest ? 1 : 0.72,
+                  opacity: isLatest ? 1 : 0.75,
                   animationDelay,
                 }}
               >
@@ -726,13 +760,14 @@ function BattleArena({
           )}
 
           {/* Opponent Stack (Top) */}
-          <div className="flex-1 flex items-end justify-center min-h-0 relative py-2 overflow-hidden border-b border-cyber-border/10">
+          <div className="flex-1 flex items-end justify-center min-h-0 relative py-2 border-b border-cyber-border/10">
             <PlayerStackView
               stack={oppStack}
               side="opp"
               isMyDrawTurn={isOpponentDrawTurn}
               flagPower={flagPowerValue}
               challengerPower={challengerPower}
+              ownerLabel={opponent}
             />
           </div>
 
@@ -773,13 +808,14 @@ function BattleArena({
           </div>
 
           {/* Player Stack (Bottom) */}
-          <div className="flex-1 flex items-start justify-center min-h-0 relative py-2 overflow-hidden border-t border-cyber-border/10">
+          <div className="flex-1 flex items-start justify-center min-h-0 relative py-2 border-t border-cyber-border/10">
             <PlayerStackView
               stack={myStack}
               side="me"
               isMyDrawTurn={isMyDrawTurn}
               flagPower={flagPowerValue}
               challengerPower={challengerPower}
+              ownerLabel={playerName}
             />
           </div>
         </div>
@@ -821,18 +857,30 @@ function BattleArena({
         {/* ===== CONTROLS PANEL (BOTTOM CENTER) ===== */}
         <div className="flex flex-col items-center gap-1.5 py-0.5 z-10 shrink-0">
           {/* Active Turn Indicator Banner */}
-          <div className="w-full max-w-md text-center">
+          <div className="w-full max-w-lg text-center">
             {isReplayFinished ? (
               <div className="text-neon-green text-glow-green text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-green/30 bg-green-950/15 py-1 rounded animate-pulse">
-                バトル決着
+                🏁 バトル決着
               </div>
             ) : isMyDrawTurn ? (
-              <div className="text-neon-cyan text-glow-cyan text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-cyan/30 bg-cyan-950/15 py-1 rounded animate-pulse">
-                &gt;&gt; あなたのめくり番 &lt;&lt;
+              <div className="text-neon-cyan text-glow-cyan text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-cyan/30 bg-cyan-950/15 py-1.5 px-3 rounded animate-pulse">
+                {!flagHolder ? (
+                  <>&gt;&gt; あなたの山札からカードをめくります &lt;&lt;</>
+                ) : flagHolder === playerName ? (
+                  <>&gt;&gt; あなたは防衛中 — 相手がカードをめくります &lt;&lt;</>
+                ) : (
+                  <>&gt;&gt; あなたが挑戦！自分の山札からめくります &lt;&lt;</>
+                )}
               </div>
             ) : isOpponentDrawTurn ? (
-              <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/30 bg-purple-950/15 py-1 rounded animate-pulse">
-                &gt;&gt; 相手のめくり番 &lt;&lt;
+              <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/30 bg-purple-950/15 py-1.5 px-3 rounded animate-pulse">
+                {!flagHolder ? (
+                  <>&gt;&gt; {opponent} の山札からカードをめくります &lt;&lt;</>
+                ) : flagHolder === opponent ? (
+                  <>&gt;&gt; {opponent} は防衛中 — あなたがめくります &lt;&lt;</>
+                ) : (
+                  <>&gt;&gt; {opponent} が挑戦中 — 相手の山札からめくります &lt;&lt;</>
+                )}
               </div>
             ) : showChoiceUI ? (
               <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/40 bg-purple-950/30 py-1 rounded animate-pulse">
@@ -840,7 +888,7 @@ function BattleArena({
               </div>
             ) : isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer !== playerName ? (
               <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/20 bg-purple-950/10 py-1 rounded animate-pulse">
-                相手の効果選択中...
+                ⏳ {opponent} の効果選択中...
               </div>
             ) : (
               <div className="text-cyber-text-dim text-xs font-bold font-mono tracking-widest uppercase border border-cyber-border/20 bg-cyber-surface/10 py-1.5 rounded">
@@ -938,9 +986,21 @@ function BattleArena({
               >
                 <Play size={14} className={isMyDrawTurn ? 'animate-bounce' : ''} />
                 {isMyDrawTurn ? (
-                  <span>{t('drawNextCard')}</span>
+                  <span>
+                    {!flagHolder
+                      ? '自分の山札からめくる'
+                      : flagHolder === playerName
+                      ? '防衛中 — 次の挑戦を待つ'
+                      : '挑戦！自分の山札からめくる'}
+                  </span>
                 ) : isOpponentDrawTurn ? (
-                  <span>{t('opponentDrawNext')}</span>
+                  <span>
+                    {!flagHolder
+                      ? `${opponent} の山札からめくる`
+                      : flagHolder === opponent
+                      ? `${opponent} 防衛中 — 次をめくる`
+                      : `${opponent} 挑戦中 — 相手の山札からめくる`}
+                  </span>
                 ) : (
                   <span>{t('nextStep')}</span>
                 )}

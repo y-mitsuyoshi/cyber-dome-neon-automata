@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { HardDrive } from 'lucide-react';
 import { useTranslation } from '../context/TranslationContext';
 import { getCardImagePath } from '../utils/cardImage';
@@ -109,18 +110,45 @@ interface MemSlotProps {
 
 function MemSlot({ slot, isEmpty, topCard, imgPath, compact, isDanger, isWarning, accent, t, translateCardName }: MemSlotProps) {
   const [hover, setHover] = useState(false);
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    setHover(true);
+    if (slotRef.current) {
+      const rect = slotRef.current.getBoundingClientRect();
+      setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setHover(false);
+    setTooltipPos(null);
+  }, []);
+
   return (
     <div
+      ref={slotRef}
       className="relative shrink-0"
       style={{ width: compact ? 44 : 64, height: compact ? 56 : 82 }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      {/* Hover popover: full-size card preview */}
-      {hover && topCard && (
-        <div className="absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 pointer-events-none">
+      {/* Hover popover: full-size card preview via portal */}
+      {hover && topCard && tooltipPos && createPortal(
+        <div
+          className="pointer-events-none animate-fade-in"
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            transform: 'translate(-50%, -100%) translateY(-8px)',
+            zIndex: 9999,
+          }}
+        >
           <CardDisplay card={topCard} disabled />
-        </div>
+        </div>,
+        document.body
       )}
       {/* Stack visual effect layers (card-back feel) */}
       {!isEmpty && slot.count > 1 && (
