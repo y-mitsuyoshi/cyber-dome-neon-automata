@@ -82,6 +82,7 @@ export interface BattleSession {
   actionOptions: Card[];
   activeCards: Card[];
   defenderStack?: Card[];
+  flagCard?: Card | null;
   challengerPower: number;
 }
 

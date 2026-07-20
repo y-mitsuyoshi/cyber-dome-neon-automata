@@ -56,11 +56,23 @@ interface BuildPlayerStackArgs {
 function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
   const { player, playerName, opponent, isLiveMode, battleSession, battleLog, currentLogIndex, hasLog } = args;
   const myName = player === 'me' ? playerName : opponent;
-  const empty: PlayerStack = { flagCard: null, challengerCards: [], isDefending: false };
 
+  if (isLiveMode && battleSession) {
+    const isDefending = battleSession.flagHolder === myName;
+    const rawCards = isDefending
+      ? (battleSession.defenderStack ?? [])
+      : (battleSession.activeCards ?? []);
+    return {
+      flagCard: battleSession.flagCard ? convertToFullCard(battleSession.flagCard) : null,
+      challengerCards: rawCards.map(convertToFullCard),
+      isDefending,
+    };
+  }
+
+  const empty: PlayerStack = { flagCard: null, challengerCards: [], isDefending: false };
   if (!hasLog || currentLogIndex < 0) return empty;
 
-  const logList = isLiveMode && battleSession ? battleSession.log : battleLog;
+  const logList = battleLog;
   let defenderName = '';
   let flagCard: Card | null = null;
   let flagChangeIdx = -1;
@@ -618,21 +630,36 @@ function BattleArena({
 
   const myMemSlots = useMemo(() => {
     if (isLiveMode) {
+      // During live log visualization, keep the memory bar synchronized with the
+      // currently shown log step so memory pressure appears at the same moment as
+      // the card-loss animation. Once caught up, use the full session memory.
+      if (isVisualizing && battleSession) {
+        const currentEntry = battleSession.log[Math.min(activeStepIndex, battleSession.log.length - 1)];
+        if (currentEntry) {
+          return parseMemSlots(isPlayer1 ? currentEntry.playerMemSlots : currentEntry.cpuMemSlots);
+        }
+      }
       return mapLiveMemSlots(isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem);
     }
     const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
     return parseMemSlots(isPlayer1 ? currentEntry.playerMemSlots : currentEntry.cpuMemSlots);
-  }, [isLiveMode, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
+  }, [isLiveMode, isVisualizing, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
 
   const opponentMemSlots = useMemo(() => {
     if (isLiveMode) {
+      if (isVisualizing && battleSession) {
+        const currentEntry = battleSession.log[Math.min(activeStepIndex, battleSession.log.length - 1)];
+        if (currentEntry) {
+          return parseMemSlots(isPlayer1 ? currentEntry.cpuMemSlots : currentEntry.playerMemSlots);
+        }
+      }
       return mapLiveMemSlots(isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem);
     }
     const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
     return parseMemSlots(isPlayer1 ? currentEntry.cpuMemSlots : currentEntry.playerMemSlots);
-  }, [isLiveMode, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
+  }, [isLiveMode, isVisualizing, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
 
   const myDeckCount = useMemo(() => {
     if (isLiveMode) {
