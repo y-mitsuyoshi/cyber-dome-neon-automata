@@ -93,7 +93,7 @@ func TestRunBattle(t *testing.T) {
 	}
 
 	// Player card is much stronger (10 vs 2,2). Player should win.
-	result := RunBattle(playerDeck, cpuDeck)
+	result := RunBattle(playerDeck, cpuDeck, 1, false, false)
 
 	if result.Winner != "player" {
 		t.Errorf("Expected player to win, got %s", result.Winner)
@@ -192,7 +192,7 @@ func TestInteractiveBattle(t *testing.T) {
 		{ID: "starter_4", Name: "スカウト", Attribute: "None", Power: 3},
 	}
 
-	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
+	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck, 1, false, false)
 
 	// Ensure RequiredAction is DRAW at start
 	if session.RequiredAction != "DRAW" {
@@ -240,7 +240,7 @@ func TestInteractiveBattleFlagNotStolenIncorrectly(t *testing.T) {
 		{ID: "p2_b", Name: "B", Attribute: "None", Power: 4},
 	}
 
-	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
+	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck, 1, false, false)
 	session.TurnOwner = "P1"
 	session.PendingActionPlayer = "P1"
 
@@ -284,7 +284,7 @@ func TestInteractiveBattleMemoryNotDuplicated(t *testing.T) {
 		{ID: "p2_y", Name: "P2Card", Attribute: "None", Power: 3},
 	}
 
-	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
+	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck, 1, false, false)
 	session.TurnOwner = "P1"
 	session.PendingActionPlayer = "P1"
 
@@ -326,7 +326,7 @@ func TestInteractiveBattleFlagStolenOnEqualPower(t *testing.T) {
 		{ID: "p2_y", Name: "P2Card", Attribute: "None", Power: 3},
 	}
 
-	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck)
+	session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck, 1, false, false)
 	session.TurnOwner = "P1"
 	session.PendingActionPlayer = "P1"
 
@@ -344,5 +344,106 @@ func TestInteractiveBattleFlagStolenOnEqualPower(t *testing.T) {
 	}
 	if session.FlagPower != 3 {
 		t.Fatalf("Expected FlagPower to be 3, got %d", session.FlagPower)
+	}
+}
+
+func TestRefactoredDiscrepancies(t *testing.T) {
+	// Test 1: Simulation extra fans returns & Clown Win Effect in simulation
+	{
+		playerDeck := []models.Card{
+			{ID: "p_1", Name: "DataClown", Attribute: "Matrix", Power: 10, EffectType: "clown"},
+		}
+		cpuDeck := []models.Card{
+			{ID: "c_1", Name: "Scout", Attribute: "None", Power: 1},
+		}
+		// DataClown wins flag, should trigger Clown win effect +2 fans.
+		// Player won. Winner is player. Base fans gained is 2 since cpu deck ran out of cards,
+		// plus 2 fans from clown win effect = 4 fans gained.
+		// Force CPU to start by setting round=2 and cpuWonPrev=true, playerWonPrev=false
+		res := RunBattle(playerDeck, cpuDeck, 2, false, true)
+		if res.Winner != "player" {
+			t.Errorf("Expected player to win, got %s", res.Winner)
+		}
+		if res.FansGained != 4 {
+			t.Errorf("Expected FansGained to be 4 (2 base + 2 clown), got %d", res.FansGained)
+		}
+	}
+
+	// Test 2: Navigator and Fortune Teller deck reordering in simulation
+	{
+		// Player has Navigator, CPU has strong card.
+		// Player starts and claims flag with Navigator (Power 1).
+		// CPU draws Scout (Power 2), defeats Navigator, causing Navigator to bench.
+		// Symmetrical reordering triggers on Player's deck.
+		// Player deck has CardA (Power 1) on top, CardB (Power 3) next.
+		// Navigator AI choice should reorder: CardB (higher power) to top, CardA to bottom.
+		playerDeck := []models.Card{
+			{ID: "p_nav", Name: "Navigator", Attribute: "Matrix", Power: 1, EffectType: "navigator"},
+			{ID: "p_a", Name: "CardA", Attribute: "None", Power: 1},
+			{ID: "p_b", Name: "CardB", Attribute: "None", Power: 3},
+		}
+		cpuDeck := []models.Card{
+			{ID: "c_a", Name: "Scout", Attribute: "None", Power: 2},
+			{ID: "c_b", Name: "Scout", Attribute: "None", Power: 2},
+		}
+
+		// Run battle simulation
+		res := RunBattle(playerDeck, cpuDeck, 2, true, false)
+		foundNavLog := false
+		for _, entry := range res.Log {
+			if entry.Action == "effect" && entry.EffectTriggered == "navigator" {
+				foundNavLog = true
+			}
+		}
+		if !foundNavLog {
+			t.Errorf("Expected navigator effect to be applied and logged in simulation")
+		}
+	}
+
+	// Test 3: Movie Star retrieval of up to 2 HoloMedia cards descending by power
+	{
+		// Movie Star is played, memory has multiple HoloMedia cards.
+		bs := newBattleState(nil, nil)
+		addToMemory(&bs.PlayerMem, models.Card{ID: "hm_1", Name: "HM1", Attribute: "HoloMedia", Power: 1})
+		addToMemory(&bs.PlayerMem, models.Card{ID: "hm_2", Name: "HM2", Attribute: "HoloMedia", Power: 2})
+		addToMemory(&bs.PlayerMem, models.Card{ID: "hm_3", Name: "HM3", Attribute: "HoloMedia", Power: 3})
+
+		movieStar := models.Card{ID: "ms", Name: "MovieStar", Attribute: "None", Power: 1, EffectType: "moviestar"}
+		power := 1
+		bs.applyOnRevealEffects(&movieStar, "player", &power)
+
+		// Should return hm_2 (Power 2) then hm_1 (Power 1) to top of deck
+		if len(bs.PlayerDeck) != 2 {
+			t.Errorf("Expected 2 cards returned to deck, got %d", len(bs.PlayerDeck))
+		} else {
+			if bs.PlayerDeck[0].ID != "hm_2" || bs.PlayerDeck[1].ID != "hm_1" {
+				t.Errorf("Expected hm_2 on top, hm_1 next. Got: top=%s, next=%s", bs.PlayerDeck[0].ID, bs.PlayerDeck[1].ID)
+			}
+		}
+	}
+
+	// Test 4: NPC Butler AI choice banishing up to 2 lowest-power cards
+	{
+		p1Deck := []models.Card{{ID: "p1_1", Name: "Card1", Attribute: "None", Power: 1}}
+		p2Deck := []models.Card{{ID: "p2_1", Name: "Card1", Attribute: "None", Power: 1}}
+		session := InitializeBattleSession("test_session", "P1", "P2", p1Deck, p2Deck, 1, false, false)
+
+		addToMemory(&session.Player1Mem, models.Card{ID: "m_1", Name: "M1", Attribute: "None", Power: 5})
+		addToMemory(&session.Player1Mem, models.Card{ID: "m_2", Name: "M2", Attribute: "None", Power: 1})
+		addToMemory(&session.Player1Mem, models.Card{ID: "m_3", Name: "M3", Attribute: "None", Power: 3})
+
+		options := getUniqueCardsInMem(session.Player1Mem)
+		resolveNPCChoice(session, "P1", "CHOOSE_BUTLER", options)
+
+		if len(session.Player1Mem) != 1 || session.Player1Mem[0].CardName != "M1" {
+			t.Errorf("Expected only M1 to remain in memory, got: %+v", session.Player1Mem)
+		}
+		discardNames := []string{}
+		for _, c := range session.Player1Discard {
+			discardNames = append(discardNames, c.Name)
+		}
+		if len(discardNames) != 2 {
+			t.Errorf("Expected 2 cards in discard, got %d", len(discardNames))
+		}
 	}
 }

@@ -146,7 +146,7 @@ function MemSlot({ slot, isEmpty, topCard, imgPath, compact, isDanger, isWarning
             zIndex: 9999,
           }}
         >
-          <CardDisplay card={topCard} disabled />
+          <CardDisplay card={topCard} disabled={false} />
         </div>,
         document.body
       )}

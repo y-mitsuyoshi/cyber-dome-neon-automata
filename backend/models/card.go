@@ -63,15 +63,16 @@ type MemorySlot struct {
 
 // Player represents a player (human or NPC).
 type Player struct {
-	Name        string       `json:"name"`
-	Credits     int          `json:"credits"`
-	Deck        []Card       `json:"deck"`
-	Hand        []Card       `json:"hand"` // In-hand cards (historical/unused now)
-	Wins        int          `json:"wins"`
-	Fans        int          `json:"fans"`
-	IsNPC       bool         `json:"isNpc"`
-	AIStrategy  string       `json:"aiStrategy"` // Aggro, Combo, Control
-	MemorySlots []MemorySlot `json:"-"`
+	Name             string       `json:"name"`
+	Credits          int          `json:"credits"`
+	Deck             []Card       `json:"deck"`
+	Hand             []Card       `json:"hand"` // In-hand cards (historical/unused now)
+	Wins             int          `json:"wins"`
+	Fans             int          `json:"fans"`
+	IsNPC            bool         `json:"isNpc"`
+	AIStrategy       string       `json:"aiStrategy"` // Aggro, Combo, Control
+	MemorySlots      []MemorySlot `json:"-"`
+	WonPreviousRound bool         `json:"wonPreviousRound"`
 }
 
 // CloneDeck returns a copy of the player's deck.

@@ -63,14 +63,11 @@ function SpectatorScreen({ gameId, onExit }: SpectatorScreenProps) {
     );
   }
 
-  const sorted = [...state.standings].sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    return b.fans - a.fans;
-  });
+  const sorted = state.standings;
 
   const roundLabel = state.currentRound >= state.maxRounds
     ? t('finalsLabel')
-    : `Round ${state.currentRound}/${state.maxRounds - 1}`;
+    : t('roundOf', { round: String(state.currentRound), maxRounds: String(state.maxRounds - 1) });
 
   return (
     <div className="min-h-screen bg-cyber-dark cyber-grid relative overflow-hidden">
@@ -190,11 +187,19 @@ function SpectatorScreen({ gameId, onExit }: SpectatorScreenProps) {
                     >
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="text-xs font-bold truncate text-neon-cyan">{s.p1} vs {s.p2}</span>
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-bold ${
-                          s.isFinished ? 'text-cyber-text-dim/40' : 'text-neon-green animate-pulse'
-                        }`}>
-                          {s.isFinished ? 'DONE' : `Step ${s.step}`}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {s.isFinished && s.winner && (
+                            <span className="flex items-center gap-0.5 text-[9px] text-neon-amber font-bold">
+                              <Trophy size={9} className="text-neon-amber" />
+                              {s.winner}
+                            </span>
+                          )}
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-bold ${
+                            s.isFinished ? 'text-cyber-text-dim/40' : 'text-neon-green animate-pulse'
+                          }`}>
+                            {s.isFinished ? 'DONE' : `Step ${s.step}`}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3 text-[10px] text-cyber-text-dim">
                         <span>Flag: <span className="text-neon-amber font-bold">{s.flagHolder || '—'}</span></span>

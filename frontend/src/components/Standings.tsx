@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
-import { Trophy, Star, ChevronRight, User } from 'lucide-react';
-import type { Standing } from '../types/game';
+import { useEffect, useRef, useState } from 'react';
+import { Trophy, Star, ChevronRight, User, Award } from 'lucide-react';
+import type { Standing, BattleResult } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
+import { getRankVisual } from '../utils/rankStyle';
+import { getPreviousRanks, saveRanks } from '../utils/rankHistory';
 
 interface StandingsProps {
   standings: Standing[];
@@ -11,15 +13,14 @@ interface StandingsProps {
   battleResult: string;
   onNext: () => void;
   loading: boolean;
+  gameId: string;
+  playerName: string;
+  lastResult: BattleResult | null;
 }
 
-function Standings({ standings, round, maxRounds, battleResult, onNext, loading }: StandingsProps) {
+function Standings({ standings, round, maxRounds, battleResult, onNext, loading, gameId, playerName, lastResult }: StandingsProps) {
   const { playSE } = useAudio();
   const playedResultRef = useRef(false);
-  const sorted = [...standings].sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    return b.fans - a.fans;
-  });
 
   const { t, translateBattleResult } = useTranslation();
   const isFinalRound = round >= maxRounds;
@@ -31,9 +32,29 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
   // Localize Go backend match results banner
   const displayResult = translateBattleResult(battleResult);
 
-  // Check victory/defeat status from original English string
-  const isVictory = battleResult.toLowerCase().includes('win') || battleResult.toLowerCase().includes('victory');
-  const isDefeat = battleResult.toLowerCase().includes('loss') || battleResult.toLowerCase().includes('lose') || battleResult.toLowerCase().includes('defeat');
+  // Victory/defeat from BattleResult (not battleResult string matching)
+  const isVictory = lastResult != null && lastResult.winner === playerName;
+  const isDefeat = lastResult != null && lastResult.loser === playerName;
+
+  // Rank change tracking
+  const [rankChanges, setRankChanges] = useState<Map<string, number> | null>(null);
+  useEffect(() => {
+    const prev = getPreviousRanks(gameId);
+    if (prev) {
+      const changes = new Map<string, number>();
+      standings.forEach((s, i) => {
+        const currentRank = i + 1;
+        const prevRank = prev.get(s.name);
+        if (prevRank !== undefined) {
+          changes.set(s.name, prevRank - currentRank); // positive = improved
+        } else {
+          changes.set(s.name, 0);
+        }
+      });
+      setRankChanges(changes);
+    }
+    saveRanks(gameId, standings);
+  }, [gameId, standings]);
 
   // Play result SE on mount (once)
   useEffect(() => {
@@ -42,6 +63,10 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
     if (isVictory) playSE('victory');
     else if (isDefeat) playSE('defeat');
   }, [isVictory, isDefeat, playSE]);
+
+  // Badge conditions
+  const isFinalistRound = round === maxRounds - 1;
+  const isChampionRound = round === maxRounds && lastResult && lastResult.loser !== 'BYE';
 
   return (
     <div className="min-h-screen bg-cyber-dark cyber-grid relative overflow-hidden flex items-center justify-center">
@@ -111,66 +136,95 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading 
           </div>
 
           {/* Rows */}
-          {sorted.map((player, i) => (
-            <div
-              key={player.name}
-              className={`
-                grid grid-cols-[50px_1fr_80px_80px] gap-2 px-4 py-3 border-b border-cyber-border/10
-                transition-all duration-300 animate-slide-in
-                ${player.isPlayer
-                  ? 'bg-cyan-900/10 border-l-2 border-l-neon-cyan'
-                  : 'hover:bg-cyber-surface/30'
-                }
-              `}
-              style={{
-                animationDelay: `${i * 0.1}s`,
-                ...(player.isPlayer ? { boxShadow: 'inset 0 0 30px rgba(0,240,255,0.05)' } : {}),
-              }}
-            >
-              {/* Rank */}
-              <div className="flex items-center">
-                {i === 0 ? (
-                  <span className="text-lg font-black text-neon-amber text-glow-amber">
-                    <Trophy size={18} />
-                  </span>
-                ) : (
-                  <span className={`text-lg font-bold ${player.isPlayer ? 'text-neon-cyan' : 'text-cyber-text-dim'}`}>
-                    {i + 1}
-                  </span>
-                )}
-              </div>
+          {standings.map((player, i) => {
+            const rank = i + 1;
+            const visual = getRankVisual(rank);
+            const change = rankChanges?.get(player.name) ?? 0;
+            const isFinalist = isFinalistRound && rank <= 2;
+            const isChampion = isChampionRound && lastResult?.winner === player.name;
 
-              {/* Name */}
-              <div className="flex items-center gap-2 min-w-0">
-                {player.isPlayer && <User size={14} className="text-neon-cyan shrink-0" />}
-                <span className={`font-bold text-sm truncate ${
-                  player.isPlayer ? 'text-neon-cyan text-glow-cyan' : 'text-cyber-text'
-                }`}>
-                  {player.name}
-                </span>
-                {player.isPlayer && (
-                  <span className="text-[9px] text-neon-cyan/60 uppercase tracking-wider border border-neon-cyan/20 px-1.5 rounded">
-                    {t('youBadge')}
+            return (
+              <div
+                key={player.name}
+                className={`
+                  grid grid-cols-[50px_1fr_80px_80px] gap-2 px-4 py-3 border-b border-cyber-border/10
+                  transition-all duration-300 animate-slide-in
+                  ${visual.rowClass}
+                  ${player.isPlayer ? 'bg-cyan-900/10 border-l-2 border-l-neon-cyan' : ''}
+                `}
+                style={{
+                  animationDelay: `${i * 0.1}s`,
+                  ...(player.isPlayer ? { boxShadow: 'inset 0 0 30px rgba(0,240,255,0.05)' } : {}),
+                }}
+              >
+                {/* Rank */}
+                <div className="flex items-center">
+                  {visual.icon === 'trophy' ? (
+                    <Trophy size={18} className={visual.textClass} />
+                  ) : visual.icon === 'medal' ? (
+                    <span className={`text-lg font-bold ${visual.textClass}`}>{rank}</span>
+                  ) : (
+                    <span className={`text-lg font-bold ${player.isPlayer ? 'text-neon-cyan' : 'text-cyber-text-dim'}`}>
+                      {rank}
+                    </span>
+                  )}
+                </div>
+
+                {/* Name */}
+                <div className="flex items-center gap-2 min-w-0">
+                  {player.isPlayer && <User size={14} className="text-neon-cyan shrink-0" />}
+                  <span className={`font-bold text-sm truncate ${
+                    player.isPlayer ? 'text-neon-cyan text-glow-cyan' :
+                    visual.icon ? visual.textClass : 'text-cyber-text'
+                  }`}>
+                    {player.name}
                   </span>
-                )}
-              </div>
+                  {player.isPlayer && (
+                    <span className="text-[9px] text-neon-cyan/60 uppercase tracking-wider border border-neon-cyan/20 px-1.5 rounded">
+                      {t('youBadge')}
+                    </span>
+                  )}
+                  {/* Rank change indicator */}
+                  {rankChanges && (
+                    <span className="text-[10px] font-bold" aria-label={change > 0 ? t('rankUp') : change < 0 ? t('rankDown') : t('rankSame')}>
+                      {change > 0 && <span className="text-neon-green">{t('rankUp')}</span>}
+                      {change < 0 && <span className="text-neon-red">{t('rankDown')}</span>}
+                      {change === 0 && <span className="text-cyber-text-dim">{t('rankSame')}</span>}
+                    </span>
+                  )}
+                  {/* Finalist badge */}
+                  {isFinalist && (
+                    <span className="text-[8px] text-neon-amber font-bold uppercase tracking-wider border border-neon-amber/40 px-1.5 rounded bg-amber-950/20 animate-pulse">
+                      <Award size={8} className="inline mr-0.5 -mt-0.5" />
+                      {t('finalistBadge')}
+                    </span>
+                  )}
+                  {/* Champion badge */}
+                  {isChampion && (
+                    <span className="text-[8px] text-neon-amber font-bold uppercase tracking-wider border border-neon-amber/50 px-1.5 rounded bg-amber-950/20" style={{ boxShadow: '0 0 8px rgba(255,191,0,0.3)' }}>
+                      <Trophy size={8} className="inline mr-0.5 -mt-0.5" />
+                      {t('championBadge')}
+                    </span>
+                  )}
+                </div>
 
-              {/* Wins */}
-              <div className="flex items-center justify-center">
-                <span className={`text-lg font-bold ${player.isPlayer ? 'text-neon-cyan' : 'text-cyber-text'}`}>
-                  {player.wins}
-                </span>
-              </div>
+                {/* Wins */}
+                <div className="flex items-center justify-center">
+                  <span className={`text-lg font-bold ${player.isPlayer ? 'text-neon-cyan' : 'text-cyber-text'}`}>
+                    {player.wins}
+                  </span>
+                </div>
 
-              {/* Fans */}
-              <div className="flex items-center justify-center gap-1">
-                <Star size={12} className="text-neon-amber" />
-                <span className={`text-sm font-bold ${player.isPlayer ? 'text-neon-amber' : 'text-cyber-text-dim'}`}>
-                  {player.fans}
-                </span>
+                {/* Fans */}
+                <div className="flex items-center justify-center gap-1">
+                  <Star size={12} className="text-neon-amber" />
+                  <span className={`text-sm font-bold ${player.isPlayer ? 'text-neon-amber' : 'text-cyber-text-dim'}`}>
+                    {player.fans}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Next button */}

@@ -46,6 +46,10 @@ function App() {
   const [waitingForNextRound, setWaitingForNextRound] = useState<boolean>(false);
   const [waitingForResults, setWaitingForResults] = useState<boolean>(false);
 
+  // Battle finished hold: keep BattleArena visible for 1500ms after finish
+  const battleFinishedAtRef = useRef<number | null>(null);
+  const [holdBattleView, setHoldBattleView] = useState<boolean>(false);
+
   const { locale, setLocale, t } = useTranslation();
 
   // Error alert sound effect — fire once per new error string
@@ -478,7 +482,33 @@ function App() {
     setWaitingForBattle(false);
     setWaitingForNextRound(false);
     setWaitingForResults(false);
+    battleFinishedAtRef.current = null;
+    setHoldBattleView(false);
   };
+
+  // Battle finished hold effect: when our battle session finishes, keep showing BattleArena for 1500ms
+  useEffect(() => {
+    if (!gameState || gameState.phase !== 'battle') {
+      battleFinishedAtRef.current = null;
+      setHoldBattleView(false);
+      return;
+    }
+    const bs = gameState.battleSession;
+    if (bs && bs.isFinished && (bs.winner === playerName || bs.loser === playerName)) {
+      if (battleFinishedAtRef.current === null) {
+        battleFinishedAtRef.current = Date.now();
+        setHoldBattleView(true);
+        const timer = setTimeout(() => {
+          setHoldBattleView(false);
+          battleFinishedAtRef.current = null;
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      battleFinishedAtRef.current = null;
+      setHoldBattleView(false);
+    }
+  }, [gameState, playerName]);
 
   // Render screens based on screen state
   return (
@@ -588,7 +618,7 @@ function App() {
 
       {screen === 'game' && gameState && (
         <>
-          {gameState.currentRound > gameState.maxRounds && gameState.phase === 'results' ? (
+          {gameState.currentRound > gameState.maxRounds && gameState.phase === 'results' && !holdBattleView ? (
             <GameOver standings={gameState.standings} onRestart={handleRestart} />
           ) : gameState.phase === 'shop' ? (
             <Shop
@@ -603,7 +633,7 @@ function App() {
               onBattle={handleStartBattle}
               loading={loading}
             />
-          ) : gameState.phase === 'battle' ? (
+          ) : gameState.phase === 'battle' || holdBattleView ? (
             <BattleArena
               gameId={gameState.gameId}
               playerName={playerName}
@@ -625,6 +655,9 @@ function App() {
               battleResult={gameState.battleResult}
               onNext={handleNextRound}
               loading={loading}
+              gameId={gameState.gameId}
+              playerName={playerName}
+              lastResult={gameState.lastResult}
             />
           )}
         </>

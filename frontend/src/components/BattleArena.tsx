@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Flag, User, Cpu, Play, Pause, RotateCcw, Layers, Shield, Activity } from 'lucide-react';
+import { Flag, User, Cpu, Play, Pause, RotateCcw, Layers, Shield, Activity, Zap } from 'lucide-react';
 import type { BattleLogEntry, BattleSession, Card, BattleLogCard, MemorySlot } from '../types/game';
 import MemorySlots from './MemorySlots';
 import CardDisplay from './CardDisplay';
@@ -133,11 +133,11 @@ interface PlayerStackViewProps {
   side: 'me' | 'opp';
   isMyDrawTurn: boolean;
   flagPower: number;
-  challengerPower: number;
+  activeChallengerPower: number;
   ownerLabel: string;
 }
 
-function StackCardThumb({ card, isFlag }: { card: Card; isFlag: boolean }) {
+function StackCardThumb({ card, isFlag, neededPower }: { card: Card; isFlag: boolean; neededPower?: number }) {
   const [hover, setHover] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
@@ -158,16 +158,36 @@ function StackCardThumb({ card, isFlag }: { card: Card; isFlag: boolean }) {
   return (
     <div
       ref={thumbRef}
-      className="relative transition-all duration-200"
+      className="relative transition-all duration-200 preserve-3d w-28 h-40"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <CardDisplay card={card} disabled size="sm" />
-      {isFlag && (
-        <div className={`absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 text-[8px] font-mono font-bold text-neon-amber bg-cyber-darker border border-neon-amber/50 px-1 py-0.5 rounded-full shadow-[0_0_8px_rgba(255,191,0,0.4)] whitespace-nowrap z-20`}>
-          <Flag size={8} /> FLAG
+      {/* Card Front Face */}
+      <div className="absolute inset-0 backface-hidden z-10">
+        <CardDisplay card={card} disabled size="sm" />
+        {isFlag && (
+          <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 text-[8px] font-mono font-bold text-neon-amber bg-cyber-darker border border-neon-amber/50 px-1 py-0.5 rounded-full shadow-[0_0_8px_rgba(255,191,0,0.4)] whitespace-nowrap z-20">
+            <Flag size={8} /> FLAG
+          </div>
+        )}
+        {neededPower !== undefined && neededPower > 0 && (
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center justify-center text-[9px] font-mono font-bold text-neon-red bg-cyber-darker border border-neon-red/50 px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(255,0,64,0.6)] whitespace-nowrap z-20 animate-pulse">
+            +{neededPower} power needed to capture
+          </div>
+        )}
+      </div>
+
+      {/* Card Back Face (visible during 3D flip rotation) */}
+      <div className="absolute inset-0 backface-hidden rotate-y-180 bg-cyber-darker border-2 border-cyber-border rounded-lg flex flex-col items-center justify-center p-2 shadow-lg relative overflow-hidden select-none">
+        <div className="absolute inset-0 cyber-grid opacity-35 pointer-events-none" />
+        <div className="w-full h-full border border-dashed border-neon-cyan/20 rounded flex flex-col items-center justify-center gap-2">
+          <div className="w-8 h-8 rounded-full border border-neon-cyan/40 flex items-center justify-center text-neon-cyan text-glow-cyan animate-pulse">
+            💿
+          </div>
+          <span className="text-[8px] uppercase tracking-widest text-cyber-text-dim text-center">NEON AUTO</span>
         </div>
-      )}
+      </div>
+
       {hover && tooltipPos && createPortal(
         <div
           className="pointer-events-none animate-fade-in"
@@ -179,7 +199,7 @@ function StackCardThumb({ card, isFlag }: { card: Card; isFlag: boolean }) {
             zIndex: 9999,
           }}
         >
-          <CardDisplay card={card} disabled />
+          <CardDisplay card={card} disabled={false} />
         </div>,
         document.body
       )}
@@ -187,8 +207,11 @@ function StackCardThumb({ card, isFlag }: { card: Card; isFlag: boolean }) {
   );
 }
 
-function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower, ownerLabel }: PlayerStackViewProps) {
+function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, activeChallengerPower, ownerLabel }: PlayerStackViewProps) {
+  const { t } = useTranslation();
   const accent = side === 'me' ? 'neon-cyan' : 'neon-magenta';
+  const borderClass = side === 'me' ? 'border-neon-cyan/30' : 'border-neon-magenta/30';
+  const textClass = side === 'me' ? 'text-neon-cyan/40' : 'text-neon-magenta/40';
 
   const isDefending = stack.isDefending;
   const cards = useMemo(() => {
@@ -232,7 +255,10 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
       setVisibleCount(newLen);
     }
     prevCardsLen.current = newLen;
-    return () => { revealTimers.current.forEach(clearTimeout); };
+    return () => {
+      revealTimers.current.forEach(clearTimeout);
+      revealTimers.current = [];
+    };
   }, [cards.length, isDefending]);
 
   const [newKeys, setNewKeys] = useState<string[]>([]);
@@ -253,16 +279,16 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
   if (!hasAny && visibleCount === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
-        <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
-          {side === 'opp' ? `${ownerLabel} のカードを待っています` : 'カードをめくってください'}
+        <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed ${borderClass} rounded-lg px-4 py-2 ${textClass}`}>
+          {side === 'opp' ? t('awaitingOpponentCard', { name: ownerLabel }) : t('drawYourCard')}
         </div>
       </div>
     );
   }
 
-  const cumulative = isDefending ? flagPower : challengerPower;
-  const needed = Math.max(0, flagPower - cumulative + 1);
-  const willTake = !isDefending && challengerPower > flagPower;
+  const cumulative = isDefending ? flagPower : activeChallengerPower;
+  const needed = Math.max(0, flagPower - activeChallengerPower + 1);
+  const willTake = !isDefending && activeChallengerPower > flagPower;
   const flagCardName = stack.flagCard ? stack.flagCard.name : '';
 
   const CARD_W = 112;
@@ -277,7 +303,7 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
         {isDefending ? (
           <>
             <Flag size={11} className="animate-pulse" />
-            <span>{ownerLabel}: 防衛中</span>
+            <span>{t('defendingLabel', { name: ownerLabel })}</span>
             {flagCardName && (
               <span className="text-neon-amber font-black border border-neon-amber/30 px-1.5 rounded bg-amber-950/20">
                 🃏 {flagCardName}
@@ -287,24 +313,24 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
           </>
         ) : (
           <>
-            <span>{ownerLabel}: 挑戦中</span>
-            <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">計 {cumulative} POW</span>
+            <span>{t('challengingLabel', { name: ownerLabel })}</span>
+            <span className="text-white font-black border border-white/20 px-1.5 rounded bg-cyber-darker">{t('totalPowLabel', { pow: cumulative })}</span>
             {!willTake && flagPower > 0 && (
-              <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">あと {needed} POW 必要</span>
+              <span className="text-neon-amber border border-neon-amber/40 px-1.5 rounded bg-amber-950/20">{t('needMorePow', { needed })}</span>
             )}
             {willTake && (
-              <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">🏴 フラッグ奪取！</span>
+              <span className="text-neon-green border border-neon-green/40 px-1.5 rounded bg-green-950/20 animate-pulse">🏴 {t('flagStolen')}</span>
             )}
           </>
         )}
       </div>
 
       {/* Fanned stack */}
-      <div className="relative" style={{ width: stackWidth, height: 140 }}>
+      <div className="relative perspective-arena" style={{ width: stackWidth, height: 140 }}>
         {n === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed border-${accent}/30 rounded-lg px-4 py-2 text-${accent}/40`}>
-              {isMyDrawTurn ? 'カードをめくる' : '待機中'}
+            <div className={`text-[10px] uppercase tracking-widest font-mono border border-dashed ${borderClass} rounded-lg px-4 py-2 ${textClass}`}>
+              {isMyDrawTurn ? t('drawPlaceholder') : t('waitingPlaceholder')}
             </div>
           </div>
         ) : (
@@ -323,10 +349,10 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower
             return (
               <div
                 key={cardKey}
-                className={`absolute top-0 ${cardClass} transition-all duration-200 hover:-translate-y-3 hover:scale-105 hover:!z-[99] hover:filter hover:brightness-110 cursor-pointer`}
+                className={`absolute top-0 ${cardClass} preserve-3d transition-all duration-200 hover:-translate-y-3 hover:scale-105 hover:!z-[99] hover:filter hover:brightness-110 cursor-pointer`}
                 style={{ left: idx * OVERLAP, zIndex: idx, opacity: isLatest ? 1 : 0.85 }}
               >
-                <StackCardThumb card={cCard} isFlag={!!isFlag} />
+                <StackCardThumb card={cCard} isFlag={!!isFlag} neededPower={isFlag ? needed : undefined} />
               </div>
             );
           })
@@ -367,6 +393,14 @@ function BattleArena({
   "use no memo";
   const { playSE } = useAudio();
   const { t, translateBattleDetail } = useTranslation();
+  const playSERef = useRef(playSE);
+  const translateBattleDetailRef = useRef(translateBattleDetail);
+
+  useEffect(() => {
+    playSERef.current = playSE;
+    translateBattleDetailRef.current = translateBattleDetail;
+  }, [playSE, translateBattleDetail]);
+
   const [showDeckModal, setShowDeckModal] = useState(false);
 
   // Replay playback states (for non-live historical log viewer fallback)
@@ -375,6 +409,11 @@ function BattleArena({
   const [isAutoPlay, setIsAutoPlay] = useState<boolean>(false);
   const [playSpeed, setPlaySpeed] = useState<number>(1200); // ms per step (slowed down from 1000ms for readability)
   const [flashState, setFlashState] = useState<'cyan' | 'magenta' | null>(null);
+  const [effectAlert, setEffectAlert] = useState<string | null>(null);
+  const effectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isShaking, setIsShaking] = useState<boolean>(false);
+  const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Interactive selection state
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
@@ -383,7 +422,9 @@ function BattleArena({
 
   const isLiveMode = battleSession !== null;
   const hasLog = isLiveMode ? (battleSession.log.length > 0) : (battleLog && battleLog.length > 0);
-  const activeLog = isLiveMode ? (battleSession?.log || []) : battleLog;
+  const activeLog = useMemo(() => {
+    return isLiveMode ? (battleSession?.log || []) : battleLog;
+  }, [isLiveMode, battleSession?.log, battleLog]);
   const activeStepIndex = isLiveMode ? liveLogIndex : currentLogIndex;
 
   // Track the actual log length we have visualized
@@ -467,32 +508,79 @@ function BattleArena({
     if (targetIdx === lastPlayedIndexRef.current) return;
     lastPlayedIndexRef.current = targetIdx;
 
+    if (effectTimeoutRef.current) {
+      clearTimeout(effectTimeoutRef.current);
+      effectTimeoutRef.current = null;
+    }
+    setEffectAlert(null);
+
     const entry = activeLog[targetIdx];
     if (!entry) return;
 
+    if (entry.effectTriggered && entry.effectTriggered !== 'None' && entry.effectTriggered !== '') {
+      const translated = translateBattleDetailRef.current(entry.effectTriggered);
+      setEffectAlert(translated);
+      effectTimeoutRef.current = setTimeout(() => {
+        setEffectAlert(null);
+        effectTimeoutRef.current = null;
+      }, 1800);
+    }
+
     if (entry.action === 'reveal') {
-      playSE('clash');
+      playSERef.current('clash');
     } else if (entry.action === 'flag_change') {
-      playSE('roll');
+      playSERef.current('roll');
+      
+      // Trigger screen shake
+      setIsShaking(true);
+      if (shakeTimeoutRef.current) {
+        clearTimeout(shakeTimeoutRef.current);
+      }
+      shakeTimeoutRef.current = setTimeout(() => {
+        setIsShaking(false);
+        shakeTimeoutRef.current = null;
+      }, 500);
+
       if (entry.flagHolder === playerName) {
         setFlashState('cyan');
       } else if (entry.flagHolder === opponent) {
         setFlashState('magenta');
       }
-      setTimeout(() => setFlashState(null), 400);
+      if (flashTimeoutRef.current) {
+        clearTimeout(flashTimeoutRef.current);
+      }
+      flashTimeoutRef.current = setTimeout(() => {
+        setFlashState(null);
+        flashTimeoutRef.current = null;
+      }, 500);
     } else if (entry.action === 'memory_overflow' || entry.action === 'deck_empty') {
-      playSE('discard');
+      playSERef.current('discard');
     }
 
     if (targetIdx === activeLog.length - 1 && (isLiveMode ? battleSession.isFinished : currentLogIndex === battleLog.length - 1)) {
       const winner = entry.flagHolder;
       if (winner === playerName) {
-        playSE('victory');
+        playSERef.current('victory');
       } else if (winner === opponent) {
-        playSE('defeat');
+        playSERef.current('defeat');
       }
     }
-  }, [activeStepIndex, activeLog, playerName, opponent, playSE, hasLog, isLiveMode, battleSession?.isFinished, battleLog.length]);
+
+    return () => {
+      if (effectTimeoutRef.current) {
+        clearTimeout(effectTimeoutRef.current);
+      }
+      if (shakeTimeoutRef.current) {
+        clearTimeout(shakeTimeoutRef.current);
+      }
+      if (flashTimeoutRef.current) {
+        clearTimeout(flashTimeoutRef.current);
+      }
+      setIsShaking(false);
+      setFlashState(null);
+      lastPlayedIndexRef.current = -1;
+    };
+  }, [activeStepIndex, activeLog, playerName, opponent, hasLog, isLiveMode, battleSession?.isFinished, battleLog.length, currentLogIndex]);
 
   // Helper to parse live slots into MemorySlot[]
   const mapLiveMemSlots = (slots: MemorySlot[] | undefined): MemorySlot[] => {
@@ -578,6 +666,21 @@ function BattleArena({
   const myStack = buildMyStack;
   const oppStack = buildOppStack;
 
+  const activeChallengerPower = useMemo(() => {
+    if (isLiveMode && battleSession) {
+      return battleSession.challengerPower;
+    }
+    const currentEntry = hasLog && activeLog && activeLog[activeStepIndex];
+    if (!currentEntry) return 0;
+    const currentFlagHolder = currentEntry.flagHolder;
+    if (currentFlagHolder === opponent) {
+      return myStack.challengerCards.reduce((sum, card) => sum + (card.power || 0), 0);
+    } else if (currentFlagHolder === playerName) {
+      return oppStack.challengerCards.reduce((sum, card) => sum + (card.power || 0), 0);
+    }
+    return 0;
+  }, [isLiveMode, battleSession, hasLog, activeLog, activeStepIndex, opponent, playerName, myStack.challengerCards, oppStack.challengerCards]);
+
   // Draw turns status
   const isMyDrawTurn = useMemo(() => {
     if (isLiveMode) {
@@ -598,7 +701,7 @@ function BattleArena({
   const displayedLog = useMemo(() => {
     if (isLiveMode) return activeLog;
     return activeLog.slice(0, activeStepIndex + 1);
-  }, [isLiveMode, activeLog, currentLogIndex]);
+  }, [isLiveMode, activeLog, activeStepIndex]);
 
   const liveStatusMessage = useMemo(() => {
     if (!hasLog || activeLog.length === 0) return { text: t('initializingArenaLink'), color: 'text-cyber-text-dim' };
@@ -608,35 +711,35 @@ function BattleArena({
 
     const actionPlayer = entry.player;
     const isPlayer = actionPlayer === playerName;
-    const pName = isPlayer ? 'あなた' : actionPlayer;
+    const pName = isPlayer ? t('statusYouLabel') : actionPlayer;
     const color = isPlayer ? 'text-neon-cyan text-glow-cyan' : 'text-neon-magenta text-glow-magenta';
 
     switch (entry.action) {
       case 'reveal':
         if (entry.card) {
           return {
-            text: `${pName} が 「${entry.card.name}」 (POW ${entry.card.power}) をめくりました！`,
+            text: t('statusDrewCard', { name: pName, card: entry.card.name, power: entry.card.power }),
             color,
             card: entry.card,
           };
         }
-        return { text: `${pName} がカードをめくりました`, color };
+        return { text: t('statusDrewCardGeneric', { name: pName }), color };
       case 'flag_change': {
-        const winnerName = entry.flagHolder === playerName ? 'あなた' : entry.flagHolder;
+        const winnerName = entry.flagHolder === playerName ? t('statusYouLabel') : entry.flagHolder;
         const winnerColor = entry.flagHolder === playerName ? 'text-neon-cyan text-glow-cyan' : 'text-neon-magenta text-glow-magenta';
         return {
-          text: `🚩 ${winnerName} がフラッグを奪いました！ (防衛パワー: ${entry.currentPower})`,
+          text: t('statusFlagTaken', { name: winnerName, power: entry.currentPower }),
           color: winnerColor + ' font-black scale-105',
         };
       }
       case 'memory_overflow':
         return {
-          text: `⚠️ ${pName} のメモリが満杯 (オーバーフロー) になりました！`,
+          text: t('statusMemoryOverflow', { name: pName }),
           color: 'text-neon-red animate-pulse',
         };
       case 'deck_empty':
         return {
-          text: `🚫 ${pName} の山札がなくなりました！`,
+          text: t('statusDeckEmpty', { name: pName }),
           color: 'text-neon-red animate-pulse',
         };
       default:
@@ -645,11 +748,11 @@ function BattleArena({
           color: 'text-cyber-text',
         };
     }
-  }, [activeLog, currentLogIndex, hasLog, isLiveMode, playerName, t, translateBattleDetail]);
+  }, [activeLog, activeStepIndex, hasLog, playerName, t, translateBattleDetail]);
 
   const isReplayFinished = isLiveMode ? battleSession.isFinished : (currentLogIndex >= battleLog.length - 1);
   const flagPowerValue = isLiveMode ? battleSession.flagPower : (hasLog ? activeLog[currentLogIndex].currentPower : 0);
-  const challengerPower = isLiveMode ? battleSession.challengerPower : 0;
+  const challengerPower = activeChallengerPower;
 
   // Active Choice Config
   const showChoiceUI = isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer === playerName && !battleSession.isFinished;
@@ -660,8 +763,8 @@ function BattleArena({
     switch (action) {
       case 'CHOOSE_REPORTER':
         return {
-          title: 'REPORTER DETECTED / リポーター効果発動',
-          instructions: '山札の上のカードを1枚選択してください。選択したカードが山札の一番上になり、もう1枚は山札の一番下に置かれます。',
+          title: t('choiceTitleReporter'),
+          instructions: t('choiceInstrReporter'),
           maxSelect: 1,
           minSelect: 1,
           isOptional: false,
@@ -669,8 +772,8 @@ function BattleArena({
       case 'CHOOSE_JUGGLER':
       case 'CHOOSE_BUMPER_CAR':
         return {
-          title: 'JUGGLER / バンパーカー効果発動',
-          instructions: '山札の上のカードを並び替えたい順に選択してください。最初に選択したカードが山札の一番上になります。',
+          title: t('choiceTitleJuggler'),
+          instructions: t('choiceInstrJuggler'),
           maxSelect: battleSession.actionOptions.length,
           minSelect: battleSession.actionOptions.length,
           isOptional: false,
@@ -678,8 +781,8 @@ function BattleArena({
       case 'CHOOSE_SAILOR':
       case 'CHOOSE_PROPHET':
         return {
-          title: 'SAILOR / 船乗り・予知能力者効果発動',
-          instructions: '山札からカードを1枚選択し、山札の底（予知能力者の場合は山札のトップ）に移動します。',
+          title: t('choiceTitleSailor'),
+          instructions: t('choiceInstrSailor'),
           maxSelect: 1,
           minSelect: 1,
           isOptional: false,
@@ -687,54 +790,54 @@ function BattleArena({
       case 'CHOOSE_BUTLER':
       case 'CHOOSE_PUMPKIN':
         return {
-          title: 'BUTLER / 執事・パンプキン効果発動',
-          instructions: 'ベンチから除外するカードを最大2枚選択してください。（選択しなくても構いません）',
+          title: t('choiceTitleButler'),
+          instructions: t('choiceInstrButler'),
           maxSelect: 2,
           minSelect: 0,
           isOptional: true,
         };
       case 'CHOOSE_MAGICIAN':
         return {
-          title: 'MAGICIAN / 魔術師効果発動',
-          instructions: 'ベンチからパワー3以下のカードを1枚選択して除外してください。',
+          title: t('choiceTitleMagician'),
+          instructions: t('choiceInstrMagician'),
           maxSelect: 1,
           minSelect: 0,
           isOptional: true,
         };
       case 'CHOOSE_VAMPIRE':
         return {
-          title: 'VAMPIRE / バンパイア効果発動',
-          instructions: 'ベンチからBデッキのカードを1枚選択し、山札の一番上に戻します。',
+          title: t('choiceTitleVampire'),
+          instructions: t('choiceInstrVampire'),
           maxSelect: 1,
           minSelect: 0,
           isOptional: true,
         };
       case 'CHOOSE_MOVIESTAR':
         return {
-          title: 'MOVIESTAR / ムービースター効果発動',
-          instructions: 'ベンチからパワー1または2の映画カードを最大2枚選択し、山札の上に戻します。',
+          title: t('choiceTitleMoviestar'),
+          instructions: t('choiceInstrMoviestar'),
           maxSelect: 2,
           minSelect: 0,
           isOptional: true,
         };
       case 'CHOOSE_SIREN':
         return {
-          title: 'SIREN / サイレン効果発動',
-          instructions: '相手のベンチからカードを1枚選択し、除外エリアに送ります。',
+          title: t('choiceTitleSiren'),
+          instructions: t('choiceInstrSiren'),
           maxSelect: 1,
           minSelect: 0,
           isOptional: true,
         };
       default:
         return {
-          title: 'CARD EFFECT TRIGGERED / カード効果選択',
-          instructions: 'カードを選択してください。',
+          title: t('choiceTitleGeneric'),
+          instructions: t('choiceInstrGeneric'),
           maxSelect: 1,
           minSelect: 0,
           isOptional: true,
         };
     }
-  }, [showChoiceUI, battleSession]);
+  }, [showChoiceUI, battleSession, t]);
 
   const handleSelectCard = (id: string) => {
     if (!choiceConfig) return;
@@ -786,7 +889,15 @@ function BattleArena({
   const flagHolder = hasLog && activeLog && activeLog[activeStepIndex] ? activeLog[activeStepIndex].flagHolder : '';
 
   return (
-    <div className="h-screen bg-cyber-dark relative overflow-hidden flex flex-col p-2 sm:p-4 select-none">
+    <div className={`h-screen bg-cyber-dark relative overflow-hidden flex flex-col p-2 sm:p-4 select-none ${isShaking ? 'animate-screen-shake' : ''}`}>
+      {/* Fullscreen impact flash overlays */}
+      {flashState === 'cyan' && (
+        <div className="fixed inset-0 animate-impact-flash-cyan pointer-events-none z-50" />
+      )}
+      {flashState === 'magenta' && (
+        <div className="fixed inset-0 animate-impact-flash-magenta pointer-events-none z-50" />
+      )}
+
       {/* Background gradients */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -848,12 +959,18 @@ function BattleArena({
           flagHolder === opponent ? 'border-neon-magenta/40 shadow-[0_0_15px_rgba(255,0,255,0.1)]' :
           'border-cyber-border/40'
         }`}>
-          {/* Flash overlays inside playmat */}
-          {flashState === 'cyan' && (
-            <div className="absolute inset-0 bg-neon-cyan/20 border-2 border-neon-cyan shadow-[inset_0_0_50px_rgba(0,240,255,0.4)] rounded-2xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
-          )}
-          {flashState === 'magenta' && (
-            <div className="absolute inset-0 bg-neon-magenta/20 border-2 border-neon-magenta shadow-[inset_0_0_50px_rgba(255,0,255,0.4)] rounded-2xl pointer-events-none z-30 animate-fade-in" style={{ animationDuration: '100ms' }} />
+
+          {/* Effect Alert sliding banner overlay */}
+          {effectAlert && (
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-40 pointer-events-none flex items-center justify-center animate-slide-banner">
+              <div className="w-full bg-black/85 border-y-2 border-neon-amber shadow-[0_0_25px_rgba(255,191,0,0.6)] py-3 px-6 flex items-center justify-center gap-3">
+                <Zap className="text-neon-amber animate-pulse shrink-0" size={20} />
+                <span className="text-sm md:text-base font-mono font-black text-neon-amber tracking-wider text-glow-amber text-center">
+                  ⚡ {effectAlert} ⚡
+                </span>
+                <Zap className="text-neon-amber animate-pulse shrink-0" size={20} />
+              </div>
+            </div>
           )}
 
           {/* Player Stack (Left) */}
@@ -863,14 +980,14 @@ function BattleArena({
               side="me"
               isMyDrawTurn={isMyDrawTurn}
               flagPower={flagPowerValue}
-              challengerPower={challengerPower}
+              activeChallengerPower={activeChallengerPower}
               ownerLabel={playerName}
             />
           </div>
 
           {/* Center Flag/Trophy Bar (Playmat Vertical Divider) */}
           <div className="shrink-0 w-24 h-full flex flex-col items-center justify-between py-6 bg-cyber-darker/60 relative z-20 font-mono">
-            {/* Top: Opponent Challenger Power */}
+            {/* Top: Opponent Attack Power */}
             <div className="h-8 flex items-center justify-center text-center">
               {!isReplayFinished && flagHolder === playerName && challengerPower > 0 && (
                 <div className="flex flex-col items-center text-[10px] text-neon-magenta font-bold uppercase tracking-wider animate-pulse">
@@ -895,7 +1012,7 @@ function BattleArena({
               </div>
             </div>
 
-            {/* Bottom: Player Challenger Power */}
+            {/* Bottom: Player Attack Power */}
             <div className="h-8 flex items-center justify-center text-center">
               {!isReplayFinished && flagHolder === opponent && challengerPower > 0 && (
                 <div className="flex flex-col items-center text-[10px] text-neon-cyan font-bold uppercase tracking-wider animate-pulse">
@@ -913,7 +1030,7 @@ function BattleArena({
               side="opp"
               isMyDrawTurn={isOpponentDrawTurn}
               flagPower={flagPowerValue}
-              challengerPower={challengerPower}
+              activeChallengerPower={activeChallengerPower}
               ownerLabel={opponent}
             />
           </div>
@@ -958,40 +1075,60 @@ function BattleArena({
           {/* Active Turn Indicator Banner */}
           <div className="w-full max-w-lg text-center">
             {isReplayFinished ? (
-              <div className="text-neon-green text-glow-green text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-green/30 bg-green-950/15 py-1 rounded animate-pulse">
-                🏁 バトル決着
+              <div className="text-neon-green text-glow-green text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-green/30 bg-green-950/15 py-1.5 rounded animate-pulse">
+                <span className="text-lg">🏁 {t('battleFinished')}</span>
+                {(() => {
+                  const lastEntry = activeLog.length > 0 ? activeLog[activeLog.length - 1] : null;
+                  if (!lastEntry) return null;
+                  const isWinner = lastEntry.flagHolder === playerName;
+                  const isOppWinner = lastEntry.flagHolder === opponent;
+                  if (!isWinner && !isOppWinner) return null;
+                  const won = isWinner;
+                  return (
+                    <div className="mt-1">
+                      <span className={`font-black ${won ? 'text-neon-green text-glow-green' : 'text-neon-red text-glow-red'}`}>
+                        {won ? t('battleVictory') : t('battleDefeat')}
+                      </span>
+                      <span className="text-cyber-text-dim ml-2 text-[9px] font-normal">
+                        {lastEntry.action === 'memory_overflow' && t('reasonMemoryOverflow')}
+                        {lastEntry.action === 'deck_empty' && t('reasonDeckEmpty')}
+                        {lastEntry.action !== 'memory_overflow' && lastEntry.action !== 'deck_empty' && t('reasonBattleComplete')}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             ) : isMyDrawTurn ? (
               <div className="text-neon-cyan text-glow-cyan text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-cyan/30 bg-cyan-950/15 py-1.5 px-3 rounded animate-pulse">
                 {!flagHolder ? (
-                  <>&gt;&gt; あなたの山札からカードをめくります &lt;&lt;</>
+                  <>&gt;&gt; {t('bannerDrawOwn')} &lt;&lt;</>
                 ) : flagHolder === playerName ? (
-                  <>&gt;&gt; あなたは防衛中 — 相手がカードをめくります &lt;&lt;</>
+                  <>&gt;&gt; {t('bannerDefend')} &lt;&lt;</>
                 ) : (
-                  <>&gt;&gt; あなたが挑戦！自分の山札からめくります &lt;&lt;</>
+                  <>&gt;&gt; {t('bannerChallenge')} &lt;&lt;</>
                 )}
               </div>
             ) : isOpponentDrawTurn ? (
               <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/30 bg-purple-950/15 py-1.5 px-3 rounded animate-pulse">
                 {!flagHolder ? (
-                  <>&gt;&gt; {opponent} の山札からカードをめくります &lt;&lt;</>
+                  <>&gt;&gt; {t('bannerOppDraw', { opponent })} &lt;&lt;</>
                 ) : flagHolder === opponent ? (
-                  <>&gt;&gt; {opponent} は防衛中 — あなたがめくります &lt;&lt;</>
+                  <>&gt;&gt; {t('bannerOppDefend', { opponent })} &lt;&lt;</>
                 ) : (
-                  <>&gt;&gt; {opponent} が挑戦中 — 相手の山札からめくります &lt;&lt;</>
+                  <>&gt;&gt; {t('bannerOppChallenge', { opponent })} &lt;&lt;</>
                 )}
               </div>
             ) : showChoiceUI ? (
               <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/40 bg-purple-950/30 py-1 rounded animate-pulse">
-                ⚡ 効果選択待機中 ⚡
+                {t('effectChoicePending')}
               </div>
             ) : isLiveMode && battleSession.requiredAction !== 'DRAW' && battleSession.pendingActionPlayer !== playerName ? (
               <div className="text-neon-magenta text-glow-magenta text-[11px] font-bold font-mono tracking-widest uppercase border border-neon-magenta/20 bg-purple-950/10 py-1 rounded animate-pulse">
-                ⏳ {opponent} の効果選択中...
+                {t('opponentEffectChoosing', { name: opponent })}
               </div>
             ) : (
               <div className="text-cyber-text-dim text-xs font-bold font-mono tracking-widest uppercase border border-cyber-border/20 bg-cyber-surface/10 py-1.5 rounded">
-                {t('battleStep')} / 進捗: {isLiveMode ? activeLog.length : currentLogIndex + 1}{isLiveMode ? '' : ` / ${battleLog.length}`}
+                {t('battleStep')} / {t('progressLabel')} {isLiveMode ? activeLog.length : currentLogIndex + 1}{isLiveMode ? '' : ` / ${battleLog.length}`}
               </div>
             )}
           </div>
@@ -1087,18 +1224,18 @@ function BattleArena({
                 {isMyDrawTurn ? (
                   <span>
                     {!flagHolder
-                      ? '自分の山札からめくる'
+                      ? t('drawBtnDrawOwn')
                       : flagHolder === playerName
-                      ? '防衛中 — 次の挑戦を待つ'
-                      : '挑戦！自分の山札からめくる'}
+                      ? t('drawBtnDefendWait')
+                      : t('drawBtnChallenge')}
                   </span>
                 ) : isOpponentDrawTurn ? (
                   <span>
                     {!flagHolder
-                      ? `${opponent} の山札からめくる`
+                      ? t('drawBtnOppDraw', { name: opponent })
                       : flagHolder === opponent
-                      ? `${opponent} 防衛中 — 次をめくる`
-                      : `${opponent} 挑戦中 — 相手の山札からめくる`}
+                      ? t('drawBtnOppDefend', { name: opponent })
+                      : t('drawBtnOppChallenge', { name: opponent })}
                   </span>
                 ) : (
                   <span>{t('nextStep')}</span>

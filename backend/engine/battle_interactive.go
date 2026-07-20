@@ -8,7 +8,7 @@ import (
 )
 
 // InitializeBattleSession creates a fresh interactive battle session between two players.
-func InitializeBattleSession(sessionID string, p1Name, p2Name string, p1Deck, p2Deck []models.Card) *models.BattleSession {
+func InitializeBattleSession(sessionID string, p1Name, p2Name string, p1Deck, p2Deck []models.Card, round int, p1WonPrev, p2WonPrev bool) *models.BattleSession {
 	p1DeckCopy := make([]models.Card, len(p1Deck))
 	for i, c := range p1Deck {
 		p1DeckCopy[i] = c.Clone()
@@ -22,9 +22,22 @@ func InitializeBattleSession(sessionID string, p1Name, p2Name string, p1Deck, p2
 	rand.Shuffle(len(p1DeckCopy), func(i, j int) { p1DeckCopy[i], p1DeckCopy[j] = p1DeckCopy[j], p1DeckCopy[i] })
 	rand.Shuffle(len(p2DeckCopy), func(i, j int) { p2DeckCopy[i], p2DeckCopy[j] = p2DeckCopy[j], p2DeckCopy[i] })
 
-	// Cointoss for first turn owner
+	// Starting Player Selection
 	turnOwner := p1Name
-	if rand.Intn(2) == 0 {
+	p1Starts := false
+	if round == 1 {
+		p1Starts = secureCoinToss()
+	} else {
+		if p1WonPrev && !p2WonPrev {
+			p1Starts = true
+		} else if p2WonPrev && !p1WonPrev {
+			p1Starts = false
+		} else {
+			p1Starts = secureCoinToss()
+		}
+	}
+
+	if !p1Starts {
 		turnOwner = p2Name
 	}
 
@@ -247,8 +260,8 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 		if emptySlots > 0 {
 			for i := range session.ActiveCards {
 				if session.ActiveCards[i].ID == card.ID {
-					session.ActiveCards[i].Power += emptySlots * 3
-					effectText = fmt.Sprintf("ベンチの空き数 (%d) 分パワー+%d", emptySlots, emptySlots*3)
+					session.ActiveCards[i].Power += emptySlots * 2
+					effectText = fmt.Sprintf("ベンチの空き数 (%d) 分パワー+%d", emptySlots, emptySlots*2)
 					break
 				}
 			}
@@ -883,18 +896,32 @@ func resolveNPCChoice(session *models.BattleSession, npcName string, action stri
 			details = fmt.Sprintf("%s (AI) は %s を山札の上に移動しました", npcName, best.Name)
 		}
 	case "CHOOSE_BUTLER":
-		// Strategic: banish the lowest-power card from bench (frees slots, minimal loss).
+		// Strategic: banish up to 2 lowest-power cards from bench (frees slots, minimal loss).
 		if len(options) > 0 {
-			lowest := options[0]
-			for _, c := range options {
-				if c.Power < lowest.Power {
-					lowest = c
+			pool := make([]models.Card, len(options))
+			copy(pool, options)
+			// Sort pool by power ascending
+			for i := 0; i < len(pool)-1; i++ {
+				for j := i + 1; j < len(pool); j++ {
+					if pool[j].Power < pool[i].Power {
+						pool[i], pool[j] = pool[j], pool[i]
+					}
 				}
 			}
-			c, found := removeCardFromMemory(activeMem, lowest.ID)
-			if found {
-				*activeDiscard = append(*activeDiscard, c)
-				details = fmt.Sprintf("%s (AI) はベンチから %s を除外しました", npcName, c.Name)
+			limit := 2
+			if len(pool) < limit {
+				limit = len(pool)
+			}
+			banishedNames := []string{}
+			for k := 0; k < limit; k++ {
+				c, found := removeCardFromMemory(activeMem, pool[k].ID)
+				if found {
+					*activeDiscard = append(*activeDiscard, c)
+					banishedNames = append(banishedNames, c.Name)
+				}
+			}
+			if len(banishedNames) > 0 {
+				details = fmt.Sprintf("%s (AI) はベンチから %s を除外しました", npcName, strings.Join(banishedNames, ", "))
 			}
 		}
 	case "CHOOSE_MAGICIAN":
@@ -1032,10 +1059,8 @@ func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppP
 	session.PendingActionPlayer = oppPlayerName
 	session.RequiredAction = "DRAW"
 
-	// Preserve the challenger's full stack (all revealed cards including the
-	// winner) as the new defender's stack, so both sides can see how the flag
-	// was claimed. Must capture BEFORE resetting ActiveCards.
-	session.DefenderStack = append([]models.Card{}, session.ActiveCards...)
+	// The new defender stack starts with just the winning card.
+	session.DefenderStack = []models.Card{winningCard}
 	// Track the flag-defending card explicitly. ActiveCards must be reset to
 	// empty so the next challenger's reveal stack starts fresh — keeping the
 	// previous winning card in ActiveCards caused it to be (a) double-counted
@@ -1102,7 +1127,6 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		// FLAG SECURED!
 		oldFlagHolder := session.FlagHolder
 
-		var activeMem *[]models.MemorySlot
 		var oppMem *[]models.MemorySlot
 		var oppDeck *[]models.Card
 		var oppDiscard *[]models.Card
@@ -1110,7 +1134,6 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		var isOpponentNPC bool
 
 		if session.TurnOwner == session.Player1Name {
-			activeMem = &session.Player1Mem
 			oppMem = &session.Player2Mem
 			oppDeck = &session.Player2Deck
 			oppDiscard = &session.Player2Discard
@@ -1118,7 +1141,6 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 			oppPlayerName = session.Player2Name
 			isOpponentNPC = isP2NPC
 		} else {
-			activeMem = &session.Player2Mem
 			oppMem = &session.Player1Mem
 			oppDeck = &session.Player1Deck
 			oppDiscard = &session.Player1Discard
@@ -1128,18 +1150,15 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		}
 
 		var oldFlagCard *models.Card
-
-		// 1. Move old defender cards to defender's memory
 		if oldFlagHolder != "" && session.FlagCard != nil {
-			// The previous defender's flag card is tracked explicitly on the
-			// session; no need to scan the log (avoids accidentally picking up
-			// a stale entry from earlier in the same step).
 			oldFlagCard = session.FlagCard
+		}
 
-			{
-				// Check Prince effect: Prince is banished instead of benched when losing the flag
-				if oldFlagCard.EffectType == "prince" {
-					*oppDiscard = append(*oppDiscard, *oldFlagCard)
+		// 1. Move old defender stack to defender's memory / discard together
+		if oldFlagHolder != "" && len(session.DefenderStack) > 0 {
+			for _, c := range session.DefenderStack {
+				if c.EffectType == "prince" {
+					*oppDiscard = append(*oppDiscard, c)
 					session.Log = append(session.Log, models.BattleLogEntry{
 						Step:            session.Step,
 						Action:          "bench",
@@ -1153,8 +1172,8 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 						FlagHolder:      session.FlagHolder,
 						Details:         fmt.Sprintf("プリンスがフラッグを失ったため、ベンチではなく除外エリアに送られました"),
 					})
-				} else if oldFlagCard.EffectType == "rescue_pod" {
-					*oppDiscard = append(*oppDiscard, *oldFlagCard)
+				} else if c.EffectType == "rescue_pod" {
+					*oppDiscard = append(*oppDiscard, c)
 					session.Log = append(session.Log, models.BattleLogEntry{
 						Step:            session.Step,
 						Action:          "bench",
@@ -1169,7 +1188,7 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 						Details:         fmt.Sprintf("レスキューポッドがフラッグを失い、除外されました"),
 					})
 				} else {
-					added := addToMemory(oppMem, *oldFlagCard)
+					added := addToMemory(oppMem, c)
 					if !added {
 						session.IsFinished = true
 						session.Winner = activePlayerName
@@ -1188,10 +1207,22 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 						})
 						return
 					}
+					session.Log = append(session.Log, models.BattleLogEntry{
+						Step:            session.Step,
+						Action:          "bench",
+						Player:          oldFlagHolder,
+						CurrentPower:    session.FlagPower,
+						PlayerMemSlots:  memSlotNames(session.Player1Mem),
+						CPUMemSlots:     memSlotNames(session.Player2Mem),
+						PlayerDeckCount: len(session.Player1Deck),
+						CPUDeckCount:    len(session.Player2Deck),
+						FlagHolder:      session.FlagHolder,
+						Details:         fmt.Sprintf("%s benched to memory", c.Name),
+					})
 				}
 
 				// Apply Comic buff (next attack gets +2)
-				if oldFlagCard.EffectType == "comic" {
+				if c.EffectType == "comic" {
 					if oldFlagHolder == session.Player1Name {
 						session.Player1NextAttackBuff += 2
 					} else {
@@ -1214,35 +1245,14 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 			}
 		}
 
-		// 2. Move challenger's non-winning active cards to memory
 		winningCard := session.ActiveCards[len(session.ActiveCards)-1]
-		for i := 0; i < len(session.ActiveCards)-1; i++ {
-			c := session.ActiveCards[i]
-			added := addToMemory(activeMem, c)
-			if !added {
-				session.IsFinished = true
-				session.Winner = oppPlayerName
-				session.Loser = activePlayerName
-				session.Log = append(session.Log, models.BattleLogEntry{
-					Step:            session.Step,
-					Action:          "memory_overflow",
-					Player:          activePlayerName,
-					CurrentPower:    session.FlagPower,
-					PlayerMemSlots:  memSlotNames(session.Player1Mem),
-					CPUMemSlots:     memSlotNames(session.Player2Mem),
-					PlayerDeckCount: len(session.Player1Deck),
-					CPUDeckCount:    len(session.Player2Deck),
-					FlagHolder:      session.FlagHolder,
-					Details:         fmt.Sprintf("メモリ上限超過！ %s のベンチが満杯になり敗北しました", activePlayerName),
-				})
-				return
-			}
-		}
 
 		// Apply OnWin effects (Hero, Cowboy, etc.)
 		effectText := ""
 		if winningCard.EffectType == "hero" {
 			effectText = "ヒーローの効果でファン+2を獲得！"
+		} else if winningCard.EffectType == "clown" {
+			effectText = "クラウンの効果でファン+2を獲得！"
 		} else if winningCard.EffectType == "cowboy" {
 			var highestCard *models.Card
 			for _, slot := range *oppMem {
@@ -1292,8 +1302,8 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		}
 
 		if hasLossChoice && len(lossOptions) > 0 {
-			// Preserve the challenger's full stack before resetting ActiveCards.
-			session.DefenderStack = append([]models.Card{}, session.ActiveCards...)
+			// The new defender stack starts with just the winning card.
+			session.DefenderStack = []models.Card{winningCard}
 			wc := winningCard
 			session.FlagCard = &wc
 			session.ActiveCards = []models.Card{}
@@ -1329,6 +1339,21 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		// Need to draw more cards.
 		session.RequiredAction = "DRAW"
 		session.PendingActionPlayer = session.TurnOwner
+
+		// Symmetrically, slide the last revealed card underneath the defending card holding the flag
+		if len(session.ActiveCards) > 0 {
+			lastCard := session.ActiveCards[len(session.ActiveCards)-1]
+			alreadyInStack := false
+			for _, c := range session.DefenderStack {
+				if c.ID == lastCard.ID {
+					alreadyInStack = true
+					break
+				}
+			}
+			if !alreadyInStack {
+				session.DefenderStack = append(session.DefenderStack, lastCard)
+			}
+		}
 	}
 }
 

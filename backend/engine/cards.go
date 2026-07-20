@@ -40,7 +40,7 @@ func AllCards() []models.Card {
 
 		// Daemon (old Ghost)
 		{ID: "a_butler", Name: "メモリークリーナー", Attribute: "Daemon", Power: 1, Rarity: "Common", Effect: "ベンチにあるカードを最大2枚まで除外エリアに置いて良い。", EffectType: "butler", Cost: 2, Deck: "A", Quantity: 4},
-		{ID: "a_skeleton", Name: "スケルトンキー", Attribute: "Daemon", Power: 2, Rarity: "Common", Effect: "このカードがフラッグを手に入れたら、パワー+1。", EffectType: "skeleton", Cost: 2, Deck: "A", Quantity: 8},
+		{ID: "a_skeleton", Name: "スケルトンキー", Attribute: "Daemon", Power: 2, Rarity: "Common", Effect: "このカードがフラッグを手に入れたら、パワー+1。", EffectType: "skeleton", Cost: 2, Deck: "A", Quantity: 4},
 		{ID: "a_spider", Name: "ウェブクロウラー", Attribute: "Daemon", Power: 4, Rarity: "Rare", Effect: "", EffectType: "none", Cost: 4, Deck: "A", Quantity: 3},
 
 		// Matrix (old Fairground)
@@ -85,7 +85,7 @@ func AllCards() []models.Card {
 		{ID: "b_bat", Name: "サイバーバット", Attribute: "Daemon", Power: 7, Rarity: "Rare", Effect: "", EffectType: "none", Cost: 7, Deck: "B", Quantity: 3},
 
 		// Matrix (old Fairground)
-		{ID: "b_mime", Name: "ミラープログラム", Attribute: "Matrix", Power: 2, Rarity: "Common", Effect: "ベンチの空きの数だけ、パワー+3", EffectType: "mime", Cost: 4, Deck: "B", Quantity: 4},
+		{ID: "b_mime", Name: "ミラープログラム", Attribute: "Matrix", Power: 2, Rarity: "Common", Effect: "ベンチの空きの数だけ、パワー+2", EffectType: "mime", Cost: 4, Deck: "B", Quantity: 4},
 		{ID: "b_pyrotechnist", Name: "バッファオーバーロード", Attribute: "Matrix", Power: 4, Rarity: "Common", Effect: "このカードが出たとき、ベンチが満杯（6スロットすべて埋まっている）なら、★+3", EffectType: "pyrotechnist", Cost: 4, Deck: "B", Quantity: 4},
 		{ID: "b_fortune_teller", Name: "予測モデル", Attribute: "Matrix", Power: 4, Rarity: "Common", Effect: "このカードがフラッグを失う際、山札を見て、好きなカードを一番上に移動させて良い。", EffectType: "fortune_teller", Cost: 4, Deck: "B", Quantity: 4},
 		{ID: "b_duck", Name: "サイバーダック", Attribute: "Matrix", Power: 7, Rarity: "Rare", Effect: "", EffectType: "none", Cost: 7, Deck: "B", Quantity: 3},
@@ -108,7 +108,7 @@ func AllCards() []models.Card {
 		// HoloMedia (old Movie)
 		{ID: "c_hero", Name: "サイバーヒーロー", Attribute: "HoloMedia", Power: 5, Rarity: "Common", Effect: "このカードがフラッグを手に入れたら、★+2", EffectType: "hero", Cost: 7, Deck: "C", Quantity: 4},
 		{ID: "c_trex", Name: "Tウイルスレックス", Attribute: "HoloMedia", Power: 9, Rarity: "Rare", Effect: "", EffectType: "none", Cost: 7, Deck: "C", Quantity: 2},
-		{ID: "c_villain", Name: "ヴィランプログラム", Attribute: "HoloMedia", Power: 10, Rarity: "Common", Effect: "このカードを出したら、Aデッキのカードを1枚見ないで、自分の山札の一番上に置く。", EffectType: "villain", Cost: 7, Deck: "C", Quantity: 4},
+		{ID: "c_villain", Name: "ヴィランプログラム", Attribute: "HoloMedia", Power: 9, Rarity: "Common", Effect: "このカードを出したら、Aデッキのカードを1枚見ないで、自分の山札の一番上に置く。", EffectType: "villain", Cost: 7, Deck: "C", Quantity: 4},
 
 		// DeepWeb (old Shipwreck)
 		{ID: "c_siren", Name: "フィッシングプログラム", Attribute: "DeepWeb", Power: 6, Rarity: "Common", Effect: "相手のベンチにある最もパワーの高いカード1枚を相手の除外エリアに送る。", EffectType: "siren", Cost: 7, Deck: "C", Quantity: 4},

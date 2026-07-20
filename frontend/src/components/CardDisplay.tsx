@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import { Cpu, Bug, HardDrive, User, Zap, Shield, Building, Rocket, Film, Ghost, Skull, Grid } from 'lucide-react';
 import type { Card } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
@@ -13,7 +13,9 @@ interface CardDisplayProps {
   compact?: boolean;
   basePower?: number;
   size?: 'sm' | 'md';
-}const attributeConfig = {
+}
+
+const attributeConfig = {
   Virus: { color: 'text-red-400', bg: 'bg-red-900/30', border: 'border-red-500/50', glow: '#ff0040', icon: Bug },
   AI: { color: 'text-blue-400', bg: 'bg-blue-900/30', border: 'border-blue-500/50', glow: '#4488ff', icon: Cpu },
   Hardware: { color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-500/50', glow: '#ffbf00', icon: HardDrive },
@@ -29,10 +31,62 @@ interface CardDisplayProps {
   None: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User },
   Starter: { color: 'text-gray-400', bg: 'bg-gray-900/30', border: 'border-gray-500/50', glow: '#888888', icon: User }
 };
+// Card frame texture: attribute-color gradient line (REQ-CD-04)
+function CardFrameLine({ glow }: { glow: string }) {
+  return (
+    <div
+      className="absolute left-0 right-0 top-[38%] h-px pointer-events-none opacity-30"
+      style={{ background: `linear-gradient(90deg, transparent, ${glow}, transparent)` }}
+    />
+  );
+}
+
 function CardDisplay({ card, showCost = false, onClick, disabled = false, compact = false, basePower, size = 'md' }: CardDisplayProps) {
   const { translateCard, t } = useTranslation();
   const { playSE } = useAudio();
   const hoverGuard = useRef<number>(0);
+
+  // 3D tilt state (only for md, non-compact, non-disabled)
+  const enableTilt = !compact && size === 'md' && !disabled;
+  const prefersReducedMotion = useRef(
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [glare, setGlare] = useState({ x: 50, y: 50, visible: false });
+  const tiltRafRef = useRef<number>(0);
+  const tiltCoordsRef = useRef({ x: 0, y: 0 });
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!enableTilt || prefersReducedMotion.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+    tiltCoordsRef.current = { x, y };
+    if (!tiltRafRef.current) {
+      tiltRafRef.current = requestAnimationFrame(() => {
+        tiltRafRef.current = 0;
+        const { x: rx, y: ry } = tiltCoordsRef.current;
+        setTilt({ x: rx * 6, y: -ry * 6 });
+        setGlare({ x: (rx + 1) * 50, y: (ry + 1) * 50, visible: true });
+      });
+    }
+  }, [enableTilt]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!enableTilt) return;
+    if (tiltRafRef.current) {
+      cancelAnimationFrame(tiltRafRef.current);
+      tiltRafRef.current = 0;
+    }
+    setTilt({ x: 0, y: 0 });
+    setGlare(prev => ({ ...prev, visible: false }));
+  }, [enableTilt]);
+
+  useEffect(() => {
+    return () => {
+      if (tiltRafRef.current) cancelAnimationFrame(tiltRafRef.current);
+    };
+  }, []);
   
   // Translate the card details for rendering
   const displayCard = useMemo(() => translateCard(card), [card, translateCard]);
@@ -52,10 +106,11 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         };
       case 'Rare':
         return {
-          className: 'border-neon-magenta/60 animate-neon-pulse',
-          shadow: '0 0 15px rgba(255,0,255,0.3)',
+          className: 'border-neon-magenta animate-neon-pulse',
+          shadow: '0 0 18px rgba(255,0,255,0.45)',
         };
       case 'Epic':
+        // Epic rarity exists in type definitions but is not currently in any card pool (ADR-7)
         return {
           className: 'border-neon-amber/70 animate-epic-aura',
           shadow: '0 0 20px rgba(255,191,0,0.4)',
@@ -67,6 +122,11 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         };
     }
   }, [card.rarity]);
+
+  const hasGlowAura = displayCard.power >= 7;
+  const mergedBoxShadow = hasGlowAura
+    ? `${rarityStyle.shadow}, 0 0 15px ${attr.glow}, 0 0 30px ${attr.glow}80`
+    : rarityStyle.shadow;
 
   if (compact) {
     const isBuffed = basePower !== undefined && basePower !== displayCard.power;
@@ -97,16 +157,31 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
           playSE('hover');
         }
       }}
+      onMouseMove={enableTilt ? handleMouseMove : undefined}
+      onMouseLeave={enableTilt ? handleMouseLeave : undefined}
       className={`
         relative group rounded-lg border-2 ${rarityStyle.className}
         bg-cyber-surface/80 backdrop-blur-sm
         transition-all duration-300 ease-out
         ${!disabled ? 'cursor-pointer hover:scale-105 hover:-translate-y-1' : 'opacity-60 cursor-not-allowed'}
         ${compact ? 'p-2' : size === 'sm' ? 'p-2 w-28' : 'p-4 w-48'}
+        ${hasGlowAura ? 'animate-border-glow animate-pulse' : ''}
       `}
-      style={{ boxShadow: rarityStyle.shadow }}
+      style={{
+        boxShadow: mergedBoxShadow,
+        ...(enableTilt ? { perspective: '800px' } : {}),
+      }}
     >
-      {/* Scanline overlay */}
+      {/* Tilt inner wrapper */}
+      <div
+        className="relative"
+        style={enableTilt ? {
+          transform: `rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)`,
+          transition: tilt.x === 0 && tilt.y === 0 ? 'transform 300ms ease-out' : 'transform 120ms ease-out',
+          transformStyle: 'preserve-3d',
+        } : undefined}
+      >
+        {/* Scanline overlay */}
       <div className="absolute inset-0 rounded-lg overflow-hidden pointer-events-none opacity-20">
         <div
           className="absolute w-full h-px bg-gradient-to-r from-transparent via-neon-cyan/50 to-transparent"
@@ -117,9 +192,9 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
       {/* Rarity indicator */}
       {size !== 'sm' && (
       <div className="flex items-center justify-between mb-2">
-        <span className={`text-[10px] uppercase tracking-widest font-bold ${
+        <span className={`text-[10px] uppercase tracking-widest font-bold px-1 rounded ${
           card.rarity === 'Epic' ? 'text-neon-amber text-glow-amber' :
-          card.rarity === 'Rare' ? 'text-neon-magenta text-glow-magenta' :
+          card.rarity === 'Rare' ? 'text-neon-magenta text-glow-magenta border border-neon-magenta/50' :
           'text-neon-cyan'
         }`}>
           {displayCard.rarity}
@@ -129,6 +204,9 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
         </span>
       </div>
       )}
+
+      {/* Card frame texture — attribute-color gradient line (REQ-CD-04) */}
+      {size !== 'sm' && <CardFrameLine glow={attr.glow} />}
 
       {/* Card name */}
       <h3 className={`font-bold text-white mb-2 tracking-wide leading-tight ${size === 'sm' ? 'text-[10px] min-h-[1.6rem]' : 'text-sm min-h-[2.5rem]'}`}>
@@ -188,6 +266,18 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
           <span className="text-sm font-bold text-neon-amber text-glow-amber">{displayCard.cost}¢</span>
         </div>
       )}
+
+      {/* Glare overlay — only when tilt is active (REQ-CD-02) */}
+      {enableTilt && (
+        <div
+          className="absolute inset-0 rounded-lg pointer-events-none transition-opacity duration-200"
+          style={{
+            background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.18), transparent 60%)`,
+            opacity: glare.visible ? 1 : 0,
+          }}
+        />
+      )}
+      </div>{/* end tilt inner wrapper */}
 
       {/* Hover glow overlay */}
       {!disabled && (

@@ -146,10 +146,47 @@
   to { transform: translateY(0); opacity: 1; }
 }
 
+@keyframes confettiFall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0.3; }
+}
+
+@keyframes podiumRise {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
 @keyframes warningPulse {
   0%, 100% { box-shadow: 0 0 5px #ff0040, 0 0 10px #ff0040; }
   50% { box-shadow: 0 0 20px #ff0040, 0 0 40px #ff0040, 0 0 60px rgba(255,0,64,0.4); }
 }
+
+@keyframes countPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+@keyframes slideBanner {
+  0% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  15% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  85% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+}
+
 
 /* ===== UTILITY CLASSES ===== */
 .animate-flicker {
@@ -200,8 +237,20 @@
   animation: fadeIn 0.5s ease-out forwards;
 }
 
+.animate-count-up {
+  animation: countUp 0.6s ease-out forwards;
+}
+
+.animate-count-pop {
+  animation: countPop 0.35s ease-out;
+}
+
 .animate-grid-move {
   animation: gridMove 4s linear infinite;
+}
+
+.animate-slide-banner {
+  animation: slideBanner 1.8s ease-in-out forwards;
 }
 
 /* ===== CYBERPUNK GRID BACKGROUND ===== */
@@ -267,7 +316,9 @@
   .animate-slide-in-left,
   .animate-epic-aura,
   .animate-fade-in,
-  .animate-bounce {
+  .animate-bounce,
+  .animate-count-up,
+  .animate-count-pop {
     animation: none !important;
   }
 }
@@ -281,12 +332,16 @@
 /* Card draw animations — slide-in from deck position with fade */
 @keyframes drawCardMe {
   0% {
-    transform: translateX(200px) translateY(40px) scale(0.4);
+    transform: translateX(200px) translateY(40px) scale(0.4) rotateY(180deg);
     opacity: 0;
     filter: brightness(1.8);
   }
+  50% {
+    transform: translateX(100px) translateY(20px) scale(0.7) rotateY(90deg);
+    opacity: 0.5;
+  }
   100% {
-    transform: translateX(0) translateY(0) scale(1);
+    transform: translateX(0) translateY(0) scale(1) rotateY(0deg);
     opacity: 1;
     filter: brightness(1);
   }
@@ -294,12 +349,16 @@
 
 @keyframes drawCardOpp {
   0% {
-    transform: translateX(200px) translateY(-40px) scale(0.4);
+    transform: translateX(200px) translateY(-40px) scale(0.4) rotateY(180deg);
     opacity: 0;
     filter: brightness(1.8);
   }
+  50% {
+    transform: translateX(100px) translateY(-20px) scale(0.7) rotateY(90deg);
+    opacity: 0.5;
+  }
   100% {
-    transform: translateX(0) translateY(0) scale(1);
+    transform: translateX(0) translateY(0) scale(1) rotateY(0deg);
     opacity: 1;
     filter: brightness(1);
   }
@@ -330,4 +389,69 @@
 .card-static-opp-latest {
   transform: scale(1.03);
   box-shadow: 0 4px 16px rgba(255, 0, 255, 0.25);
+}
+
+/* 3D and Screen Shake Utilities */
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+@keyframes screenShake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-3px, 2px) rotate(-1deg); }
+  20% { transform: translate(2px, -3px) rotate(1deg); }
+  30% { transform: translate(-4px, -1px) rotate(-0.5deg); }
+  40% { transform: translate(3px, 3px) rotate(0deg); }
+  50% { transform: translate(-2px, 1px) rotate(1deg); }
+  60% { transform: translate(2px, -2px) rotate(-1deg); }
+  70% { transform: translate(-3px, 1px) rotate(0deg); }
+  80% { transform: translate(1px, 2px) rotate(1deg); }
+  90% { transform: translate(-1px, -2px) rotate(-0.5deg); }
+}
+
+.animate-screen-shake {
+  animation: screenShake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes impactFlashCyan {
+  0% {
+    background-color: rgba(0, 240, 255, 0.6);
+    box-shadow: inset 0 0 80px rgba(0, 240, 255, 0.8);
+    opacity: 1;
+  }
+  100% {
+    background-color: rgba(0, 240, 255, 0);
+    box-shadow: inset 0 0 20px rgba(0, 240, 255, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes impactFlashMagenta {
+  0% {
+    background-color: rgba(255, 0, 255, 0.6);
+    box-shadow: inset 0 0 80px rgba(255, 0, 255, 0.8);
+    opacity: 1;
+  }
+  100% {
+    background-color: rgba(255, 0, 255, 0);
+    box-shadow: inset 0 0 20px rgba(255, 0, 255, 0);
+    opacity: 0;
+  }
+}
+
+.animate-impact-flash-cyan {
+  animation: impactFlashCyan 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-impact-flash-magenta {
+  animation: impactFlashMagenta 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }

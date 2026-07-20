@@ -49,4 +49,27 @@ describe('CardDisplay', () => {
     render(<CardDisplay card={mockCard} showCost />)
     expect(screen.getByText('3¢')).toBeDefined()
   })
+
+  it('applies glowing neon aura classes when power >= 7', () => {
+    const highPowerCard: Card = {
+      ...mockCard,
+      power: 7,
+    }
+    const { container } = render(<CardDisplay card={highPowerCard} />)
+    const cardEl = container.firstChild as HTMLElement
+    expect(cardEl.className).toContain('animate-border-glow')
+    expect(cardEl.className).toContain('animate-pulse')
+  })
+
+  it('does not apply glowing neon aura classes when power < 7', () => {
+    const lowPowerCard: Card = {
+      ...mockCard,
+      power: 6,
+    }
+    const { container } = render(<CardDisplay card={lowPowerCard} />)
+    const cardEl = container.firstChild as HTMLElement
+    expect(cardEl.className).not.toContain('animate-border-glow')
+    expect(cardEl.className).not.toContain('animate-pulse')
+  })
 })
+

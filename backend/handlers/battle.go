@@ -355,17 +355,6 @@ func finalizeBattleSession(gs *models.GameState, session *models.BattleSession) 
 	bonus := calculateBonusFans(session.Log, winnerName)
 	fansGained += bonus
 
-	// Check if winning card has Hero effect (+2 Fans)
-	var winningCard *models.Card
-	if session.FlagCard != nil {
-		winningCard = session.FlagCard
-	} else if len(session.ActiveCards) > 0 {
-		winningCard = &session.ActiveCards[0]
-	}
-	if winningCard != nil && winningCard.EffectType == "hero" {
-		fansGained += 2
-	}
-
 	// Apply standings increases
 	for i := range gs.Players {
 		if gs.Players[i].Name == winnerName {
@@ -388,17 +377,11 @@ func finalizeBattleSession(gs *models.GameState, session *models.BattleSession) 
 	gs.LastResults[session.Player2Name] = &battleRes
 	gs.BattleLogs[session.Player2Name] = session.Log
 
-	// Delete sessions for both players
-	delete(gs.BattleSessions, session.Player1Name)
-	delete(gs.BattleSessions, session.Player2Name)
-
-	// Broadcast matchup complete via WS to all lobby members (combatants + spectators)
+	// Keep battle sessions active to allow manual transition checks
+	// Symmetrical: Evaluate round resolution advancement via manual transition complete endpoint only
 	if gs.LobbyCode != "" {
 		lobby.GlobalHub.Broadcast(gs.LobbyCode, map[string]interface{}{"type": "battle_complete"})
 	}
-
-	// Symmetrical: Evaluate round resolution advancement
-	checkAndAdvanceResults(gs)
 }
 
 func calculateBonusFans(log []models.BattleLogEntry, player string) int {

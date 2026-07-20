@@ -259,6 +259,7 @@ func WriteSpectatorGameState(w http.ResponseWriter, gs *models.GameState) {
 			"turnOwner":      session.TurnOwner,
 			"requiredAction": session.RequiredAction,
 			"isFinished":     session.IsFinished,
+			"winner":         session.Winner,
 			"log":            session.Log,
 			"step":           session.Step,
 		})
@@ -648,6 +649,9 @@ func resolveRound(gs *models.GameState) {
 				p2.Name,
 				p1.Deck,
 				p2.Deck,
+				gs.CurrentRound,
+				p1.WonPreviousRound,
+				p2.WonPreviousRound,
 			)
 			session.Player1Wins = p1.Wins
 			session.Player2Wins = p2.Wins
@@ -663,19 +667,8 @@ func resolveRound(gs *models.GameState) {
 				fansGained = 1
 			}
 
-			// Check for Hero effect bonus (+2 Fans) if hero was winning card
-			// We can scan the log details or simply check the winning card's effect
-			// Let's check if the winning card has c_hero effect
-			// Since we want to award Hero bonus:
-			var winningCard *models.Card
-			if session.FlagCard != nil {
-				winningCard = session.FlagCard
-			} else if len(session.ActiveCards) > 0 {
-				winningCard = &session.ActiveCards[0]
-			}
-			if winningCard != nil && winningCard.EffectType == "hero" {
-				fansGained += 2
-			}
+			bonus := calculateBonusFans(session.Log, session.Winner)
+			fansGained += bonus
 
 			winnerName := session.Winner
 			for i := range gs.Players {
@@ -705,6 +698,9 @@ func resolveRound(gs *models.GameState) {
 				p2.Name,
 				p1.Deck,
 				p2.Deck,
+				gs.CurrentRound,
+				p1.WonPreviousRound,
+				p2.WonPreviousRound,
 			)
 			session.Player1Wins = p1.Wins
 			session.Player2Wins = p2.Wins
@@ -785,6 +781,17 @@ func advanceRound(gs *models.GameState) {
 		gs.Phase = "results"
 	} else {
 		gs.CurrentRound++
+
+		// Set WonPreviousRound flag from LastResults before clearing
+		for i := range gs.Players {
+			p := &gs.Players[i]
+			p.WonPreviousRound = false
+			if res, ok := gs.LastResults[p.Name]; ok {
+				if res.Winner == p.Name {
+					p.WonPreviousRound = true
+				}
+			}
+		}
 
 		// Reset ready players and results maps for the new round
 		gs.ReadyPlayers = make(map[string]bool)

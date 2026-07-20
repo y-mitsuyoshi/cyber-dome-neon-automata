@@ -2,6 +2,7 @@ package engine
 
 import (
 	"backend/models"
+	cryptorand "crypto/rand"
 	"fmt"
 	"math/rand"
 )
@@ -17,6 +18,7 @@ type BattleState struct {
 	PlayerDiscard        []models.Card
 	CPUDiscard           []models.Card
 	FlagCard             *models.Card
+	FlagStack            []models.Card
 	FlagHolder           string // "player" or "cpu"
 	FlagPower            int
 	Step                 int
@@ -40,6 +42,7 @@ func newBattleState(playerDeck, cpuDeck []models.Card) *BattleState {
 		PlayerDiscard:        []models.Card{},
 		CPUDiscard:           []models.Card{},
 		FlagCard:             nil,
+		FlagStack:            []models.Card{},
 		FlagHolder:           "",
 		FlagPower:            0,
 		Step:                 0,
@@ -52,6 +55,12 @@ func newBattleState(playerDeck, cpuDeck []models.Card) *BattleState {
 		PlayerNextAttackBuff: 0,
 		CPUNextAttackBuff:    0,
 	}
+}
+
+func secureCoinToss() bool {
+	var b [1]byte
+	_, _ = cryptorand.Read(b[:])
+	return (b[0] & 1) == 1
 }
 
 // memSlotNames returns the card names in memory slots.
@@ -266,8 +275,8 @@ func (bs *BattleState) applyOnRevealEffects(card *models.Card, side string, effe
 	case "mime":
 		emptySlots := 6 - uniqueSlotCount(*myMem)
 		if emptySlots > 0 {
-			*effectivePower += emptySlots * 3
-			effectText = fmt.Sprintf("%s gains +%d power (empty slots)", card.Name, emptySlots*3)
+			*effectivePower += emptySlots * 2
+			effectText = fmt.Sprintf("%s gains +%d power (empty slots)", card.Name, emptySlots*2)
 		}
 	case "ufo":
 		all := AllCards()
@@ -427,19 +436,39 @@ func (bs *BattleState) applyOnRevealEffects(card *models.Card, side string, effe
 			}
 		}
 	case "moviestar":
-		var targetCard *models.Card
+		var pool []models.Card
 		for _, slot := range *myMem {
-			if len(slot.Cards) > 0 && slot.Cards[0].Attribute == "HoloMedia" && (slot.Cards[0].Power == 1 || slot.Cards[0].Power == 2) {
-				targetCard = &slot.Cards[0]
-				break
+			for _, c := range slot.Cards {
+				if c.Attribute == "HoloMedia" && (c.Power == 1 || c.Power == 2) {
+					pool = append(pool, c)
+				}
 			}
 		}
-		if targetCard != nil {
-			c, found := removeCardFromMemory(myMem, targetCard.ID)
-			if found {
-				*myDeck = append([]models.Card{c}, *myDeck...)
-				effectText = fmt.Sprintf("%s returns benched %s to top of deck", card.Name, c.Name)
+		var chosen []models.Card
+		for k := 0; k < 2 && len(pool) > 0; k++ {
+			bestIdx := 0
+			for i := 1; i < len(pool); i++ {
+				if pool[i].Power > pool[bestIdx].Power {
+					bestIdx = i
+				}
 			}
+			chosen = append(chosen, pool[bestIdx])
+			pool = append(pool[:bestIdx], pool[bestIdx+1:]...)
+		}
+		prepend := make([]models.Card, 0, len(chosen))
+		for _, target := range chosen {
+			c, found := removeCardFromMemory(myMem, target.ID)
+			if found {
+				prepend = append(prepend, c)
+			}
+		}
+		if len(prepend) > 0 {
+			*myDeck = append(prepend, *myDeck...)
+			var names []string
+			for _, c := range prepend {
+				names = append(names, c.Name)
+			}
+			effectText = fmt.Sprintf("%s returns benched HoloMedia cards %v to top of deck", card.Name, names)
 		}
 	}
 
@@ -491,6 +520,13 @@ func (bs *BattleState) applyOnWinEffect(card models.Card, side string) string {
 			bs.CPUExtraFans += 2
 		}
 		effectText = "Hero wins flag, gains 2 fans"
+	case "clown":
+		if side == "player" {
+			bs.PlayerExtraFans += 2
+		} else {
+			bs.CPUExtraFans += 2
+		}
+		effectText = "Clown wins flag, gains 2 fans"
 	case "cowboy":
 		var highestCard *models.Card
 		for _, slot := range *oppMem {
@@ -550,13 +586,26 @@ func (bs *BattleState) logEntry(action, side string, card *models.Card, power in
 
 // RunBattle executes the full battle simulation between two players.
 // playerDeck and cpuDeck should be pre-shuffled copies.
-func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
+func RunBattle(playerDeck, cpuDeck []models.Card, round int, playerWonPrev, cpuWonPrev bool) models.BattleResult {
 	bs := newBattleState(playerDeck, cpuDeck)
 
-	// Phase 1: Player reveals first card to claim the flag
+	// Starting Player Selection
 	startingSide := "player"
 	otherSide := "cpu"
-	if rand.Intn(2) == 0 {
+	p1Starts := false
+	if round == 1 {
+		p1Starts = secureCoinToss()
+	} else {
+		if playerWonPrev && !cpuWonPrev {
+			p1Starts = true
+		} else if cpuWonPrev && !playerWonPrev {
+			p1Starts = false
+		} else {
+			p1Starts = secureCoinToss()
+		}
+	}
+
+	if !p1Starts {
 		startingSide = "cpu"
 		otherSide = "player"
 	}
@@ -573,9 +622,15 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 
 	card, ok := drawCard(startDeck, bs.LockedCards[lockedKey])
 	if !ok {
+		fansGained := 1
+		if otherSide == "player" {
+			fansGained += bs.PlayerExtraFans
+		} else if otherSide == "cpu" {
+			fansGained += bs.CPUExtraFans
+		}
 		return models.BattleResult{
 			Winner: otherSide, Loser: startingSide, Reason: fmt.Sprintf("%s has no cards", startingSide),
-			Log: bs.Log, FansGained: 1,
+			Log: bs.Log, FansGained: fansGained,
 		}
 	}
 
@@ -583,6 +638,8 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 	effect := bs.applyOnRevealEffects(&card, startingSide, &effectivePower)
 	bs.FlagHolder = startingSide
 	bs.FlagPower = effectivePower
+	bs.FlagCard = &card
+	bs.FlagStack = []models.Card{card}
 	bs.PrevCardAttr[startingSide] = card.Attribute
 	bs.logEntry("reveal", startingSide, &card, bs.FlagPower, effect, bs.FlagHolder, fmt.Sprintf("%s claims the flag", startingSide))
 
@@ -613,10 +670,16 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 					bs.FlagHolder, fmt.Sprintf("%s cannot draw", challengerSide))
 				winner := bs.FlagHolder
 				loser := challengerSide
+				fansGained := 2
+				if winner == "player" {
+					fansGained += bs.PlayerExtraFans
+				} else if winner == "cpu" {
+					fansGained += bs.CPUExtraFans
+				}
 				return models.BattleResult{
 					Winner: winner, Loser: loser,
 					Reason: fmt.Sprintf("%s ran out of cards", loser),
-					Log:    bs.Log, FansGained: 2,
+					Log:    bs.Log, FansGained: fansGained,
 				}
 			}
 
@@ -650,24 +713,19 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				flagTaken = true
 				winCardPower = ePower
 				break
+			} else {
+				// Slide underneath the defending card holding the flag
+				bs.FlagStack = append(bs.FlagStack, cCard)
 			}
 		}
 
 		if flagTaken {
 			oldFlagHolder := bs.FlagHolder
 			newFlagHolder := challengerSide
+			oldFlagCard := bs.FlagCard
 
-			var oldFlagCard *models.Card
-			for i := len(bs.Log) - 1; i >= 0; i-- {
-				if bs.Log[i].Action == "flag_change" && bs.Log[i].Player == oldFlagHolder && bs.Log[i].Card != nil {
-					c := convertLogCardToCard(bs.Log[i].Card)
-					oldFlagCard = &c
-					break
-				}
-			}
-
-			// 1. Move old defender cards to memory / discard
-			if oldFlagCard != nil {
+			// 1. Move old defender stack to memory / discard
+			if len(bs.FlagStack) > 0 {
 				var oppMem *[]models.MemorySlot
 				var oppDiscard *[]models.Card
 				if oldFlagHolder == "player" {
@@ -678,69 +736,100 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 					oppDiscard = &bs.CPUDiscard
 				}
 
-				if oldFlagCard.EffectType == "prince" || oldFlagCard.EffectType == "rescue_pod" {
-					*oppDiscard = append(*oppDiscard, *oldFlagCard)
-					bs.logEntry("bench", oldFlagHolder, oldFlagCard, 0, oldFlagCard.EffectType, bs.FlagHolder,
-						fmt.Sprintf("%s was benched to discard (effect: %s)", oldFlagCard.Name, oldFlagCard.EffectType))
-				} else {
-					if !addToMemory(oppMem, *oldFlagCard) {
-						// Memory overflow!
-						winner := newFlagHolder
-						loser := oldFlagHolder
-						bs.logEntry("memory_overflow", oldFlagHolder, oldFlagCard, 0, "MEMORY OVERFLOW", bs.FlagHolder,
-							fmt.Sprintf("%s memory overflow", oldFlagHolder))
-						return models.BattleResult{
-							Winner: winner, Loser: loser,
-							Reason: fmt.Sprintf("%s memory overflow", loser),
-							Log:    bs.Log, FansGained: 3,
-						}
-					}
-					bs.logEntry("bench", oldFlagHolder, oldFlagCard, 0, "Card benched", bs.FlagHolder,
-						fmt.Sprintf("%s benched to memory", oldFlagCard.Name))
-				}
-
-				// Apply Comic buff (next attack gets +2)
-				if oldFlagCard.EffectType == "comic" {
-					if oldFlagHolder == "player" {
-						bs.PlayerNextAttackBuff += 2
+				for _, c := range bs.FlagStack {
+					if c.EffectType == "prince" || c.EffectType == "rescue_pod" {
+						*oppDiscard = append(*oppDiscard, c)
+						bs.logEntry("bench", oldFlagHolder, &c, 0, c.EffectType, bs.FlagHolder,
+							fmt.Sprintf("%s was benched to discard (effect: %s)", c.Name, c.EffectType))
 					} else {
-						bs.CPUNextAttackBuff += 2
+						if !addToMemory(oppMem, c) {
+							// Memory overflow!
+							winner := newFlagHolder
+							loser := oldFlagHolder
+							bs.logEntry("memory_overflow", oldFlagHolder, &c, 0, "MEMORY OVERFLOW", bs.FlagHolder,
+								fmt.Sprintf("%s memory overflow", oldFlagHolder))
+							fansGained := 3
+							if winner == "player" {
+								fansGained += bs.PlayerExtraFans
+							} else if winner == "cpu" {
+								fansGained += bs.CPUExtraFans
+							}
+							return models.BattleResult{
+								Winner: winner, Loser: loser,
+								Reason: fmt.Sprintf("%s memory overflow", loser),
+								Log:    bs.Log, FansGained: fansGained,
+							}
+						}
+						bs.logEntry("bench", oldFlagHolder, &c, 0, "Card benched", bs.FlagHolder,
+							fmt.Sprintf("%s benched to memory", c.Name))
 					}
-					bs.logEntry("effect", oldFlagHolder, oldFlagCard, 0, "comic", bs.FlagHolder,
-						fmt.Sprintf("%s comic effect triggered: next attack power +2", oldFlagCard.Name))
-				}
 
-				// Apply Loss choice effects automatically
-				if oldFlagCard.EffectType == "navigator" {
-					bs.logEntry("effect", oldFlagHolder, oldFlagCard, 0, "navigator", bs.FlagHolder,
-						fmt.Sprintf("%s navigator effect applied (order kept)", oldFlagCard.Name))
-				} else if oldFlagCard.EffectType == "fortune_teller" {
-					bs.logEntry("effect", oldFlagHolder, oldFlagCard, 0, "fortune_teller", bs.FlagHolder,
-						fmt.Sprintf("%s fortune_teller effect applied (first card on top)", oldFlagCard.Name))
+					// Apply Comic buff (next attack gets +2)
+					if c.EffectType == "comic" {
+						if oldFlagHolder == "player" {
+							bs.PlayerNextAttackBuff += 2
+						} else {
+							bs.CPUNextAttackBuff += 2
+						}
+						bs.logEntry("effect", oldFlagHolder, &c, 0, "comic", bs.FlagHolder,
+							fmt.Sprintf("%s comic effect triggered: next attack power +2", c.Name))
+					}
 				}
 			}
 
-			// 2. Move challenger's non-winning active cards to memory
-			for i := 0; i < len(revealedCards)-1; i++ {
-				var mem *[]models.MemorySlot
-				if challengerSide == "player" {
-					mem = &bs.PlayerMem
+			// Apply Loss choice effects automatically on the old flag card
+			if oldFlagCard != nil {
+				var targetDeck *[]models.Card
+				if oldFlagHolder == "player" {
+					targetDeck = &bs.PlayerDeck
 				} else {
-					mem = &bs.CPUMem
+					targetDeck = &bs.CPUDeck
 				}
-				if !addToMemory(mem, revealedCards[i]) {
-					winner := oldFlagHolder
-					loser := challengerSide
-					bs.logEntry("memory_overflow", challengerSide, &revealedCards[i], 0, "MEMORY OVERFLOW", bs.FlagHolder,
-						fmt.Sprintf("%s memory overflow", challengerSide))
-					return models.BattleResult{
-						Winner: winner, Loser: loser,
-						Reason: fmt.Sprintf("%s memory overflow", loser),
-						Log:    bs.Log, FansGained: 3,
+
+				if oldFlagCard.EffectType == "navigator" {
+					if len(*targetDeck) >= 2 {
+						top := (*targetDeck)[0]
+						next := (*targetDeck)[1]
+						if next.Power > top.Power {
+							// Swap top and next
+							(*targetDeck)[0], (*targetDeck)[1] = next, top
+							// Move the second card (now top) to the bottom
+							low := (*targetDeck)[1]
+							*targetDeck = append((*targetDeck)[:1], (*targetDeck)[2:]...)
+							*targetDeck = append(*targetDeck, low)
+							bs.logEntry("effect", oldFlagHolder, oldFlagCard, 0, "navigator", bs.FlagHolder,
+								fmt.Sprintf("%s navigator effect applied (AI reordered: %s on top, %s on bottom)", oldFlagCard.Name, next.Name, low.Name))
+						} else {
+							// Keep top, send next to bottom
+							low := (*targetDeck)[1]
+							*targetDeck = append((*targetDeck)[:1], (*targetDeck)[2:]...)
+							*targetDeck = append(*targetDeck, low)
+							bs.logEntry("effect", oldFlagHolder, oldFlagCard, 0, "navigator", bs.FlagHolder,
+								fmt.Sprintf("%s navigator effect applied (AI reordered: %s kept on top, %s on bottom)", oldFlagCard.Name, top.Name, low.Name))
+						}
+					} else {
+						bs.logEntry("effect", oldFlagHolder, oldFlagCard, 0, "navigator", bs.FlagHolder,
+							fmt.Sprintf("%s navigator effect applied (deck too small)", oldFlagCard.Name))
+					}
+				} else if oldFlagCard.EffectType == "fortune_teller" {
+					if len(*targetDeck) > 0 {
+						bestIdx := 0
+						best := (*targetDeck)[0]
+						for i, c := range *targetDeck {
+							if c.Power > best.Power {
+								best = c
+								bestIdx = i
+							}
+						}
+						*targetDeck = append((*targetDeck)[:bestIdx], (*targetDeck)[bestIdx+1:]...)
+						*targetDeck = append([]models.Card{best}, *targetDeck...)
+						bs.logEntry("effect", oldFlagHolder, oldFlagCard, 0, "fortune_teller", bs.FlagHolder,
+							fmt.Sprintf("%s fortune_teller effect applied (AI moved %s to top)", oldFlagCard.Name, best.Name))
+					} else {
+						bs.logEntry("effect", oldFlagHolder, oldFlagCard, 0, "fortune_teller", bs.FlagHolder,
+							fmt.Sprintf("%s fortune_teller effect applied (deck empty)", oldFlagCard.Name))
 					}
 				}
-				bs.logEntry("bench", challengerSide, &revealedCards[i], 0, "Card benched", bs.FlagHolder,
-					fmt.Sprintf("%s benched to memory", revealedCards[i].Name))
 			}
 
 			// The winning card becomes the new flag card
@@ -763,6 +852,8 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 			// Update flag
 			bs.FlagHolder = newFlagHolder
 			bs.FlagPower = winCardPower
+			bs.FlagCard = &winCard
+			bs.FlagStack = []models.Card{winCard}
 
 			// Re-apply Illusionist buff if it won
 			if winCard.EffectType == "illusionist" {
@@ -789,12 +880,18 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				if winner == "cpu" {
 					loser = "player"
 				}
+				fansGained := 2
+				if winner == "player" {
+					fansGained += bs.PlayerExtraFans
+				} else if winner == "cpu" {
+					fansGained += bs.CPUExtraFans
+				}
 				bs.logEntry("game_end", winner, nil, bs.FlagPower, "Both decks empty",
 					bs.FlagHolder, fmt.Sprintf("%s wins — both decks exhausted", winner))
 				return models.BattleResult{
 					Winner: winner, Loser: loser,
 					Reason: "Both decks exhausted, flag holder wins",
-					Log:    bs.Log, FansGained: 2,
+					Log:    bs.Log, FansGained: fansGained,
 				}
 			}
 
@@ -805,7 +902,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				return models.BattleResult{
 					Winner: "player", Loser: "cpu",
 					Reason: "CPU ran out of cards",
-					Log:    bs.Log, FansGained: 2,
+					Log:    bs.Log, FansGained: 2 + bs.PlayerExtraFans,
 				}
 			}
 			if bs.FlagHolder == "cpu" && len(bs.PlayerDeck) == 0 {
@@ -814,7 +911,7 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 				return models.BattleResult{
 					Winner: "cpu", Loser: "player",
 					Reason: "Player ran out of cards",
-					Log:    bs.Log, FansGained: 2,
+					Log:    bs.Log, FansGained: 2 + bs.CPUExtraFans,
 				}
 			}
 		}
@@ -827,10 +924,16 @@ func RunBattle(playerDeck, cpuDeck []models.Card) models.BattleResult {
 			if bs.FlagHolder == "cpu" {
 				loser = "player"
 			}
+			fansGained := 1
+			if bs.FlagHolder == "player" {
+				fansGained += bs.PlayerExtraFans
+			} else if bs.FlagHolder == "cpu" {
+				fansGained += bs.CPUExtraFans
+			}
 			return models.BattleResult{
 				Winner: bs.FlagHolder, Loser: loser,
 				Reason: "Battle step limit reached, flag holder wins",
-				Log:    bs.Log, FansGained: 1,
+				Log:    bs.Log, FansGained: fansGained,
 			}
 		}
 	}

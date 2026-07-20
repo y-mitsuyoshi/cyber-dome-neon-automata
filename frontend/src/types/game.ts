@@ -142,6 +142,7 @@ export interface SpectatorBattleSession {
   turnOwner: string;
   requiredAction: string;
   isFinished: boolean;
+  winner?: string;
   log: BattleLogEntry[];
   step: number;
 }

@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Trash2, Swords, CreditCard, Layers } from 'lucide-react';
 import type { Card } from '../types/game';
 import CardDisplay from './CardDisplay';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
 import DeckViewerModal from './DeckViewerModal';
+
+// Pool band rule: matches backend/engine/shop.go L11–17
+function getPoolBand(round: number): string {
+  if (round <= 2) return 'A';
+  if (round <= 4) return 'B';
+  return 'C';
+}
 
 interface ShopProps {
   round: number;
@@ -24,6 +31,20 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
   const [isDeckModalOpen, setIsDeckModalOpen] = useState(false);
   const [deleteModeSupportedInModal, setDeleteModeSupportedInModal] = useState(false);
   const { t } = useTranslation();
+
+  // Deck count +1 pop detection (REQ-UX-05)
+  const prevDeckLenRef = useRef(deck.length);
+  const [deckPop, setDeckPop] = useState(false);
+
+  useEffect(() => {
+    if (deck.length > prevDeckLenRef.current) {
+      setDeckPop(true);
+      const timer = setTimeout(() => setDeckPop(false), 400);
+      prevDeckLenRef.current = deck.length;
+      return () => clearTimeout(timer);
+    }
+    prevDeckLenRef.current = deck.length;
+  }, [deck.length]);
 
   return (
     <div className="min-h-screen bg-cyber-dark cyber-grid relative overflow-hidden">
@@ -68,8 +89,25 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
             <span className="text-[10px] uppercase tracking-widest text-cyber-text-dim">
               {t('deckLabel')}
             </span>
-            <span className="text-xl font-bold text-neon-magenta text-glow-magenta ml-2">{deck.length}</span>
+            <span className={`text-xl font-bold text-neon-magenta text-glow-magenta ml-2 ${deckPop ? 'animate-count-pop' : ''}`}>{deck.length}</span>
           </button>
+        </div>
+
+        {/* Pool band banner */}
+        <div className="flex justify-center mb-4 animate-fade-in">
+          <div className="flex items-center gap-2 border border-neon-cyan/20 bg-cyber-surface/30 rounded px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-cyber-text-dim">
+            <span>{t('shopPoolBand', { band: getPoolBand(round) })}</span>
+            {round <= 2 && (
+              <span className="text-neon-magenta/60">
+                {t('shopPoolNext', { band: 'B', round: '3' })}
+              </span>
+            )}
+            {round > 2 && round <= 4 && (
+              <span className="text-neon-magenta/60">
+                {t('shopPoolNext', { band: 'C', round: '5' })}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Shop title */}
@@ -107,7 +145,7 @@ function Shop({ round, maxRounds, credits, shopCards, deck, onBuy, onReroll, onD
               >
                 {credits >= card.cost 
                   ? t('buyBtn', { cost: card.cost })
-                  : t('insufficientCredits')}
+                  : t('insufficientBy', { amount: String(card.cost - credits) })}
               </button>
             </div>
           ))}
