@@ -616,12 +616,12 @@ const uiDict: Record<Locale, Record<string, string>> = {
 // Card Translation Map (80 unique card IDs)
 const cardDictJa: Record<string, { name: string; effect: string }> = {
   // === Starter Cards ===
-  starter_scout_1a: { name: "探索ノード", effect: "" },
-  starter_scout_1b: { name: "探索ノード", effect: "" },
-  starter_scout_1c: { name: "探索ノード", effect: "" },
-  starter_scout_2a: { name: "探索ノード", effect: "" },
-  starter_scout_2b: { name: "探索ノード", effect: "" },
-  starter_mascot: { name: "デーモンマスコット", effect: "" },
+  starter_scout_1a: { name: "スキャンノード", effect: "" },
+  starter_scout_1b: { name: "スキャンノード", effect: "" },
+  starter_scout_1c: { name: "スキャンノード", effect: "" },
+  starter_scout_2a: { name: "プローブノード", effect: "" },
+  starter_scout_2b: { name: "プローブノード", effect: "" },
+  starter_mascot: { name: "ガードマスコット", effect: "" },
 
   // === Deck A ===
   a_jester: { name: "データジョーカー", effect: "ベンチにパワー1のカードがあれば、パワー+2" },
@@ -815,7 +815,9 @@ const rarityJa: Record<string, string> = {
 
 // Japanese Card Name to English mapping for logs and display names
 const jaCardNameToEn: Record<string, string> = {
-  "探索ノード": "Discovery Node",
+  "スキャンノード": "Scan Node",
+  "プローブノード": "Probe Node",
+  "ガードマスコット": "Guard Mascot",
   "デーモンマスコット": "Daemon Mascot",
   "データジョーカー": "Data Joker",
   "サンドボックス": "Sandbox",

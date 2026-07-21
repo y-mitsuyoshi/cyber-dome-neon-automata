@@ -486,16 +486,23 @@ function BattleArena({
   const activeStepIndex = isLiveMode ? liveLogIndex : currentLogIndex;
 
   // Track the actual log length we have visualized
-  const lastLogLengthRef = useRef(0);
+  const lastLogLengthRef = useRef(-1);
 
-  // Synchronize liveLogIndex step-by-step
+  // Synchronize liveLogIndex step-by-step. On first mount we jump to the end
+  // of the existing log (so joining mid-battle doesn't replay history). After
+  // that, each new batch of log entries is visualized one entry at a time
+  // with a delay — liveLogIndex is NOT advanced here; the visualization
+  // effect below handles that.
   useEffect(() => {
     if (isLiveMode && battleSession) {
       const actualLen = battleSession.log.length;
-      if (lastLogLengthRef.current === 0) {
+      if (lastLogLengthRef.current === -1) {
+        // First mount: jump to the end of the existing log.
         setLiveLogIndex(Math.max(0, actualLen - 1));
         lastLogLengthRef.current = actualLen;
       } else if (actualLen > lastLogLengthRef.current) {
+        // New log entries arrived — don't advance liveLogIndex here;
+        // let the visualization effect catch up step-by-step.
         lastLogLengthRef.current = actualLen;
       }
     }
