@@ -105,7 +105,7 @@ describe('BattleArena Animation & Performance (Empirical Verification)', () => {
     expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
-  it('triggers screen-shake and impact flashes on flag capture / change action', async () => {
+  it('triggers impact flashes on flag capture / change action', async () => {
     const flagChangeLog: BattleLogEntry[] = [
       {
         step: 1,
@@ -145,21 +145,16 @@ describe('BattleArena Animation & Performance (Empirical Verification)', () => {
       />
     );
 
-    // Verify screen-shake class is applied to container wrapper
-    const mainContainer = container.firstChild as HTMLElement;
-    expect(mainContainer.className).toContain('animate-screen-shake');
-
     // Verify impact flash cyan overlay is rendered for PLAYER_ONE flag holder
     const flashCyan = container.querySelector('.animate-impact-flash-cyan');
     expect(flashCyan).not.toBeNull();
 
-    // Advance timers beyond screen shake and flash duration (500ms)
+    // Advance timers beyond flash duration (500ms)
     act(() => {
       vi.advanceTimersByTime(600);
     });
 
-    // Screen-shake class should be removed and impact flash should be gone
-    expect(mainContainer.className).not.toContain('animate-screen-shake');
+    // Impact flash should be gone
     const flashCyanAfter = container.querySelector('.animate-impact-flash-cyan');
     expect(flashCyanAfter).toBeNull();
     expect(consoleErrorSpy).not.toHaveBeenCalled();

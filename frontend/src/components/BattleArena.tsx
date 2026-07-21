@@ -46,31 +46,26 @@ interface BuildPlayerStackArgs {
   player: 'me' | 'opp';
   playerName: string;
   opponent: string;
-  isLiveMode: boolean;
-  battleSession: BattleSession | null;
   battleLog: BattleLogEntry[];
   currentLogIndex: number;
   hasLog: boolean;
 }
 
+// isFlagMarker reports whether a log entry marks the point at which the flag
+// transferred to a new holder. Both "flag_change" (final transfer) and
+// "flag_change_pending" (transfer pending an effect choice) qualify — in both
+// cases the new flag holder is already decided and `entry.card`/`entry.flagHolder`
+// reflect the new defender.
+function isFlagMarker(action: string): boolean {
+  return action === 'flag_change' || action === 'flag_change_pending';
+}
+
 function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
-  const { player, playerName, opponent, isLiveMode, battleSession, battleLog, currentLogIndex, hasLog } = args;
+  const { player, playerName, opponent, battleLog, currentLogIndex, hasLog } = args;
   const myName = player === 'me' ? playerName : opponent;
 
-  if (isLiveMode && battleSession) {
-    const isDefending = battleSession.flagHolder === myName;
-    const rawCards = isDefending
-      ? (battleSession.defenderStack ?? [])
-      : (battleSession.activeCards ?? []);
-    return {
-      flagCard: battleSession.flagCard ? convertToFullCard(battleSession.flagCard) : null,
-      challengerCards: rawCards.map(convertToFullCard),
-      isDefending,
-    };
-  }
-
   const empty: PlayerStack = { flagCard: null, challengerCards: [], isDefending: false };
-  if (!hasLog || currentLogIndex < 0) return empty;
+  if (!hasLog || currentLogIndex < 0 || battleLog.length === 0) return empty;
 
   const logList = battleLog;
   let defenderName = '';
@@ -79,9 +74,9 @@ function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
 
   for (let i = currentLogIndex; i >= 0; i--) {
     const entry = logList[i];
-    if (entry && entry.action === 'flag_change' && entry.card) {
+    if (entry && isFlagMarker(entry.action)) {
       defenderName = entry.flagHolder;
-      flagCard = convertToFullCard(entry.card);
+      flagCard = entry.card ? convertToFullCard(entry.card) : null;
       flagChangeIdx = i;
       break;
     }
@@ -106,11 +101,11 @@ function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
 
   if (isDefending) {
     // Collect all cards this player revealed to claim the flag
-    // (i.e. from the flagChangeIdx backwards until the previous flag change or start)
+    // (i.e. from the flagChangeIdx backwards until the previous flag marker or start)
     const defenderCards: Card[] = [];
     let startIdx = 0;
     for (let i = flagChangeIdx - 1; i >= 0; i--) {
-      if (logList[i]?.action === 'flag_change') {
+      if (logList[i] && isFlagMarker(logList[i].action)) {
         startIdx = i + 1;
         break;
       }
@@ -132,7 +127,7 @@ function buildPlayerStack(args: BuildPlayerStackArgs): PlayerStack {
   for (let i = flagChangeIdx + 1; i <= currentLogIndex; i++) {
     const entry = logList[i];
     if (!entry) continue;
-    if (entry.action === 'flag_change') break;
+    if (isFlagMarker(entry.action)) break;
     if (entry.action === 'reveal' && entry.player === myName && entry.card) {
       challengerCards.push(convertToFullCard(entry.card));
     }
@@ -145,7 +140,12 @@ interface PlayerStackViewProps {
   side: 'me' | 'opp';
   isMyDrawTurn: boolean;
   flagPower: number;
-  activeChallengerPower: number;
+  // The challenger power (opponent-of-flag-holder). Used to derive the
+  // "needed to capture" badge on the defending flag card and the "will
+  // take" pulse on the challenger stack. Reflects the visualized log step
+  // (NOT the live backend total) so the UI stays numerically in sync with
+  // the visible cards.
+  challengerPower: number;
   ownerLabel: string;
 }
 
@@ -219,7 +219,7 @@ function StackCardThumb({ card, isFlag, neededPower }: { card: Card; isFlag: boo
   );
 }
 
-function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, activeChallengerPower, ownerLabel }: PlayerStackViewProps) {
+function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, challengerPower, ownerLabel }: PlayerStackViewProps) {
   const { t } = useTranslation();
   const accent = side === 'me' ? 'neon-cyan' : 'neon-magenta';
   const borderClass = side === 'me' ? 'border-neon-cyan/30' : 'border-neon-magenta/30';
@@ -237,15 +237,47 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, activeChallenge
     return arr;
   }, [stack.challengerCards, isDefending, stack.flagCard]);
 
-  // One-by-one reveal: each new card appears 400ms after the previous
+  // One-by-one reveal: each new card appears 400ms after the previous.
+  // When a challenger takes the flag, the winning card carries over to the
+  // defender side; in that case we must NOT re-animate the card (otherwise the
+  // user sees the winning card "flip" again). We detect this by checking that
+  // the last card of the new stack has the same ID as the previously-visible
+  // last card.
   const [visibleCount, setVisibleCount] = useState(0);
   const prevCardsLen = useRef(0);
   const wasDefending = useRef(isDefending);
+  const prevLastCardId = useRef<string | null>(null);
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Keep a ref to the latest `cards` array so the effect can read the
+  // current last-card ID without re-running whenever the array reference
+  // changes (which would cancel pending reveal timers).
+  const cardsRef = useRef(cards);
+  useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
 
   useEffect(() => {
+    const currentCards = cardsRef.current;
     const roleChanged = wasDefending.current !== isDefending;
-    const cardsReset = cards.length < prevCardsLen.current;
+    const cardsReset = currentCards.length < prevCardsLen.current;
+    const newLastId = currentCards.length > 0 ? currentCards[currentCards.length - 1].id : null;
+    const carriesWinningCard =
+      roleChanged &&
+      prevLastCardId.current !== null &&
+      newLastId !== null &&
+      prevLastCardId.current === newLastId;
+
+    if (carriesWinningCard) {
+      // Role transition with the same winning card on top — keep it visible
+      // without re-flipping. Snap visibleCount to the new (defender) length.
+      revealTimers.current.forEach(clearTimeout);
+      revealTimers.current = [];
+      setVisibleCount(currentCards.length);
+      prevCardsLen.current = currentCards.length;
+      wasDefending.current = isDefending;
+      prevLastCardId.current = newLastId;
+      return;
+    }
 
     if (roleChanged || cardsReset) {
       revealTimers.current.forEach(clearTimeout);
@@ -256,17 +288,19 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, activeChallenge
     wasDefending.current = isDefending;
 
     const oldLen = prevCardsLen.current;
-    const newLen = cards.length;
+    const newLen = currentCards.length;
     if (newLen > oldLen) {
       for (let i = oldLen; i < newLen; i++) {
         const delay = (i - oldLen) * 400;
         const t = setTimeout(() => setVisibleCount(i + 1), delay);
         revealTimers.current.push(t);
       }
-    } else {
+    } else if (newLen < oldLen) {
+      // Stack shrunk (e.g. opponent cleared); snap to current count.
       setVisibleCount(newLen);
     }
     prevCardsLen.current = newLen;
+    prevLastCardId.current = newLastId;
     return () => {
       revealTimers.current.forEach(clearTimeout);
       revealTimers.current = [];
@@ -288,6 +322,15 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, activeChallenge
   const visibleCards = cards.slice(0, visibleCount);
   const hasAny = cards.length > 0;
 
+  // Power displays must follow the visible cards, not the session-level
+  // totals — otherwise the user sees the full challenger power before the
+  // cards have finished flipping in (numerical mismatch with the visuals).
+  const visibleChallengerPower = useMemo(
+    () => visibleCards.reduce((sum, c) => sum + (c.power || 0), 0),
+    [visibleCards]
+  );
+  const allCardsVisible = visibleCount >= cards.length;
+
   if (!hasAny && visibleCount === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
@@ -298,9 +341,14 @@ function PlayerStackView({ stack, side, isMyDrawTurn, flagPower, activeChallenge
     );
   }
 
-  const cumulative = isDefending ? flagPower : activeChallengerPower;
-  const needed = Math.max(0, flagPower - activeChallengerPower + 1);
-  const willTake = !isDefending && activeChallengerPower > flagPower;
+  // For the defender: "POW" is the flag power. For the challenger: "POW"
+  // is the (visible) cumulative attacker power. The "needed" badge on the
+  // defender's flag card uses the (full) challenger power passed in, while
+  // the challenger "will take" pulse requires all of its cards to be
+  // visible AND the total challenger power to exceed flag power.
+  const cumulative = isDefending ? flagPower : visibleChallengerPower;
+  const needed = Math.max(0, flagPower - challengerPower + 1);
+  const willTake = !isDefending && allCardsVisible && challengerPower > flagPower;
   const flagCardName = stack.flagCard ? stack.flagCard.name : '';
 
   const CARD_W = 112;
@@ -423,8 +471,6 @@ function BattleArena({
   const [flashState, setFlashState] = useState<'cyan' | 'magenta' | null>(null);
   const [effectAlert, setEffectAlert] = useState<string | null>(null);
   const effectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isShaking, setIsShaking] = useState<boolean>(false);
-  const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Interactive selection state
@@ -542,16 +588,6 @@ function BattleArena({
       playSERef.current('clash');
     } else if (entry.action === 'flag_change') {
       playSERef.current('roll');
-      
-      // Trigger screen shake
-      setIsShaking(true);
-      if (shakeTimeoutRef.current) {
-        clearTimeout(shakeTimeoutRef.current);
-      }
-      shakeTimeoutRef.current = setTimeout(() => {
-        setIsShaking(false);
-        shakeTimeoutRef.current = null;
-      }, 500);
 
       if (entry.flagHolder === playerName) {
         setFlashState('cyan');
@@ -582,13 +618,9 @@ function BattleArena({
       if (effectTimeoutRef.current) {
         clearTimeout(effectTimeoutRef.current);
       }
-      if (shakeTimeoutRef.current) {
-        clearTimeout(shakeTimeoutRef.current);
-      }
       if (flashTimeoutRef.current) {
         clearTimeout(flashTimeoutRef.current);
       }
-      setIsShaking(false);
       setFlashState(null);
       lastPlayedIndexRef.current = -1;
     };
@@ -614,6 +646,59 @@ function BattleArena({
     });
   };
 
+  // Build memory slots for live mode that preserve card images while staying
+  // synchronized with the visualized log step. We start from the full live
+  // session memory (which has Card objects with images) and filter it down
+  // to only the slots that exist in the historical string snapshot at the
+  // current visualization step. This avoids the image→text→image flicker
+  // that occurred when switching between parseMemSlots (text only) and
+  // mapLiveMemSlots (with images).
+  const buildLiveMemSlots = useCallback(
+    (liveSlots: MemorySlot[] | undefined, historicalStrings: string[] | undefined | null): MemorySlot[] => {
+      const live = mapLiveMemSlots(liveSlots);
+      if (!historicalStrings || historicalStrings.length === 0) {
+        return live;
+      }
+      // Parse the historical snapshot into a map of cardName -> count
+      const histMap = new Map<string, number>();
+      for (const slotStr of historicalStrings) {
+        const match = slotStr.match(/^(.+)\(x(\d+)\)$/);
+        if (match) {
+          histMap.set(match[1], parseInt(match[2], 10));
+        } else {
+          histMap.set(slotStr, 1);
+        }
+      }
+      // Filter live slots to only those present in the historical snapshot,
+      // and clamp the count to the historical value.
+      const result: MemorySlot[] = [];
+      for (const slot of live) {
+        const histCount = histMap.get(slot.cardName);
+        if (histCount !== undefined && histCount > 0) {
+          if (histCount < slot.count) {
+            // Show only the first N cards to match the historical count
+            result.push({
+              cardName: slot.cardName,
+              cards: slot.cards.slice(0, histCount),
+              count: histCount,
+            });
+          } else {
+            result.push(slot);
+          }
+          histMap.delete(slot.cardName);
+        }
+      }
+      // Any remaining entries in histMap are cards that were in the historical
+      // snapshot but are NOT in the current live memory (e.g. they were
+      // banished by an effect later). Show them as text-only fallback.
+      for (const [name, count] of histMap) {
+        result.push({ cardName: name, cards: [], count });
+      }
+      return result;
+    },
+    []
+  );
+
   // Dual Board bindings (Dynamic depending on live vs historical mode)
   const isPlayer1 = useMemo(() => {
     const cur = (playerName || '').trim().toLowerCase();
@@ -630,100 +715,126 @@ function BattleArena({
 
   const myMemSlots = useMemo(() => {
     if (isLiveMode) {
-      // During live log visualization, keep the memory bar synchronized with the
-      // currently shown log step so memory pressure appears at the same moment as
-      // the card-loss animation. Once caught up, use the full session memory.
-      if (isVisualizing && battleSession) {
-        const currentEntry = battleSession.log[Math.min(activeStepIndex, battleSession.log.length - 1)];
-        if (currentEntry) {
-          return parseMemSlots(isPlayer1 ? currentEntry.playerMemSlots : currentEntry.cpuMemSlots);
-        }
+      const liveSlots = isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem;
+      // Always derive memory from the log snapshot at the current
+      // visualization step so the displayed memory is consistent with the
+      // visualized log step — even after visualization catches up.
+      const currentEntry = battleSession.log[Math.min(activeStepIndex, battleSession.log.length - 1)];
+      if (currentEntry) {
+        const histStrings = isPlayer1 ? currentEntry.playerMemSlots : currentEntry.cpuMemSlots;
+        return buildLiveMemSlots(liveSlots, histStrings);
       }
-      return mapLiveMemSlots(isPlayer1 ? battleSession.player1Mem : battleSession.player2Mem);
+      return mapLiveMemSlots(liveSlots);
     }
     const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
     return parseMemSlots(isPlayer1 ? currentEntry.playerMemSlots : currentEntry.cpuMemSlots);
-  }, [isLiveMode, isVisualizing, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
+  }, [isLiveMode, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog, buildLiveMemSlots]);
 
   const opponentMemSlots = useMemo(() => {
     if (isLiveMode) {
-      if (isVisualizing && battleSession) {
-        const currentEntry = battleSession.log[Math.min(activeStepIndex, battleSession.log.length - 1)];
-        if (currentEntry) {
-          return parseMemSlots(isPlayer1 ? currentEntry.cpuMemSlots : currentEntry.playerMemSlots);
-        }
+      const liveSlots = isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem;
+      const currentEntry = battleSession.log[Math.min(activeStepIndex, battleSession.log.length - 1)];
+      if (currentEntry) {
+        const histStrings = isPlayer1 ? currentEntry.cpuMemSlots : currentEntry.playerMemSlots;
+        return buildLiveMemSlots(liveSlots, histStrings);
       }
-      return mapLiveMemSlots(isPlayer1 ? battleSession.player2Mem : battleSession.player1Mem);
+      return mapLiveMemSlots(liveSlots);
     }
     const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return [];
     return parseMemSlots(isPlayer1 ? currentEntry.cpuMemSlots : currentEntry.playerMemSlots);
-  }, [isLiveMode, isVisualizing, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
+  }, [isLiveMode, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog, buildLiveMemSlots]);
 
   const myDeckCount = useMemo(() => {
+    if (isLiveMode && isVisualizing && battleSession) {
+      const currentEntry = battleSession.log[Math.min(activeStepIndex, battleSession.log.length - 1)];
+      if (currentEntry) {
+        return isPlayer1 ? currentEntry.playerDeckCount : currentEntry.cpuDeckCount;
+      }
+    }
     if (isLiveMode) {
       return isPlayer1 ? battleSession.player1Deck.length : battleSession.player2Deck.length;
     }
     const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return 0;
     return isPlayer1 ? currentEntry.playerDeckCount : currentEntry.cpuDeckCount;
-  }, [isLiveMode, battleSession, activeStepIndex, battleLog, hasLog, isPlayer1]);
+  }, [isLiveMode, isVisualizing, battleSession, activeStepIndex, battleLog, hasLog, isPlayer1]);
 
   const opponentDeckCount = useMemo(() => {
+    if (isLiveMode && isVisualizing && battleSession) {
+      const currentEntry = battleSession.log[Math.min(activeStepIndex, battleSession.log.length - 1)];
+      if (currentEntry) {
+        return isPlayer1 ? currentEntry.cpuDeckCount : currentEntry.playerDeckCount;
+      }
+    }
     if (isLiveMode) {
       return isPlayer1 ? battleSession.player2Deck.length : battleSession.player1Deck.length;
     }
     const currentEntry = hasLog ? battleLog[Math.min(activeStepIndex, battleLog.length - 1)] : null;
     if (!currentEntry) return 0;
     return isPlayer1 ? currentEntry.cpuDeckCount : currentEntry.playerDeckCount;
-  }, [isLiveMode, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
+  }, [isLiveMode, isVisualizing, battleSession, activeStepIndex, battleLog, isPlayer1, hasLog]);
 
   // Card Visuals: each player has their own stack of revealed cards.
   const buildMyStack = useMemo(() => buildPlayerStack({
-    player: 'me', playerName, opponent, isLiveMode, battleSession,
-    battleLog, currentLogIndex: activeStepIndex, hasLog,
-  }), [playerName, opponent, isLiveMode, battleSession, battleLog, activeStepIndex, hasLog]);
+    player: 'me', playerName, opponent,
+    battleLog: activeLog, currentLogIndex: activeStepIndex, hasLog,
+  }), [playerName, opponent, activeLog, activeStepIndex, hasLog]);
 
   const buildOppStack = useMemo(() => buildPlayerStack({
-    player: 'opp', playerName, opponent, isLiveMode, battleSession,
-    battleLog, currentLogIndex: activeStepIndex, hasLog,
-  }), [playerName, opponent, isLiveMode, battleSession, battleLog, activeStepIndex, hasLog]);
+    player: 'opp', playerName, opponent,
+    battleLog: activeLog, currentLogIndex: activeStepIndex, hasLog,
+  }), [playerName, opponent, activeLog, activeStepIndex, hasLog]);
 
   const myStack = buildMyStack;
   const oppStack = buildOppStack;
 
   const activeChallengerPower = useMemo(() => {
-    if (isLiveMode && battleSession) {
-      return battleSession.challengerPower;
-    }
     const currentEntry = hasLog && activeLog && activeLog[activeStepIndex];
     if (!currentEntry) return 0;
+    // The challenger is whoever is NOT the current flag holder. Sum the
+    // reconstructed challenger cards from the log so the displayed power is
+    // in sync with the visualized log step (not the live backend total).
     const currentFlagHolder = currentEntry.flagHolder;
     if (currentFlagHolder === opponent) {
       return myStack.challengerCards.reduce((sum, card) => sum + (card.power || 0), 0);
     } else if (currentFlagHolder === playerName) {
       return oppStack.challengerCards.reduce((sum, card) => sum + (card.power || 0), 0);
     }
-    return 0;
-  }, [isLiveMode, battleSession, hasLog, activeLog, activeStepIndex, opponent, playerName, myStack.challengerCards, oppStack.challengerCards]);
+    // No flag holder yet — the player whose turn it is has revealed cards
+    // that count as challenger power against flag power 0.
+    return myStack.challengerCards.reduce((s, c) => s + (c.power || 0), 0) +
+      oppStack.challengerCards.reduce((s, c) => s + (c.power || 0), 0);
+  }, [hasLog, activeLog, activeStepIndex, opponent, playerName, myStack.challengerCards, oppStack.challengerCards]);
 
-  // Draw turns status
+  // Draw turns status. During live visualization, derive the next-draw
+  // indicator from the log being stepped through (consistent with the
+  // visualized stack), not from the live session's TurnOwner/RequiredAction
+  // (which reflect the final backend state, ahead of the animation).
   const isMyDrawTurn = useMemo(() => {
+    if (isLiveMode && isVisualizing) {
+      const nextEntry = (hasLog && activeStepIndex + 1 < activeLog.length) ? activeLog[activeStepIndex + 1] : null;
+      return nextEntry ? nextEntry.player === playerName && nextEntry.action === 'reveal' : false;
+    }
     if (isLiveMode) {
       return battleSession.turnOwner === playerName && battleSession.requiredAction === 'DRAW' && !battleSession.isFinished;
     }
     const nextEntry = (hasLog && currentLogIndex + 1 < battleLog.length) ? battleLog[currentLogIndex + 1] : null;
     return nextEntry ? nextEntry.player === playerName && nextEntry.action === 'reveal' : false;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, playerName, hasLog]);
+  }, [isLiveMode, isVisualizing, battleSession, activeStepIndex, activeLog, hasLog, currentLogIndex, battleLog, playerName]);
 
   const isOpponentDrawTurn = useMemo(() => {
+    if (isLiveMode && isVisualizing) {
+      const nextEntry = (hasLog && activeStepIndex + 1 < activeLog.length) ? activeLog[activeStepIndex + 1] : null;
+      return nextEntry ? nextEntry.player === opponent && nextEntry.action === 'reveal' : false;
+    }
     if (isLiveMode) {
       return battleSession.turnOwner !== playerName && battleSession.requiredAction === 'DRAW' && !battleSession.isFinished;
     }
     const nextEntry = (hasLog && currentLogIndex + 1 < battleLog.length) ? battleLog[currentLogIndex + 1] : null;
     return nextEntry ? nextEntry.player === opponent && nextEntry.action === 'reveal' : false;
-  }, [isLiveMode, battleSession, currentLogIndex, battleLog, opponent, hasLog, playerName]);
+  }, [isLiveMode, isVisualizing, battleSession, activeStepIndex, activeLog, hasLog, currentLogIndex, battleLog, opponent, playerName]);
 
   const displayedLog = useMemo(() => {
     if (isLiveMode) return activeLog;
@@ -778,7 +889,22 @@ function BattleArena({
   }, [activeLog, activeStepIndex, hasLog, playerName, t, translateBattleDetail]);
 
   const isReplayFinished = isLiveMode ? battleSession.isFinished : (currentLogIndex >= battleLog.length - 1);
-  const flagPowerValue = isLiveMode ? battleSession.flagPower : (hasLog ? activeLog[currentLogIndex].currentPower : 0);
+  // Flag power must be derived from the visualized log step, not the live
+  // session total. The `currentPower` of a "reveal" entry is the challenger
+  // power at that moment, NOT the flag power — so we walk backwards from
+  // activeStepIndex to find the most recent flag marker and use its
+  // `currentPower` (which is the flag power at that flag_change).
+  const flagPowerValue = useMemo(() => {
+    if (!hasLog || activeLog.length === 0) return 0;
+    for (let i = activeStepIndex; i >= 0; i--) {
+      const e = activeLog[i];
+      if (!e) continue;
+      if (isFlagMarker(e.action)) {
+        return e.currentPower || 0;
+      }
+    }
+    return 0;
+  }, [hasLog, activeLog, activeStepIndex]);
   const challengerPower = activeChallengerPower;
 
   // Active Choice Config
@@ -916,7 +1042,7 @@ function BattleArena({
   const flagHolder = hasLog && activeLog && activeLog[activeStepIndex] ? activeLog[activeStepIndex].flagHolder : '';
 
   return (
-    <div className={`h-screen bg-cyber-dark relative overflow-hidden flex flex-col p-2 sm:p-4 select-none ${isShaking ? 'animate-screen-shake' : ''}`}>
+    <div className="h-screen bg-cyber-dark relative overflow-hidden flex flex-col p-2 sm:p-4 select-none">
       {/* Fullscreen impact flash overlays */}
       {flashState === 'cyan' && (
         <div className="fixed inset-0 animate-impact-flash-cyan pointer-events-none z-50" />
@@ -1007,7 +1133,7 @@ function BattleArena({
               side="me"
               isMyDrawTurn={isMyDrawTurn}
               flagPower={flagPowerValue}
-              activeChallengerPower={activeChallengerPower}
+              challengerPower={challengerPower}
               ownerLabel={playerName}
             />
           </div>
@@ -1057,7 +1183,7 @@ function BattleArena({
               side="opp"
               isMyDrawTurn={isOpponentDrawTurn}
               flagPower={flagPowerValue}
-              activeChallengerPower={activeChallengerPower}
+              challengerPower={challengerPower}
               ownerLabel={opponent}
             />
           </div>

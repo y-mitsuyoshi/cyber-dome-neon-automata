@@ -42,7 +42,7 @@ describe('BattleArena Visual State Leak (Empirical Verification)', () => {
     vi.useRealTimers();
   });
 
-  it('proves that screen-shake and flash states are leaked when step transitions occur rapidly', () => {
+  it('proves that flash states are leaked when step transitions occur rapidly', () => {
     const stepLog: BattleLogEntry[] = [
       {
         step: 1,
@@ -102,22 +102,18 @@ describe('BattleArena Visual State Leak (Empirical Verification)', () => {
       />
     );
 
-    const mainContainer = container.firstChild as HTMLElement;
-
-    // Initially at step 1: flag_change triggers screen-shake and flash overlay
-    expect(mainContainer.className).toContain('animate-screen-shake');
+    // Initially at step 1: flag_change triggers flash overlay
     expect(container.querySelector('.animate-impact-flash-cyan')).not.toBeNull();
 
-    // Advance timer partially (100ms), before 500ms shake/flash duration is complete
+    // Advance timer partially (100ms), before 500ms flash duration is complete
     act(() => {
       vi.advanceTimersByTime(100);
     });
 
-    // Verify shake and flash are still active
-    expect(mainContainer.className).toContain('animate-screen-shake');
+    // Verify flash is still active
     expect(container.querySelector('.animate-impact-flash-cyan')).not.toBeNull();
 
-    // Advance to step 2 (reveal action) before shake/flash duration completes by updating battleLog
+    // Advance to step 2 (reveal action) before flash duration completes by updating battleLog
     act(() => {
       rerender(
         <BattleArena
@@ -141,8 +137,7 @@ describe('BattleArena Visual State Leak (Empirical Verification)', () => {
       vi.advanceTimersByTime(1000);
     });
 
-    // Verify that mainContainer does not contain animate-screen-shake class and flash overlay is null (removed from DOM)
-    expect(mainContainer.className).not.toContain('animate-screen-shake');
+    // Verify flash overlay is null (removed from DOM)
     expect(container.querySelector('.animate-impact-flash-cyan')).toBeNull();
   });
 });

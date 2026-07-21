@@ -1045,7 +1045,8 @@ func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppP
 	winCardPower := calculateIndividualCardPower(winningCard, activeMem, oppMem, activePlayerName, session)
 	session.FlagPower = winCardPower
 
-	// Apply Illusionist on-win power buff (if applicable)
+	// Apply on-win power buffs
+	// Illusionist: +1 per empty bench slot
 	if winningCard.EffectType == "illusionist" {
 		emptySlots := 6 - uniqueSlotCount(*activeMem)
 		if emptySlots > 0 {
@@ -1053,19 +1054,39 @@ func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppP
 			effectText += fmt.Sprintf(" (イリュージョニスト効果でパワー+%d)", emptySlots)
 		}
 	}
+	// Treasure (デクリプトコア): +2 power when claiming flag
+	if winningCard.EffectType == "treasure" {
+		session.FlagPower += 2
+		effectText += " (デクリプトコア効果でパワー+2)"
+	}
+	// Skeleton (スケルトンキー): +1 power when claiming flag
+	if winningCard.EffectType == "skeleton" {
+		session.FlagPower += 1
+		effectText += " (スケルトンキー効果でパワー+1)"
+	}
 
 	// Swap turn
 	session.TurnOwner = oppPlayerName
 	session.PendingActionPlayer = oppPlayerName
 	session.RequiredAction = "DRAW"
 
-	// The new defender stack starts with just the winning card.
-	session.DefenderStack = []models.Card{winningCard}
-	// Track the flag-defending card explicitly. ActiveCards must be reset to
-	// empty so the next challenger's reveal stack starts fresh — keeping the
-	// previous winning card in ActiveCards caused it to be (a) double-counted
-	// into the next challenger's accumulated power and (b) incorrectly benched
-	// into the challenger's memory when they later took the flag.
+	// The new defender stack is ALL the cards the challenger revealed this
+	// turn (their accumulated attack stack). When this new defender later
+	// loses the flag, the entire stack is benched into THIS player's memory.
+	// Using the full stack (rather than just the winning card) keeps each
+	// player's revealed cards on their own side throughout the battle.
+	newDefenderStack := make([]models.Card, len(session.ActiveCards))
+	copy(newDefenderStack, session.ActiveCards)
+	if len(newDefenderStack) == 0 {
+		// Defensive fallback: should never happen since the challenger must
+		// have revealed at least one card to take the flag.
+		newDefenderStack = []models.Card{winningCard}
+	}
+	session.DefenderStack = newDefenderStack
+	// Track the flag-defending card explicitly (top of the new stack).
+	// ActiveCards must be reset to empty so the next challenger's reveal
+	// stack starts fresh — keeping the previous cards in ActiveCards caused
+	// them to be double-counted into the next challenger's accumulated power.
 	wc := winningCard
 	session.FlagCard = &wc
 	session.ActiveCards = []models.Card{}
@@ -1121,6 +1142,102 @@ func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppP
 	}
 }
 
+// benchDefenderStack moves the old defender's stack into their memory / discard
+// pile and logs one "bench" (or "memory_overflow") entry per card. It is called
+// AFTER the flag_change entry has already been logged, so that the UI sees the
+// flag transfer first and then memory pressure afterwards.
+func benchDefenderStack(session *models.BattleSession, stackToBench []models.Card, oldFlagHolder, activePlayerName, oppPlayerName string, oppMem *[]models.MemorySlot, oppDiscard *[]models.Card) {
+	for _, c := range stackToBench {
+		if c.EffectType == "prince" {
+			*oppDiscard = append(*oppDiscard, c)
+			session.Log = append(session.Log, models.BattleLogEntry{
+				Step:            session.Step,
+				Action:          "bench",
+				Player:          oldFlagHolder,
+				CurrentPower:    session.FlagPower,
+				EffectTriggered: "prince",
+				PlayerMemSlots:  memSlotNames(session.Player1Mem),
+				CPUMemSlots:     memSlotNames(session.Player2Mem),
+				PlayerDeckCount: len(session.Player1Deck),
+				CPUDeckCount:    len(session.Player2Deck),
+				FlagHolder:      session.FlagHolder,
+				Details:         "プリンスがフラッグを失ったため、ベンチではなく除外エリアに送られました",
+			})
+			continue
+		}
+		if c.EffectType == "rescue_pod" {
+			*oppDiscard = append(*oppDiscard, c)
+			session.Log = append(session.Log, models.BattleLogEntry{
+				Step:            session.Step,
+				Action:          "bench",
+				Player:          oldFlagHolder,
+				CurrentPower:    session.FlagPower,
+				EffectTriggered: "rescue_pod",
+				PlayerMemSlots:  memSlotNames(session.Player1Mem),
+				CPUMemSlots:     memSlotNames(session.Player2Mem),
+				PlayerDeckCount: len(session.Player1Deck),
+				CPUDeckCount:    len(session.Player2Deck),
+				FlagHolder:      session.FlagHolder,
+				Details:         "レスキューポッドがフラッグを失い、除外されました",
+			})
+			continue
+		}
+		added := addToMemory(oppMem, c)
+		if !added {
+			session.IsFinished = true
+			session.Winner = activePlayerName
+			session.Loser = oppPlayerName
+			session.Log = append(session.Log, models.BattleLogEntry{
+				Step:            session.Step,
+				Action:          "memory_overflow",
+				Player:          oppPlayerName,
+				CurrentPower:    session.FlagPower,
+				PlayerMemSlots:  memSlotNames(session.Player1Mem),
+				CPUMemSlots:     memSlotNames(session.Player2Mem),
+				PlayerDeckCount: len(session.Player1Deck),
+				CPUDeckCount:    len(session.Player2Deck),
+				FlagHolder:      session.FlagHolder,
+				Details:         fmt.Sprintf("メモリ上限超過！ %s のベンチが満杯になり敗北しました", oppPlayerName),
+			})
+			return
+		}
+		session.Log = append(session.Log, models.BattleLogEntry{
+			Step:            session.Step,
+			Action:          "bench",
+			Player:          oldFlagHolder,
+			CurrentPower:    session.FlagPower,
+			PlayerMemSlots:  memSlotNames(session.Player1Mem),
+			CPUMemSlots:     memSlotNames(session.Player2Mem),
+			PlayerDeckCount: len(session.Player1Deck),
+			CPUDeckCount:    len(session.Player2Deck),
+			FlagHolder:      session.FlagHolder,
+			Details:         fmt.Sprintf("%s benched to memory", c.Name),
+		})
+
+		// Apply Comic buff (next attack gets +2)
+		if c.EffectType == "comic" {
+			if oldFlagHolder == session.Player1Name {
+				session.Player1NextAttackBuff += 2
+			} else {
+				session.Player2NextAttackBuff += 2
+			}
+			session.Log = append(session.Log, models.BattleLogEntry{
+				Step:            session.Step,
+				Action:          "effect_trigger",
+				Player:          oldFlagHolder,
+				CurrentPower:    session.FlagPower,
+				EffectTriggered: "comic",
+				PlayerMemSlots:  memSlotNames(session.Player1Mem),
+				CPUMemSlots:     memSlotNames(session.Player2Mem),
+				PlayerDeckCount: len(session.Player1Deck),
+				CPUDeckCount:    len(session.Player2Deck),
+				FlagHolder:      session.FlagHolder,
+				Details:         fmt.Sprintf("ホロヒーローの効果発動：次の %s の攻撃にパワー+2を付与", oldFlagHolder),
+			})
+		}
+	}
+}
+
 func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 	// Check if challenger power exceeds flag power
 	if session.ChallengerPower >= session.FlagPower {
@@ -1154,96 +1271,12 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 			oldFlagCard = session.FlagCard
 		}
 
-		// 1. Move old defender stack to defender's memory / discard together
-		if oldFlagHolder != "" && len(session.DefenderStack) > 0 {
-			for _, c := range session.DefenderStack {
-				if c.EffectType == "prince" {
-					*oppDiscard = append(*oppDiscard, c)
-					session.Log = append(session.Log, models.BattleLogEntry{
-						Step:            session.Step,
-						Action:          "bench",
-						Player:          oldFlagHolder,
-						CurrentPower:    session.FlagPower,
-						EffectTriggered: "prince",
-						PlayerMemSlots:  memSlotNames(session.Player1Mem),
-						CPUMemSlots:     memSlotNames(session.Player2Mem),
-						PlayerDeckCount: len(session.Player1Deck),
-						CPUDeckCount:    len(session.Player2Deck),
-						FlagHolder:      session.FlagHolder,
-						Details:         fmt.Sprintf("プリンスがフラッグを失ったため、ベンチではなく除外エリアに送られました"),
-					})
-				} else if c.EffectType == "rescue_pod" {
-					*oppDiscard = append(*oppDiscard, c)
-					session.Log = append(session.Log, models.BattleLogEntry{
-						Step:            session.Step,
-						Action:          "bench",
-						Player:          oldFlagHolder,
-						CurrentPower:    session.FlagPower,
-						EffectTriggered: "rescue_pod",
-						PlayerMemSlots:  memSlotNames(session.Player1Mem),
-						CPUMemSlots:     memSlotNames(session.Player2Mem),
-						PlayerDeckCount: len(session.Player1Deck),
-						CPUDeckCount:    len(session.Player2Deck),
-						FlagHolder:      session.FlagHolder,
-						Details:         fmt.Sprintf("レスキューポッドがフラッグを失い、除外されました"),
-					})
-				} else {
-					added := addToMemory(oppMem, c)
-					if !added {
-						session.IsFinished = true
-						session.Winner = activePlayerName
-						session.Loser = oppPlayerName
-						session.Log = append(session.Log, models.BattleLogEntry{
-							Step:            session.Step,
-							Action:          "memory_overflow",
-							Player:          oppPlayerName,
-							CurrentPower:    session.FlagPower,
-							PlayerMemSlots:  memSlotNames(session.Player1Mem),
-							CPUMemSlots:     memSlotNames(session.Player2Mem),
-							PlayerDeckCount: len(session.Player1Deck),
-							CPUDeckCount:    len(session.Player2Deck),
-							FlagHolder:      session.FlagHolder,
-							Details:         fmt.Sprintf("メモリ上限超過！ %s のベンチが満杯になり敗北しました", oppPlayerName),
-						})
-						return
-					}
-					session.Log = append(session.Log, models.BattleLogEntry{
-						Step:            session.Step,
-						Action:          "bench",
-						Player:          oldFlagHolder,
-						CurrentPower:    session.FlagPower,
-						PlayerMemSlots:  memSlotNames(session.Player1Mem),
-						CPUMemSlots:     memSlotNames(session.Player2Mem),
-						PlayerDeckCount: len(session.Player1Deck),
-						CPUDeckCount:    len(session.Player2Deck),
-						FlagHolder:      session.FlagHolder,
-						Details:         fmt.Sprintf("%s benched to memory", c.Name),
-					})
-				}
-
-				// Apply Comic buff (next attack gets +2)
-				if c.EffectType == "comic" {
-					if oldFlagHolder == session.Player1Name {
-						session.Player1NextAttackBuff += 2
-					} else {
-						session.Player2NextAttackBuff += 2
-					}
-					session.Log = append(session.Log, models.BattleLogEntry{
-						Step:            session.Step,
-						Action:          "effect_trigger",
-						Player:          oldFlagHolder,
-						CurrentPower:    session.FlagPower,
-						EffectTriggered: "comic",
-						PlayerMemSlots:  memSlotNames(session.Player1Mem),
-						CPUMemSlots:     memSlotNames(session.Player2Mem),
-						PlayerDeckCount: len(session.Player1Deck),
-						CPUDeckCount:    len(session.Player2Deck),
-						FlagHolder:      session.FlagHolder,
-						Details:         fmt.Sprintf("ホロヒーローの効果発動：次の %s の攻撃にパワー+2を付与", oldFlagHolder),
-					})
-				}
-			}
-		}
+		// Snapshot the old defender's stack — we log the flag_change first
+		// (so the UI sees the flag transfer), then bench each defeated card
+		// afterwards. This avoids the visual "memory fills before flag moves"
+		// desync.
+		stackToBench := make([]models.Card, len(session.DefenderStack))
+		copy(stackToBench, session.DefenderStack)
 
 		winningCard := session.ActiveCards[len(session.ActiveCards)-1]
 
@@ -1302,12 +1335,38 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 		}
 
 		if hasLossChoice && len(lossOptions) > 0 {
-			// The new defender stack starts with just the winning card.
-			session.DefenderStack = []models.Card{winningCard}
+			// Flag is taken; pending user choice on the old holder's deck.
+			// Update flag state and log flag_change_pending BEFORE benching.
+			newDefenderStack := make([]models.Card, len(session.ActiveCards))
+			copy(newDefenderStack, session.ActiveCards)
+			if len(newDefenderStack) == 0 {
+				newDefenderStack = []models.Card{winningCard}
+			}
+			session.DefenderStack = newDefenderStack
 			wc := winningCard
 			session.FlagCard = &wc
 			session.ActiveCards = []models.Card{}
 			session.FlagHolder = activePlayerName
+
+			session.Log = append(session.Log, models.BattleLogEntry{
+				Step:            session.Step,
+				Action:          "flag_change_pending",
+				Player:          activePlayerName,
+				CurrentPower:    session.ChallengerPower,
+				EffectTriggered: lossAction,
+				PlayerMemSlots:  memSlotNames(session.Player1Mem),
+				CPUMemSlots:     memSlotNames(session.Player2Mem),
+				PlayerDeckCount: len(session.Player1Deck),
+				CPUDeckCount:    len(session.Player2Deck),
+				FlagHolder:      session.FlagHolder,
+				Details:         fmt.Sprintf("%s がフラッグを奪いました。%s の暗号マッパー・予測モデルの解決をお待ちください...", activePlayerName, oldFlagHolder),
+			})
+
+			// Now bench the old defender's stack to the old holder's memory.
+			benchDefenderStack(session, stackToBench, oldFlagHolder, activePlayerName, oppPlayerName, oppMem, oppDiscard)
+			if session.IsFinished {
+				return
+			}
 
 			if isOpponentNPC {
 				resolveNPCChoice(session, oldFlagHolder, lossAction, lossOptions)
@@ -1316,44 +1375,27 @@ func resolvePowerComparison(session *models.BattleSession, isP1NPC, isP2NPC bool
 				session.RequiredAction = lossAction
 				session.PendingActionPlayer = oldFlagHolder
 				session.ActionOptions = lossOptions
-				session.Log = append(session.Log, models.BattleLogEntry{
-					Step:            session.Step,
-					Action:          "flag_change_pending",
-					Player:          activePlayerName,
-					CurrentPower:    session.ChallengerPower,
-					EffectTriggered: lossAction,
-					PlayerMemSlots:  memSlotNames(session.Player1Mem),
-					CPUMemSlots:     memSlotNames(session.Player2Mem),
-					PlayerDeckCount: len(session.Player1Deck),
-					CPUDeckCount:    len(session.Player2Deck),
-					FlagHolder:      session.FlagHolder,
-					Details:         fmt.Sprintf("%s がフラッグを奪いました。%s の暗号マッパー・予測モデルの解決をお待ちください...", activePlayerName, oldFlagHolder),
-				})
 			}
 		} else {
+			// Transition first (logs flag_change and swaps turn owner),
+			// then bench the old defender's stack so memory updates AFTER
+			// the flag visibly changes hands. The bench must still run even
+			// if transitionToDrawPhase ended the battle (e.g. opponent ran
+			// out of cards) because the old defender's on-field cards still
+			// belong in their memory.
 			transitionToDrawPhase(session, activePlayerName, oppPlayerName, winningCard, effectText)
+			benchDefenderStack(session, stackToBench, oldFlagHolder, activePlayerName, oppPlayerName, oppMem, oppDiscard)
 		}
 
 	} else {
 		// Challenger power is still <= flag power.
-		// Need to draw more cards.
+		// Need to draw more cards. The challenger's revealed card stays in
+		// ActiveCards (their own side) — we do NOT slide it underneath the
+		// defender's stack, because that would later bench the challenger's
+		// card into the DEFENDER's memory when the flag is taken, which is
+		// wrong (the card belongs to the challenger, not the defender).
 		session.RequiredAction = "DRAW"
 		session.PendingActionPlayer = session.TurnOwner
-
-		// Symmetrically, slide the last revealed card underneath the defending card holding the flag
-		if len(session.ActiveCards) > 0 {
-			lastCard := session.ActiveCards[len(session.ActiveCards)-1]
-			alreadyInStack := false
-			for _, c := range session.DefenderStack {
-				if c.ID == lastCard.ID {
-					alreadyInStack = true
-					break
-				}
-			}
-			if !alreadyInStack {
-				session.DefenderStack = append(session.DefenderStack, lastCard)
-			}
-		}
 	}
 }
 
@@ -1391,6 +1433,11 @@ func calculateIndividualCardPower(card models.Card, myMem, oppMem *[]models.Memo
 			}
 			power += oppWins
 		}
+	}
+
+	// Mascot (デーモンマスコット) buff: +1 power per unique attribute on bench when attacking
+	if card.EffectType == "mascot" && session.TurnOwner == playerName {
+		power += countUniqueAttributes(myMem)
 	}
 
 	// Apply global bench buffs

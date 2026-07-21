@@ -282,8 +282,20 @@ func TestE2E_Tier1_BenchLogic(t *testing.T) {
 	if session.FlagHolder != "P1" {
 		t.Fatalf("Expected P1 to hold flag now")
 	}
-	if len(session.Player2Mem) != 2 {
-		t.Errorf("Expected P2 memory to have 2 cards on defeat, got %d", len(session.Player2Mem))
+	// Under the corrected benching rules, only the OLD flag holder's own
+	// defender stack is benched into the OLD flag holder's memory. The
+	// challenger's failed reveal cards stay with the challenger and become
+	// the new defender stack when the flag is taken — they are NOT benched
+	// into the opponent's memory.
+	if len(session.Player2Mem) != 1 {
+		t.Errorf("Expected P2 memory to have 1 card (CardBeta) on defeat, got %d", len(session.Player2Mem))
+	}
+	if len(session.Player2Mem) > 0 && session.Player2Mem[0].CardName != "CardBeta" {
+		t.Errorf("Expected P2 memory to contain CardBeta, got %+v", session.Player2Mem)
+	}
+	// P1's failed CardAlpha + winning CardAlpha become the new defender stack.
+	if len(session.DefenderStack) != 2 {
+		t.Errorf("Expected new DefenderStack to contain P1's 2 revealed cards, got %d", len(session.DefenderStack))
 	}
 }
 
@@ -798,4 +810,50 @@ func TestE2E_Tier4_RealWorldWorkloads(t *testing.T) {
 			t.Error(err)
 		}
 	})
+}
+
+// TestE2E_Tier6_FlagChangeBeforeBench verifies that when a flag is taken,
+// the "flag_change" log entry is emitted BEFORE any "bench" log entries.
+// This ensures the UI sees the flag transfer first and memory updates only
+// afterwards (so memory pressure doesn't visually appear before the flag moves).
+func TestE2E_Tier6_FlagChangeBeforeBench(t *testing.T) {
+	p1Deck := []models.Card{
+		{ID: "p_d1", Name: "Defender", Attribute: "None", Power: 5},
+		{ID: "p_f1", Name: "Filler", Attribute: "None", Power: 1},
+	}
+	p2Deck := []models.Card{
+		{ID: "p_c1", Name: "Challenger", Attribute: "None", Power: 7},
+		{ID: "p_f2", Name: "Filler2", Attribute: "None", Power: 1},
+	}
+
+	session := engine.InitializeBattleSession("test_flag_before_bench", "P1", "P2", p1Deck, p2Deck, 1, false, false)
+	session.Player1Deck = p1Deck
+	session.Player2Deck = p2Deck
+	session.TurnOwner = "P1"
+	session.PendingActionPlayer = "P1"
+
+	engine.StepBattle(session, false, false) // P1 claims flag
+
+	session.TurnOwner = "P2"
+	session.PendingActionPlayer = "P2"
+	engine.StepBattle(session, false, false) // P2 steals flag
+
+	flagChangeIdx := -1
+	benchIdx := -1
+	for i, e := range session.Log {
+		if e.Action == "flag_change" && e.Player == "P2" && benchIdx == -1 {
+			flagChangeIdx = i
+		} else if e.Action == "bench" && benchIdx == -1 {
+			benchIdx = i
+		}
+	}
+	if flagChangeIdx == -1 {
+		t.Fatalf("Expected flag_change entry for P2 to be logged, got %d entries", len(session.Log))
+	}
+	if benchIdx == -1 {
+		t.Fatalf("Expected bench entry to be logged, got %d entries", len(session.Log))
+	}
+	if flagChangeIdx >= benchIdx {
+		t.Errorf("Expected flag_change (idx %d) BEFORE bench (idx %d), but order is wrong", flagChangeIdx, benchIdx)
+	}
 }

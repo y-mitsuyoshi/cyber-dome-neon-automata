@@ -130,12 +130,12 @@ func AllCards() []models.Card {
 // StarterDeck returns the symmetrical 6-card starting deck for all players.
 func StarterDeck() []models.Card {
 	return []models.Card{
-		{ID: "starter_scout_1a", Name: "探索ノード", Attribute: "None", Power: 1, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
-		{ID: "starter_scout_1b", Name: "探索ノード", Attribute: "None", Power: 1, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
-		{ID: "starter_scout_1c", Name: "探索ノード", Attribute: "None", Power: 1, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
-		{ID: "starter_scout_2a", Name: "探索ノード", Attribute: "None", Power: 2, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
-		{ID: "starter_scout_2b", Name: "探索ノード", Attribute: "None", Power: 2, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
-		{ID: "starter_mascot", Name: "デーモンマスコット", Attribute: "None", Power: 2, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
+		{ID: "starter_scout_1a", Name: "スキャンノード", Attribute: "None", Power: 1, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
+		{ID: "starter_scout_1b", Name: "スキャンノード", Attribute: "None", Power: 1, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
+		{ID: "starter_scout_1c", Name: "スキャンノード", Attribute: "None", Power: 1, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
+		{ID: "starter_scout_2a", Name: "プローブノード", Attribute: "None", Power: 2, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
+		{ID: "starter_scout_2b", Name: "プローブノード", Attribute: "None", Power: 2, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
+		{ID: "starter_mascot", Name: "ガードマスコット", Attribute: "None", Power: 2, Rarity: "Common", Effect: "", EffectType: "none", Cost: 0, Deck: "Starter", Quantity: 0},
 	}
 }
 

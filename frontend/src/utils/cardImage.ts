@@ -10,11 +10,11 @@ for (const series of IMAGE_SERIES) {
 
 const STARTER_IMAGE_OVERRIDES: Record<string, string> = {
   starter_scout_1a: 'nr_001.png',
-  starter_scout_1b: 'nr_002.png',
-  starter_scout_1c: 'nr_003.png',
-  starter_scout_2a: 'nr_004.png',
-  starter_scout_2b: 'nr_005.png',
-  starter_mascot: 'nr_006.png',
+  starter_scout_1b: 'nr_001.png',
+  starter_scout_1c: 'nr_001.png',
+  starter_scout_2a: 'nr_002.png',
+  starter_scout_2b: 'nr_002.png',
+  starter_mascot: 'nr_003.png',
 };
 
 const EXPLICIT_IMAGE_MAP: Record<string, string> = {

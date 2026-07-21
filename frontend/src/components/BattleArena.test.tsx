@@ -176,7 +176,7 @@ describe('BattleArena', () => {
     expect(badgeElement).toBeDefined();
   });
 
-  it('empirically verifies 3D card flip, screen-shake, impact flash, and robust unmount under rapid autoplay steps', async () => {
+  it('empirically verifies 3D card flip, impact flash, and robust unmount under rapid autoplay steps', async () => {
     vi.useFakeTimers();
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -224,8 +224,8 @@ describe('BattleArena', () => {
     );
 
     // Initial render sets currentLogIndex to 1, causing flag_change animations to trigger.
-    // Let's verify that the container has screen-shake class and flash overlays.
-    expect(container.querySelector('.animate-screen-shake')).toBeDefined();
+    // Step 2 has flagHolder = 'CPU' (opponent), so the magenta flash overlay should render.
+    expect(container.querySelector('.animate-impact-flash-magenta')).not.toBeNull();
 
     // Verify no console errors occurred during the mounts and initial state triggers.
     expect(consoleErrorSpy).not.toHaveBeenCalled();
