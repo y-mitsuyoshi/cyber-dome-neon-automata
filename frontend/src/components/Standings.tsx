@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Trophy, Star, ChevronRight, User, Award } from 'lucide-react';
+import { Trophy, Star, ChevronRight, User, Award, Home } from 'lucide-react';
 import type { Standing, BattleResult } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
@@ -12,13 +12,14 @@ interface StandingsProps {
   maxRounds: number;
   battleResult: string;
   onNext: () => void;
+  onReturnToTop?: () => void;
   loading: boolean;
   gameId: string;
   playerName: string;
   lastResult: BattleResult | null;
 }
 
-function Standings({ standings, round, maxRounds, battleResult, onNext, loading, gameId, playerName, lastResult }: StandingsProps) {
+function Standings({ standings, round, maxRounds, battleResult, onNext, onReturnToTop, loading, gameId, playerName, lastResult }: StandingsProps) {
   const { playSE } = useAudio();
   const playedResultRef = useRef(false);
 
@@ -227,8 +228,8 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading,
           })}
         </div>
 
-        {/* Next button */}
-        <div className="text-center mt-8 animate-slide-in" style={{ animationDelay: '0.5s' }}>
+        {/* Action buttons */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8 animate-slide-in" style={{ animationDelay: '0.5s' }}>
           <button
             onClick={onNext}
             onMouseEnter={() => { if (!loading) playSE('hover'); }}
@@ -261,6 +262,18 @@ function Standings({ standings, round, maxRounds, battleResult, onNext, loading,
               </>
             )}
           </button>
+
+          {onReturnToTop && (
+            <button
+              onClick={() => { playSE('click'); onReturnToTop(); }}
+              onMouseEnter={() => { if (!loading) playSE('hover'); }}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded border border-cyber-border/40 text-cyber-text-dim hover:text-neon-cyan hover:border-neon-cyan/40 font-bold text-sm uppercase tracking-wider transition-all duration-300 cursor-pointer hover:scale-105 font-mono"
+            >
+              <Home size={16} />
+              {t('returnToTop')}
+            </button>
+          )}
         </div>
       </div>
     </div>

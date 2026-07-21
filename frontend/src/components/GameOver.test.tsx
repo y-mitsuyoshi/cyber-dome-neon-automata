@@ -172,4 +172,18 @@ describe('GameOver', () => {
     const youBadges = screen.getAllByText('YOU');
     expect(youBadges.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('calls onRestart when return to top button is clicked', () => {
+    const onRestart = vi.fn();
+    const standings = makeStandings([
+      { name: 'WINNER', wins: 3, fans: 15, isPlayer: true },
+    ]);
+
+    render(<GameOver standings={standings} onRestart={onRestart} />);
+
+    const returnBtn = screen.getByRole('button');
+    returnBtn.click();
+
+    expect(onRestart).toHaveBeenCalledTimes(1);
+  });
 });

@@ -33,6 +33,7 @@ vi.mock('../context/TranslationContext', () => ({
         rankGold: '金',
         rankSilver: '銀',
         rankBronze: '銅',
+        returnToTop: 'RETURN TO TOP PAGE',
       };
       return dict[key] ?? key;
     },
@@ -185,5 +186,23 @@ describe('Standings', () => {
     // ME should have rank up indicator (▲)
     const allText = document.body.textContent || '';
     expect(allText).toContain('▲'); // ME moved from 3 to 2
+  });
+
+  it('renders return to top button and triggers onReturnToTop when clicked', () => {
+    const onReturnToTop = vi.fn();
+    const { getByText } = render(
+      <Standings
+        {...defaultProps}
+        onReturnToTop={onReturnToTop}
+        standings={makeStandings([
+          { name: 'ME', wins: 2, fans: 10, isPlayer: true },
+        ])}
+      />,
+    );
+
+    const btn = getByText('RETURN TO TOP PAGE');
+    expect(btn).toBeTruthy();
+    btn.click();
+    expect(onReturnToTop).toHaveBeenCalledTimes(1);
   });
 });

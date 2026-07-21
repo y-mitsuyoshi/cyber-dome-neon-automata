@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Trophy, Star, RotateCcw, User } from 'lucide-react';
+import { Trophy, Star, Home, User } from 'lucide-react';
 import type { Standing } from '../types/game';
 import { useTranslation } from '../context/TranslationContext';
 import { useAudio } from '../context/AudioContext';
@@ -193,7 +193,7 @@ function GameOver({ standings, onRestart }: GameOverProps) {
           })}
         </div>
 
-        {/* Restart button */}
+        {/* Return to Top Page button */}
         <button
           onClick={onRestart}
           onMouseEnter={() => playSE('hover')}
@@ -204,8 +204,8 @@ function GameOver({ standings, onRestart }: GameOverProps) {
             boxShadow: '0 0 20px rgba(0,240,255,0.2), 0 0 40px rgba(0,240,255,0.1)',
           }}
         >
-          <RotateCcw size={20} />
-          {t('newGameBtn')}
+          <Home size={20} />
+          {t('returnToTop')}
         </button>
       </div>
     </div>

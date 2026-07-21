@@ -654,6 +654,7 @@ function App() {
               maxRounds={gameState.maxRounds}
               battleResult={gameState.battleResult}
               onNext={handleNextRound}
+              onReturnToTop={handleRestart}
               loading={loading}
               gameId={gameState.gameId}
               playerName={playerName}
