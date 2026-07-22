@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { X, BookOpen } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { useTranslation } from '../context/TranslationContext';
+import { MANUAL_TEXT } from '../constants/manual';
 
 interface ManualModalProps {
   onClose: () => void;
@@ -11,20 +12,24 @@ interface ManualModalProps {
 export default function ManualModal({ onClose }: ManualModalProps) {
   const { playSE } = useAudio();
   const { t, locale } = useTranslation();
-  const [content, setContent] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
+  const [content, setContent] = useState<string>(MANUAL_TEXT);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    const path = locale === 'ja' ? '/MANUAL.md' : '/MANUAL.md';
+    const path = '/MANUAL.md';
     fetch(path)
       .then(res => res.text())
       .then(text => {
-        setContent(text);
+        if (text && !text.trim().startsWith('<!') && !text.includes('<html')) {
+          setContent(text);
+        } else {
+          setContent(MANUAL_TEXT);
+        }
         setLoading(false);
       })
       .catch(err => {
         console.error(err);
-        setContent(t('manualLoadError'));
+        setContent(MANUAL_TEXT || t('manualLoadError'));
         setLoading(false);
       });
   }, [locale, t]);

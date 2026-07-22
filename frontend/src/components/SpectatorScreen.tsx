@@ -143,7 +143,7 @@ function SpectatorScreen({ gameId, onExit }: SpectatorScreenProps) {
                   : 'border-neon-amber/40 text-neon-amber bg-amber-950/20'
               }`}>
                 <Zap size={12} />
-                {state.phase.toUpperCase()}
+                {state.phase === 'shop' ? t('phaseShop') : state.phase === 'battle' ? t('phaseBattle') : t('phaseResults')}
               </div>
               <span className="text-[9px] text-cyber-text-dim uppercase tracking-wider">
                 ID: {gameId.slice(0, 8)}...
@@ -197,13 +197,13 @@ function SpectatorScreen({ gameId, onExit }: SpectatorScreenProps) {
                           <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase font-bold ${
                             s.isFinished ? 'text-cyber-text-dim/40' : 'text-neon-green animate-pulse'
                           }`}>
-                            {s.isFinished ? 'DONE' : `Step ${s.step}`}
+                            {s.isFinished ? t('doneLabel') : t('stepShort', { step: s.step })}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 text-[10px] text-cyber-text-dim">
-                        <span>Flag: <span className="text-neon-amber font-bold">{s.flagHolder || '—'}</span></span>
-                        <span>POW: <span className="text-white font-bold">{s.flagPower}</span></span>
+                        <span>{t('flagBadge')}: <span className="text-neon-amber font-bold">{s.flagHolder || '—'}</span></span>
+                        <span>{t('powerLabel')}: <span className="text-white font-bold">{s.flagPower}</span></span>
                       </div>
                       {selectedSession?.label === s.label && s.log.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-cyber-border/20 max-h-[200px] overflow-y-auto space-y-1">

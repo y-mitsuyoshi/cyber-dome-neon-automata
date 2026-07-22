@@ -152,6 +152,7 @@ interface PlayerStackViewProps {
 }
 
 function StackCardThumb({ card, isFlag, neededPower }: { card: Card; isFlag: boolean; neededPower?: number }) {
+  const { t } = useTranslation();
   const [hover, setHover] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; transform: string } | null>(null);
@@ -206,12 +207,12 @@ function StackCardThumb({ card, isFlag, neededPower }: { card: Card; isFlag: boo
         <CardDisplay card={card} disabled size="sm" />
         {isFlag && (
           <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 text-[8px] font-mono font-bold text-neon-amber bg-cyber-darker border border-neon-amber/50 px-1 py-0.5 rounded-full shadow-[0_0_8px_rgba(255,191,0,0.4)] whitespace-nowrap z-20">
-            <Flag size={8} /> FLAG
+            <Flag size={8} /> {t('flagBadge')}
           </div>
         )}
         {neededPower !== undefined && neededPower > 0 && (
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center justify-center text-[9px] font-mono font-bold text-neon-red bg-cyber-darker border border-neon-red/50 px-2 py-0.5 rounded-full shadow-[0_0_8px_rgba(255,0,64,0.6)] whitespace-nowrap z-20 animate-pulse">
-            +{neededPower} power needed to capture
+            {t('needMorePow', { needed: neededPower })}
           </div>
         )}
       </div>
@@ -1128,7 +1129,7 @@ function BattleArena({
               <span className="text-neon-magenta font-bold truncate">{opponent}</span>
               {oppStack.isDefending && (
                 <span className="flex items-center gap-0.5 text-[8px] uppercase tracking-wider text-neon-amber font-bold border border-neon-amber/40 px-1 py-0.5 rounded bg-amber-950/20 animate-pulse">
-                  <Flag size={8} /> DEFENDING
+                  <Flag size={8} /> {t('defendingBadge')}
                 </span>
               )}
             </div>
@@ -1181,7 +1182,7 @@ function BattleArena({
             <div className="h-8 flex items-center justify-center text-center">
               {!isReplayFinished && flagHolder === playerName && challengerPower > 0 && (
                 <div className="flex flex-col items-center text-[10px] text-neon-magenta font-bold uppercase tracking-wider animate-pulse">
-                  <span className="text-[7px] text-cyber-text-dim">CHALLENGER</span>
+                  <span className="text-[7px] text-cyber-text-dim">{t('challengerBadge')}</span>
                   <span>POW {challengerPower}</span>
                 </div>
               )}
@@ -1197,7 +1198,7 @@ function BattleArena({
                 <Flag size={16} className={flagHolder ? 'animate-pulse' : ''} />
               </div>
               <div className="text-center">
-                <div className="text-[7px] uppercase text-cyber-text-dim tracking-widest font-bold">FLAG POWER</div>
+                <div className="text-[7px] uppercase text-cyber-text-dim tracking-widest font-bold">{t('flagPowerLabel')}</div>
                 <div className="text-sm font-black text-white leading-none">{flagPowerValue}</div>
               </div>
             </div>
@@ -1206,7 +1207,7 @@ function BattleArena({
             <div className="h-8 flex items-center justify-center text-center">
               {!isReplayFinished && flagHolder === opponent && challengerPower > 0 && (
                 <div className="flex flex-col items-center text-[10px] text-neon-cyan font-bold uppercase tracking-wider animate-pulse">
-                  <span className="text-[7px] text-cyber-text-dim">CHALLENGER</span>
+                  <span className="text-[7px] text-cyber-text-dim">{t('challengerBadge')}</span>
                   <span>POW {challengerPower}</span>
                 </div>
               )}
@@ -1238,7 +1239,7 @@ function BattleArena({
               <span className="text-neon-cyan font-bold truncate">{playerName}</span>
               {myStack.isDefending && (
                 <span className="flex items-center gap-0.5 text-[8px] uppercase tracking-wider text-neon-amber font-bold border border-neon-amber/40 px-1 py-0.5 rounded bg-amber-950/20 animate-pulse">
-                  <Flag size={8} /> DEFENDING
+                  <Flag size={8} /> {t('defendingBadge')}
                 </span>
               )}
             </div>

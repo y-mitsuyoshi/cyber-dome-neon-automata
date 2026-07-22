@@ -317,7 +317,15 @@ const uiDict: Record<Locale, Record<string, string>> = {
     spectateDesc: "Watch the arena in read-only mode.",
     spectatingSector: "SPECTATING SECTOR",
     loadingSpectator: "Linking to spectator feed...",
-    spectateError: "Failed to connect to spectator feed."
+    spectateError: "Failed to connect to spectator feed.",
+    flagBadge: "FLAG",
+    defendingBadge: "DEFENDING",
+    challengerBadge: "CHALLENGER",
+    flagPowerLabel: "FLAG POWER",
+    doneLabel: "DONE",
+    phaseShop: "SHOP",
+    phaseBattle: "BATTLE",
+    phaseResults: "RESULTS"
   },
   ja: {
     // Title Screen
@@ -612,7 +620,15 @@ const uiDict: Record<Locale, Record<string, string>> = {
     spectateDesc: "読み取り専用でアリーナを観戦します。",
     spectatingSector: "観戦中",
     loadingSpectator: "観戦フィードにリンク中...",
-    spectateError: "観戦フィードへの接続に失敗しました。"
+    spectateError: "観戦フィードへの接続に失敗しました。",
+    flagBadge: "フラグ",
+    defendingBadge: "防衛中",
+    challengerBadge: "挑戦中",
+    flagPowerLabel: "防衛パワー",
+    doneLabel: "完了",
+    phaseShop: "ショップ",
+    phaseBattle: "バトル",
+    phaseResults: "リザルト"
   }
 };
 

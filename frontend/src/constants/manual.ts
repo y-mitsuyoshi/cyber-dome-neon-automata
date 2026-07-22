@@ -1,4 +1,4 @@
-# CYBER-DOME: NEON AUTOMATA
+export const MANUAL_TEXT = `# CYBER-DOME: NEON AUTOMATA
 ## 公式システムマニュアル
 
 『CYBER-DOME: NEON AUTOMATA』へようこそ。
@@ -89,3 +89,4 @@
 4. ホストは「ADD NPC」でボットを追加することもでき、全員の準備が整ったら「START GAME」でトーナメントを開始します。
 
 電脳空間の覇権を賭け、最適なデッキビルディングと戦略で頂点を目指してください！
+`;

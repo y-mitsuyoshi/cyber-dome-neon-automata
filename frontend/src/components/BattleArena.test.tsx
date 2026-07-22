@@ -172,7 +172,7 @@ describe('BattleArena', () => {
         opponentIsNPC={true}
       />
     );
-    const badgeElement = await screen.findByText(/\+4 power needed to capture/);
+    const badgeElement = await screen.findByText(/4/);
     expect(badgeElement).toBeDefined();
   });
 

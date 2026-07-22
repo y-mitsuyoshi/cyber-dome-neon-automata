@@ -265,14 +265,18 @@ function TitleScreen({ onStartSolo, onCreateLobby, onJoinLobby, onSpectateLobby,
             onMouseEnter={() => { setHoveredManual(true); playSE('hover'); }}
             onMouseLeave={() => setHoveredManual(false)}
             className={`
-              mt-2 py-3 rounded border border-cyber-border/60
-              text-cyber-border hover:text-neon-cyan font-bold text-[10px] tracking-[0.2em] uppercase
+              mt-3 w-full py-3.5 px-4 rounded-lg border-2 border-neon-amber/80
+              text-neon-amber font-mono font-bold text-xs tracking-[0.25em] uppercase
               transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer
-              ${hoveredManual ? 'bg-neon-cyan/10 border-neon-cyan/50' : 'bg-transparent'}
+              shadow-[0_0_12px_rgba(255,191,0,0.15)]
+              ${hoveredManual
+                ? 'bg-neon-amber/20 border-neon-amber text-glow-amber scale-[1.02] shadow-[0_0_20px_rgba(255,191,0,0.4)]'
+                : 'bg-amber-950/20 hover:bg-amber-950/30'
+              }
             `}
           >
-            <BookOpen size={14} />
-            {t('viewManual')}
+            <BookOpen size={16} className={`transition-transform duration-300 ${hoveredManual ? 'scale-110 rotate-[-5deg]' : ''}`} />
+            <span>{t('viewManual')}</span>
           </button>
         </div>
 
