@@ -111,13 +111,38 @@ interface MemSlotProps {
 function MemSlot({ slot, isEmpty, topCard, imgPath, compact, isDanger, isWarning, accent, t, translateCardName }: MemSlotProps) {
   const [hover, setHover] = useState(false);
   const slotRef = useRef<HTMLDivElement>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; transform: string } | null>(null);
 
   const handleMouseEnter = useCallback(() => {
     setHover(true);
     if (slotRef.current) {
       const rect = slotRef.current.getBoundingClientRect();
-      setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+      const cardHeight = 360;
+      const cardWidth = 240;
+
+      let x = rect.left + rect.width / 2;
+      const minX = cardWidth / 2 + 16;
+      const maxX = window.innerWidth - (cardWidth / 2 + 16);
+      x = Math.max(minX, Math.min(maxX, x));
+
+      const spaceAbove = rect.top;
+      const spaceBelow = window.innerHeight - rect.bottom;
+
+      let top: number;
+      let transform: string;
+
+      if (spaceAbove >= cardHeight + 16) {
+        top = rect.top - 8;
+        transform = 'translate(-50%, -100%)';
+      } else if (spaceBelow >= cardHeight + 16) {
+        top = rect.bottom + 8;
+        transform = 'translate(-50%, 0)';
+      } else {
+        top = Math.max(16, Math.min(window.innerHeight - cardHeight - 16, rect.top));
+        transform = 'translate(-50%, 0)';
+      }
+
+      setTooltipPos({ x, y: top, transform });
     }
   }, []);
 
@@ -142,7 +167,7 @@ function MemSlot({ slot, isEmpty, topCard, imgPath, compact, isDanger, isWarning
             position: 'fixed',
             left: tooltipPos.x,
             top: tooltipPos.y,
-            transform: 'translate(-50%, -100%) translateY(-8px)',
+            transform: tooltipPos.transform,
             zIndex: 9999,
           }}
         >
@@ -193,7 +218,16 @@ function MemSlot({ slot, isEmpty, topCard, imgPath, compact, isDanger, isWarning
               src={imgPath}
               alt={slot.cardName}
               className="w-full h-full object-cover"
-              onError={(e) => { e.currentTarget.src = '/images/cards/default.png'; }}
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src.endsWith('.webp')) {
+                  target.src = target.src.replace('.webp', '.png');
+                } else {
+                  target.src = '/images/cards/default.png';
+                }
+              }}
             />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1 py-0.5">
               <div className="text-[8px] text-white font-mono leading-tight truncate text-left">

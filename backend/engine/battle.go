@@ -560,11 +560,13 @@ func (bs *BattleState) logEntry(action, side string, card *models.Card, power in
 	var logCard *models.BattleLogCard
 	if card != nil {
 		logCard = &models.BattleLogCard{
-			ID:        card.ID,
-			Name:      card.Name,
-			Power:     card.Power,
-			BasePower: card.Power,
-			Attribute: card.Attribute,
+			ID:         card.ID,
+			Name:       card.Name,
+			Power:      card.Power,
+			BasePower:  card.Power,
+			Attribute:  card.Attribute,
+			Effect:     card.Effect,
+			EffectType: card.EffectType,
 		}
 	}
 	entry := models.BattleLogEntry{

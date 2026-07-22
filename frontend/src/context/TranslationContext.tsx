@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { Card } from '../types/game';
+import { stripInstanceSuffix } from '../utils/cardImage';
 
 export type Locale = 'en' | 'ja';
 
@@ -926,22 +927,25 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // Localizes a card on-the-fly without casting as any
   const translateCard = useCallback((card: Card): LocalizedCard => {
+    // Primary card content is managed by backend (card.name, card.effect).
+    // Fall back to dictionary only if backend values are absent/empty.
+    const baseId = stripInstanceSuffix(card.id || '');
     if (locale === 'en') {
-      const enInfo = cardDictEn[card.id];
+      const enInfo = cardDictEn[baseId] || cardDictEn[card.id];
       return {
         ...card,
-        name: enInfo ? enInfo.name : card.name,
-        effect: enInfo ? enInfo.effect : card.effect,
+        name: enInfo ? enInfo.name : (card.name || card.id),
+        effect: card.effect !== undefined && card.effect !== '' ? card.effect : (enInfo ? enInfo.effect : ''),
         attribute: card.attribute,
         archetype: card.archetype || '',
         rarity: card.rarity
       };
     }
-    const jaInfo = cardDictJa[card.id];
+    const jaInfo = cardDictJa[baseId] || cardDictJa[card.id];
     return {
       ...card,
-      name: jaInfo ? jaInfo.name : card.name,
-      effect: jaInfo ? jaInfo.effect : card.effect,
+      name: card.name || (jaInfo ? jaInfo.name : card.id),
+      effect: card.effect !== undefined && card.effect !== '' ? card.effect : (jaInfo ? jaInfo.effect : ''),
       attribute: attributeJa[card.attribute] || card.attribute,
       archetype: card.archetype ? (archetypeJa[card.archetype] || card.archetype) : '',
       rarity: rarityJa[card.rarity] || card.rarity

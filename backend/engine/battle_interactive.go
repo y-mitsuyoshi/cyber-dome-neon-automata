@@ -515,6 +515,7 @@ func StepBattle(session *models.BattleSession, isP1NPC, isP2NPC bool) {
 		Power:      finalPower,
 		BasePower:  card.Power, // original power (excluding On Reveal buffs)
 		Attribute:  card.Attribute,
+		Effect:     card.Effect,
 		EffectType: card.EffectType,
 	}
 
@@ -1098,6 +1099,7 @@ func transitionToDrawPhase(session *models.BattleSession, activePlayerName, oppP
 		Power:      session.FlagPower,
 		BasePower:  winningCard.Power,
 		Attribute:  winningCard.Attribute,
+		Effect:     winningCard.Effect,
 		EffectType: winningCard.EffectType,
 	}
 
@@ -1668,6 +1670,7 @@ func convertLogCardToCard(lc *models.BattleLogCard) models.Card {
 		Name:       lc.Name,
 		Power:      lc.Power,
 		Attribute:  lc.Attribute,
+		Effect:     lc.Effect,
 		EffectType: lc.EffectType,
 	}
 }

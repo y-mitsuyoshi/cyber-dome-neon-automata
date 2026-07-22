@@ -219,8 +219,15 @@ function CardDisplay({ card, showCost = false, onClick, disabled = false, compac
           src={cardImagePath}
           alt={displayCard.name}
           className="w-full h-full object-cover"
+          loading="eager"
+          decoding="async"
           onError={(e) => {
-            e.currentTarget.src = '/images/cards/default.png';
+            const target = e.currentTarget;
+            if (target.src.endsWith('.webp')) {
+              target.src = target.src.replace('.webp', '.png');
+            } else {
+              target.src = '/images/cards/default.png';
+            }
           }}
         />
         {/* Hologram lines overlay */}

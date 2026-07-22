@@ -99,19 +99,39 @@ function hashString(s: string): number {
   return h;
 }
 
+const preloadedUrls = new Set<string>();
+
+export function preloadCardImage(url: string): void {
+  if (!url || preloadedUrls.has(url) || typeof window === 'undefined') return;
+  preloadedUrls.add(url);
+  const img = new Image();
+  img.src = url;
+}
+
+export function preloadAllCardImages(): void {
+  for (const series of IMAGE_SERIES) {
+    for (let i = 1; i <= IMAGES_PER_SERIES; i++) {
+      const numStr = String(i).padStart(3, '0');
+      preloadCardImage(`/images/cards/${series}_${numStr}.webp`);
+    }
+  }
+}
+
 export function getCardImagePath(cardId: string): string {
   const baseId = stripInstanceSuffix(cardId);
+  let fileName: string;
 
   if (STARTER_IMAGE_OVERRIDES[baseId]) {
-    return `/images/cards/${STARTER_IMAGE_OVERRIDES[baseId]}`;
+    fileName = STARTER_IMAGE_OVERRIDES[baseId];
+  } else if (EXPLICIT_IMAGE_MAP[baseId]) {
+    fileName = EXPLICIT_IMAGE_MAP[baseId];
+  } else {
+    const idx = hashString(baseId) % ALL_CARD_IMAGES.length;
+    fileName = ALL_CARD_IMAGES[idx];
   }
 
-  if (EXPLICIT_IMAGE_MAP[baseId]) {
-    return `/images/cards/${EXPLICIT_IMAGE_MAP[baseId]}`;
-  }
-
-  const idx = hashString(baseId) % ALL_CARD_IMAGES.length;
-  return `/images/cards/${ALL_CARD_IMAGES[idx]}`;
+  const webpFileName = fileName.replace(/\.png$/, '.webp');
+  return `/images/cards/${webpFileName}`;
 }
 
 export function stripInstanceSuffix(cardId: string): string {

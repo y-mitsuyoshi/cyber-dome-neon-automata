@@ -119,6 +119,7 @@ type BattleLogCard struct {
 	Power      int    `json:"power"`
 	BasePower  int    `json:"basePower,omitempty"`
 	Attribute  string `json:"attribute"`
+	Effect     string `json:"effect,omitempty"`
 	EffectType string `json:"effectType,omitempty"`
 }
 

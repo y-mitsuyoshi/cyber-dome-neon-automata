@@ -11,6 +11,7 @@ import SpectatorScreen from './components/SpectatorScreen';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useTranslation } from './context/TranslationContext';
 import { useAudio } from './context/AudioContext';
+import { preloadAllCardImages } from './utils/cardImage';
 import {
   createNewGame,
   getGameState,
@@ -30,6 +31,39 @@ import {
 } from './api/client';
 
 type Screen = 'title' | 'lobby' | 'game' | 'spectate';
+
+const SESSION_KEY = 'cyber_dome_session';
+
+interface SavedSession {
+  screen: Screen;
+  playerName: string;
+  lobbyCode: string | null;
+  gameId: string | null;
+  spectatorCode: string | null;
+  spectatorName: string | null;
+}
+
+function loadSavedSession(): SavedSession | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SavedSession;
+  } catch {
+    return null;
+  }
+}
+
+function saveSessionState(session: SavedSession | null) {
+  try {
+    if (!session || session.screen === 'title') {
+      sessionStorage.removeItem(SESSION_KEY);
+    } else {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    }
+  } catch {
+    // Ignore quota errors
+  }
+}
 
 function App() {
   const { isMuted, toggleMute, playBGM, playSE } = useAudio();
@@ -51,6 +85,60 @@ function App() {
   const [holdBattleView, setHoldBattleView] = useState<boolean>(false);
 
   const { locale, setLocale, t } = useTranslation();
+
+  // Spectator mode state
+  const [spectatorCode, setSpectatorCode] = useState<string | null>(null);
+  const [spectatorName, setSpectatorName] = useState<string>('SPECTATOR');
+  const [spectatorGameId, setSpectatorGameId] = useState<string | null>(null);
+
+  // Preload card images & restore session on initial mount
+  const restoredSessionRef = useRef(false);
+  useEffect(() => {
+    preloadAllCardImages();
+
+    if (!restoredSessionRef.current) {
+      restoredSessionRef.current = true;
+      const saved = loadSavedSession();
+      if (saved) {
+        if (saved.screen === 'game' && saved.gameId && saved.playerName) {
+          setLoading(true);
+          getGameState(saved.gameId, saved.playerName)
+            .then(state => {
+              setGameState(state);
+              setPlayerName(saved.playerName);
+              if (saved.lobbyCode) setLobbyCode(saved.lobbyCode);
+              setScreen('game');
+            })
+            .catch(() => {
+              saveSessionState(null);
+              setScreen('title');
+            })
+            .finally(() => setLoading(false));
+        } else if (saved.screen === 'lobby' && saved.lobbyCode && saved.playerName) {
+          setPlayerName(saved.playerName);
+          setLobbyCode(saved.lobbyCode);
+          setScreen('lobby');
+        } else if (saved.screen === 'spectate' && saved.spectatorCode) {
+          setSpectatorCode(saved.spectatorCode);
+          setSpectatorName(saved.spectatorName || 'SPECTATOR');
+          setScreen('spectate');
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Save active session state to sessionStorage
+  useEffect(() => {
+    saveSessionState({
+      screen,
+      playerName,
+      lobbyCode,
+      gameId: gameState?.gameId || null,
+      spectatorCode,
+      spectatorName,
+    });
+  }, [screen, playerName, lobbyCode, gameState?.gameId, spectatorCode, spectatorName]);
 
   // Error alert sound effect — fire once per new error string
   const errorSoundGuard = useRef(false);
@@ -83,11 +171,6 @@ function App() {
   }, [screen, gameState?.phase, gameState?.currentRound, gameState?.maxRounds, playBGM, playSE]);
 
   // WebSocket Hook
-  // Spectator mode state
-  const [spectatorCode, setSpectatorCode] = useState<string | null>(null);
-  const [spectatorName, setSpectatorName] = useState<string>('SPECTATOR');
-  const [spectatorGameId, setSpectatorGameId] = useState<string | null>(null);
-
   const isSpectator = screen === 'spectate';
   const wsCode = isSpectator ? spectatorCode : lobbyCode;
   const wsName = isSpectator ? spectatorName : (lobbyCode ? playerName : null);
@@ -114,6 +197,7 @@ function App() {
       setScreen('spectate');
       resetGameId();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsGameId, isSpectator, resetGameId]);
 
   // WS Kicked Redirection Listener
@@ -475,6 +559,7 @@ function App() {
 
   const handleRestart = () => {
     playSE('click');
+    saveSessionState(null);
     setScreen('title');
     setLobbyCode(null);
     setGameState(null);

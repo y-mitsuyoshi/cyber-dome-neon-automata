@@ -126,4 +126,28 @@ describe('App Integration', () => {
       expect(spyCreateNewGame).toHaveBeenCalled();
     });
   });
+
+  it('restores game state from sessionStorage on mount', async () => {
+    const spyGetGameState = vi.spyOn(clientApi, 'getGameState').mockResolvedValue({
+      ...mockGameState,
+      phase: 'shop',
+    });
+
+    sessionStorage.setItem('cyber_dome_session', JSON.stringify({
+      screen: 'game',
+      playerName: 'RESTORED_PLAYER',
+      lobbyCode: null,
+      gameId: 'restored_game_123',
+      spectatorCode: null,
+      spectatorName: null,
+    }));
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(spyGetGameState).toHaveBeenCalledWith('restored_game_123', 'RESTORED_PLAYER');
+    });
+
+    sessionStorage.clear();
+  });
 });

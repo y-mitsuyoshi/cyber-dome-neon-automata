@@ -18,6 +18,7 @@ export interface BattleLogCard {
   power: number;
   basePower?: number;
   attribute: string;
+  effect?: string;
   effectType?: string;
 }
 

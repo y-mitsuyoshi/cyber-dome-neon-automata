@@ -23,6 +23,8 @@ const convertToFullCard = (logCard: BattleLogCard | Card | null | undefined): Ca
     };
   }
 
+  const baseEffect = 'effect' in logCard && typeof logCard.effect === 'string' ? logCard.effect : '';
+
   return {
     id: logCard.id || 'default',
     name: logCard.name,
@@ -30,7 +32,7 @@ const convertToFullCard = (logCard: BattleLogCard | Card | null | undefined): Ca
     archetype: 'Control',
     power: logCard.power,
     rarity: 'Common',
-    effect: 'effect' in logCard ? logCard.effect : '',
+    effect: baseEffect,
     effectType: logCard.effectType || '',
     cost: 0,
   };
@@ -152,13 +154,38 @@ interface PlayerStackViewProps {
 function StackCardThumb({ card, isFlag, neededPower }: { card: Card; isFlag: boolean; neededPower?: number }) {
   const [hover, setHover] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; transform: string } | null>(null);
 
   const handleMouseEnter = useCallback(() => {
     setHover(true);
     if (thumbRef.current) {
       const rect = thumbRef.current.getBoundingClientRect();
-      setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+      const cardHeight = 360;
+      const cardWidth = 240;
+
+      let x = rect.left + rect.width / 2;
+      const minX = cardWidth / 2 + 16;
+      const maxX = window.innerWidth - (cardWidth / 2 + 16);
+      x = Math.max(minX, Math.min(maxX, x));
+
+      const spaceAbove = rect.top;
+      const spaceBelow = window.innerHeight - rect.bottom;
+
+      let top: number;
+      let transform: string;
+
+      if (spaceAbove >= cardHeight + 16) {
+        top = rect.top - 8;
+        transform = 'translate(-50%, -100%)';
+      } else if (spaceBelow >= cardHeight + 16) {
+        top = rect.bottom + 8;
+        transform = 'translate(-50%, 0)';
+      } else {
+        top = Math.max(16, Math.min(window.innerHeight - cardHeight - 16, rect.top));
+        transform = 'translate(-50%, 0)';
+      }
+
+      setTooltipPos({ x, y: top, transform });
     }
   }, []);
 
@@ -207,7 +234,7 @@ function StackCardThumb({ card, isFlag, neededPower }: { card: Card; isFlag: boo
             position: 'fixed',
             left: tooltipPos.x,
             top: tooltipPos.y,
-            transform: 'translate(-50%, -100%) translateY(-8px)',
+            transform: tooltipPos.transform,
             zIndex: 9999,
           }}
         >
@@ -662,10 +689,13 @@ function BattleArena({
   // mapLiveMemSlots (with images).
   const buildLiveMemSlots = useCallback(
     (liveSlots: MemorySlot[] | undefined, historicalStrings: string[] | undefined | null): MemorySlot[] => {
-      const live = mapLiveMemSlots(liveSlots);
-      if (!historicalStrings || historicalStrings.length === 0) {
-        return live;
+      if (!historicalStrings) {
+        return mapLiveMemSlots(liveSlots);
       }
+      if (historicalStrings.length === 0) {
+        return [];
+      }
+      const live = mapLiveMemSlots(liveSlots);
       // Parse the historical snapshot into a map of cardName -> count
       const histMap = new Map<string, number>();
       for (const slotStr of historicalStrings) {
