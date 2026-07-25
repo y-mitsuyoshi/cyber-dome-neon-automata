@@ -9,13 +9,13 @@ describe('cardImage utils', () => {
   });
 
   it('getCardImagePath returns webp image paths', () => {
-    expect(getCardImagePath('starter_scout_1a')).toBe('/images/cards/nr_001.webp');
-    expect(getCardImagePath('a_jester')).toBe('/images/cards/virus_001.webp');
-    expect(getCardImagePath('b_knight')).toBe('/images/cards/ai_006.webp');
+    expect(getCardImagePath('starter_scout_1a')).toBe('/images/cards/starter_scout_1.webp');
+    expect(getCardImagePath('a_jester')).toBe('/images/cards/a_jester.webp');
+    expect(getCardImagePath('b_knight')).toBe('/images/cards/b_knight.webp');
   });
 
   it('preloadCardImage and preloadAllCardImages run without error', () => {
-    expect(() => preloadCardImage('/images/cards/virus_001.webp')).not.toThrow();
+    expect(() => preloadCardImage('/images/cards/a_jester.webp')).not.toThrow();
     expect(() => preloadAllCardImages()).not.toThrow();
   });
 });
